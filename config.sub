@@ -279,6 +279,7 @@ case $basic_machine in
 	| pdp10 | pdp11 | pj | pjl \
 	| powerpc | powerpc64 | powerpc64le | powerpcle | ppcbe \
 	| pyramid \
+	| qdsp6 \
 	| score \
 	| sh | sh[1234] | sh[24]a | sh[24]aeb | sh[23]e | sh[34]eb | sheb | shbe | shle | sh[1234]le | sh3ele \
 	| sh64 | sh64le \
@@ -1431,6 +1432,9 @@ else
 # system, and we'll never get to this point.
 
 case $basic_machine in
+	qdsp6-*)
+		os=-elf
+		;;
         score-*)
 		os=-elf
 		;;

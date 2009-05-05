@@ -1916,6 +1916,23 @@ powerpc-xilinx-eabi*)
   	extra_options="${extra_options} rs6000/sysv4.opt"
   	tmake_file="rs6000/t-fprules rs6000/t-fprules-fpbit rs6000/t-ppcgas rs6000/t-ppccomm"
   	;;
+qdsp6-*-elf*) 
+	if test x$with_dinkumware = xyes ; then 
+		tm_file="${tm_file} dbxelf.h elfos.h svr4.h qdsp6/elf.h qdsp6/dinkumware.h" 
+	else 
+		tm_file="${tm_file} dbxelf.h elfos.h svr4.h qdsp6/elf.h qdsp6/newlib.h" 
+	fi 
+	tmake_file="${tmake_file} qdsp6/t-qdsp6 qdsp6/t-elf" 
+	extra_parts="crti.o crtn.o crtbegin.o crtend.o" 
+	need_64bit_hwint=yes 
+	default_use_cxa_atexit=no 
+	;; 
+qdsp6-*-linux*) 
+	tm_file="${tm_file} dbxelf.h elfos.h qdsp6/elf.h linux.h qdsp6/linux.h" 
+	tmake_file="${tmake_file} qdsp6/t-qdsp6 qdsp6/t-linux" 
+	extra_parts="crtbegin.o crtbeginT.o crtend.o" 
+	need_64bit_hwint=yes 
+	;; 
 rs6000-ibm-aix4.[12]* | powerpc-ibm-aix4.[12]*)
 	tm_file="${tm_file} rs6000/aix.h rs6000/aix41.h rs6000/xcoff.h"
 	tmake_file="rs6000/t-fprules rs6000/t-fprules-fpbit rs6000/t-newas"

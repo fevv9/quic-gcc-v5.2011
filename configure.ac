@@ -820,6 +820,15 @@ case "${target}" in
   powerpc-*-eabi* | powerpcle-*-eabi* | powerpc-*-rtems* )
     libgloss_dir=rs6000
     ;;
+  qdsp6-*-elf*) 
+    noconfigdirs="$noconfigdirs ${libgcj} gdb" 
+    if test x$with_dinkumware = xyes ; then 
+    skipdirs="$skipdirs target-libiberty target-libgcc target-libstdc++-v3" 
+    fi 
+    ;; 
+  qdsp6-*-linux*) 
+    noconfigdirs="$noconfigdirs ${libgcj} target-newlib target-libgloss target-libiberty gdb" 
+    ;; 
   rs6000-*-lynxos*)
     noconfigdirs="$noconfigdirs target-newlib gprof ${libgcj}"
     ;;

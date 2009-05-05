@@ -1252,6 +1252,10 @@ do {						\
 #define LABEL_PRESERVE_P(RTX)						\
   (RTL_FLAG_CHECK2("LABEL_PRESERVE_P", (RTX), CODE_LABEL, NOTE)->in_struct)
 
+/* 1 if RTX is a code_label that is a target for a loop jump.  */
+#define LABEL_START_LOOP(RTX)                                           \
+  (RTL_FLAG_CHECK2("LABEL_START_LOOP", (RTX), CODE_LABEL, NOTE)->return_val)
+
 /* During sched, 1 if RTX is an insn that must be scheduled together
    with the preceding insn.  */
 #define SCHED_GROUP_P(RTX)						\

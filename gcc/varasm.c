@@ -915,7 +915,7 @@ default_no_function_rodata_section (tree decl ATTRIBUTE_UNUSED)
 
 /* Return the section to use for string merging.  */
 
-static section *
+section *
 mergeable_string_section (tree decl ATTRIBUTE_UNUSED,
 			  unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED,
 			  unsigned int flags ATTRIBUTE_UNUSED)
