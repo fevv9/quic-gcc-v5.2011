@@ -157,6 +157,8 @@ struct cost_pair
 			   the new bound to compare with.  */
 };
 
+#define CP_AUTOINC_OFFSET(CP) ((int) (size_t) (CP)->value)
+
 /* Use.  */
 struct iv_use
 {
@@ -270,6 +272,10 @@ struct iv_ca
   /* Number of times each candidate is used.  */
   unsigned *n_cand_uses;
 
+  /* For each candidate, the total offset of all autoincrements applied
+     to it.  */
+  int *cand_autoinc_distance;
+  
   /* The candidates used.  */
   bitmap cands;
 
@@ -776,7 +782,8 @@ determine_base_object (tree expr)
   /* If this is a pointer casted to any type, we need to determine
      the base object for the pointer; so handle conversions before
      throwing away non-pointer expressions.  */
-  if (CONVERT_EXPR_P (expr))
+if (TREE_CODE (expr) == NOP_EXPR
+      || TREE_CODE (expr) == CONVERT_EXPR)
     return determine_base_object (TREE_OPERAND (expr, 0));
 
   if (!POINTER_TYPE_P (TREE_TYPE (expr)))
@@ -921,12 +928,12 @@ find_bivs (struct ivopts_data *data)
       type = TREE_TYPE (PHI_RESULT (phi));
       base = fold_convert (type, base);
       if (step)
-	{
+      /* {
 	  if (POINTER_TYPE_P (type))
 	    step = fold_convert (sizetype, step);
-	  else
+	  else*/ 
 	    step = fold_convert (type, step);
-	}
+      //}
 
       set_iv (data, PHI_RESULT (phi), base, step);
       found = true;
@@ -1085,6 +1092,8 @@ record_use (struct ivopts_data *data, tree *use_p, struct iv *iv,
 {
   struct iv_use *use = XCNEW (struct iv_use);
 
+  /* _Beware, for compare use_p is junk, and original condition needs to be recreated 
+     from stmt when needed */ 
   use->id = n_iv_uses (data);
   use->type = use_type;
   use->iv = iv;
@@ -1169,7 +1178,6 @@ find_interesting_uses_op (struct ivopts_data *data, tree op)
   stmt = SSA_NAME_DEF_STMT (op);
   gcc_assert (gimple_code (stmt) == GIMPLE_PHI
 	      || is_gimple_assign (stmt));
-
   use = record_use (data, NULL, civ, stmt, USE_NONLINEAR_EXPR);
   iv->use_id = use->id;
 
@@ -1245,7 +1253,7 @@ end:
    records it.  */
 
 static void
-find_interesting_uses_cond (struct ivopts_data *data, gimple stmt)
+find_interesting_uses_cond (struct ivopts_data *data, gimple stmt, tree *cond_p)
 {
   tree *var_p, *bound_p;
   struct iv *var_iv, *civ;
@@ -1256,10 +1264,10 @@ find_interesting_uses_cond (struct ivopts_data *data, gimple stmt)
       find_interesting_uses_op (data, *bound_p);
       return;
     }
-
+	
   civ = XNEW (struct iv);
   *civ = *var_iv;
-  record_use (data, NULL, civ, stmt, USE_COMPARE);
+  record_use (data, cond_p, civ, stmt, USE_COMPARE);
 }
 
 /* Returns true if expression EXPR is obviously invariant in LOOP,
@@ -1360,9 +1368,9 @@ idx_find_step (tree base, tree *idx, void *data)
     {
       /* Moreover, for a range, the size needs to be invariant as well.  */
       if (TREE_CODE (base) == ARRAY_RANGE_REF
-	  && !expr_invariant_in_loop_p (loop, TYPE_SIZE (TREE_TYPE (base))))
+	  && !expr_invariant_in_loop_p (loop, TYPE_SIZE (TREE_TYPE (base)))){
 	return false;
-
+}
       step = array_ref_element_size (base);
       lbound = array_ref_low_bound (base);
 
@@ -1537,7 +1545,6 @@ may_be_unaligned_p (tree ref, tree step)
       if (!constant_multiple_of (step, al, &mul))
 	return true;
     }
-
   return false;
 }
 
@@ -1683,6 +1690,7 @@ find_interesting_uses_address (struct ivopts_data *data, gimple stmt, tree *op_p
   return;
 
 fail:
+
   for_each_index (op_p, idx_record_use, data);
 }
 
@@ -1712,12 +1720,13 @@ find_interesting_uses_stmt (struct ivopts_data *data, gimple stmt)
   ssa_op_iter iter;
   use_operand_p use_p;
   enum tree_code code;
+  tree cond;
 
   find_invariants_stmt (data, stmt);
 
   if (gimple_code (stmt) == GIMPLE_COND)
-    {
-      find_interesting_uses_cond (data, stmt);
+    { /* Since I cannot extract it any more, I will create it later */ 
+      find_interesting_uses_cond (data, stmt, NULL); //&cond);
       return;
     }
 
@@ -1753,7 +1762,7 @@ find_interesting_uses_stmt (struct ivopts_data *data, gimple stmt)
 	}
       else if (TREE_CODE_CLASS (code) == tcc_comparison)
 	{
-	  find_interesting_uses_cond (data, stmt);
+	  find_interesting_uses_cond (data, stmt, NULL); //&cond); //rhs);
 	  return;
 	}
 
@@ -1788,6 +1797,7 @@ find_interesting_uses_stmt (struct ivopts_data *data, gimple stmt)
 
       find_interesting_uses_op (data, op);
     }
+
 }
 
 /* Finds interesting uses of induction variables outside of loops
@@ -1860,7 +1870,6 @@ find_interesting_uses (struct ivopts_data *data)
 
       fprintf (dump_file, "\n");
     }
-
   free (body);
 }
 
@@ -2993,20 +3002,23 @@ multiplier_allowed_in_address_p (HOST_WIDE_INT ratio, enum machine_mode mode)
    variable is omitted.  Compute the cost for a memory reference that accesses
    a memory location of mode MEM_MODE.
 
+ MAY_AUTOINC is set to true if the autoincrement (increasing index by
+    size of MEM_MODE / RATIO) is available.
    TODO -- there must be some better way.  This all is quite crude.  */
 
 static comp_cost
 get_address_cost (bool symbol_present, bool var_present,
 		  unsigned HOST_WIDE_INT offset, HOST_WIDE_INT ratio,
 		  enum machine_mode mem_mode,
-		  bool speed)
+		  bool speed,bool *may_autoinc)
 {
   static bool initialized[MAX_MACHINE_MODE];
   static HOST_WIDE_INT rat[MAX_MACHINE_MODE], off[MAX_MACHINE_MODE];
   static HOST_WIDE_INT min_offset[MAX_MACHINE_MODE], max_offset[MAX_MACHINE_MODE];
   static unsigned costs[MAX_MACHINE_MODE][2][2][2][2];
+  static bool has_autoinc[MAX_MACHINE_MODE][2][2][2][2];	
   unsigned cost, acost, complexity;
-  bool offset_p, ratio_p;
+  bool offset_p, ratio_p, autoinc;
   HOST_WIDE_INT s_offset;
   unsigned HOST_WIDE_INT mask;
   unsigned bits;
@@ -3016,7 +3028,7 @@ get_address_cost (bool symbol_present, bool var_present,
       HOST_WIDE_INT i;
       HOST_WIDE_INT start = BIGGEST_ALIGNMENT / BITS_PER_UNIT;
       int old_cse_not_expected;
-      unsigned sym_p, var_p, off_p, rat_p, add_c;
+      unsigned sym_p, var_p, off_p, rat_p, add_c, ainc_p;
       rtx seq, addr, base;
       rtx reg0, reg1;
 
@@ -3066,14 +3078,21 @@ get_address_cost (bool symbol_present, bool var_present,
       reg0 = gen_raw_REG (Pmode, LAST_VIRTUAL_REGISTER + 1);
       reg1 = gen_raw_REG (Pmode, LAST_VIRTUAL_REGISTER + 2);
 
-      for (i = 0; i < 16; i++)
+      for (i = 0; i < 32; i++)
 	{
 	  sym_p = i & 1;
 	  var_p = (i >> 1) & 1;
 	  off_p = (i >> 2) & 1;
 	  rat_p = (i >> 3) & 1;
+	  ainc_p = (i >> 4) & 1;
 
 	  addr = reg0;
+	  if (ainc_p)
+	    {
+	      if (!HAVE_POST_INCREMENT)
+		continue;
+	      addr = gen_rtx_POST_INC (Pmode, addr);
+	    }
 	  if (rat_p)
 	    addr = gen_rtx_fmt_ee (MULT, Pmode, addr,
 				   gen_int_mode (rat[mem_mode], Pmode));
@@ -3105,6 +3124,14 @@ get_address_cost (bool symbol_present, bool var_present,
 	  if (base)
 	    addr = gen_rtx_fmt_ee (PLUS, Pmode, addr, base);
   
+	  /* Try detecting presence of autoincrement instructions.  */
+	  if (ainc_p)
+	    {
+	      has_autoinc[mem_mode][sym_p][var_p][off_p][rat_p]
+		      = memory_address_p (mem_mode, addr);
+	      continue;
+	    }
+
 	  start_sequence ();
 	  /* To avoid splitting addressing modes, pretend that no cse will
 	     follow.  */
@@ -3172,7 +3199,9 @@ get_address_cost (bool symbol_present, bool var_present,
 		fprintf (dump_file, "rat * ");
 
 	      acost = costs[mem_mode][sym_p][var_p][off_p][rat_p];
-	      fprintf (dump_file, "index costs %d\n", acost);
+	      autoinc = has_autoinc[mem_mode][sym_p][var_p][off_p][rat_p];
+	      fprintf (dump_file, "index costs %d%s\n", acost,
+		       autoinc ? " (may include autoinc/dec)" : "");
 	    }
 	  fprintf (dump_file, "\n");
 	}
@@ -3184,6 +3213,8 @@ get_address_cost (bool symbol_present, bool var_present,
   if ((offset >> (bits - 1) & 1))
     offset |= ~mask;
   s_offset = offset;
+  
+  autoinc = has_autoinc[mem_mode][symbol_present][var_present][offset != 0][ratio != 1];
 
   cost = 0;
   offset_p = (s_offset != 0
@@ -3193,13 +3224,23 @@ get_address_cost (bool symbol_present, bool var_present,
 	     && multiplier_allowed_in_address_p (ratio, mem_mode));
 
   if (ratio != 1 && !ratio_p)
+    {
     cost += multiply_by_cost (ratio, Pmode, speed);
+      /* If we have to do the multiplication of index separately, we cannot
+	 use autoincrement.  */
+      autoinc = false;
+    }
 
   if (s_offset && !offset_p && !symbol_present)
+    {
     cost += add_cost (Pmode, speed);
+      autoinc = false;
+    }
 
+  if (may_autoinc)    *may_autoinc = autoinc;
   acost = costs[mem_mode][symbol_present][var_present][offset_p][ratio_p];
   complexity = (symbol_present != 0) + (var_present != 0) + offset_p + ratio_p;
+  
   return new_cost (cost + acost, complexity);
 }
 
@@ -3493,29 +3534,71 @@ difference_cost (struct ivopts_data *data,
   return cost;
 }
 
+ /* Returns the offset by that CAND will be incremented in a postincrement,
+    when it is used (after multiplication by RATIO) to access a memory
+   location whose mode is MMODE.  Zero is returned if using autoincrement
+    is not possible.  */
+ 
+ static int
+ autoincrement_distance (struct iv_cand *cand, HOST_WIDE_INT ratio,
+ 			enum machine_mode mmode)
+ {
+   HOST_WIDE_INT step, delta, size;
+   bool negate = false;
+ 
+   if (!cst_and_fits_in_hwi (cand->iv->step))
+     return 0;
+   step = int_cst_value (cand->iv->step);
+ 
+   if (step < 0)
+     {
+       if (!HAVE_POST_DECREMENT)
+ 	return 0;
+ 
+       step = -step;
+       negate = true;
+     }
+ 
+   size = GET_MODE_SIZE (mmode);
+   
+   if (size % ratio != 0)
+     return 0;
+ 
+   delta = size / ratio;
+   if (delta > step)
+     return 0;
+ 
+   return negate ? -delta : delta;
+ }
+ 
 /* Determines the cost of the computation by that USE is expressed
    from induction variable CAND.  If ADDRESS_P is true, we just need
    to create an address from it, otherwise we want to get it into
    register.  A set of invariants we depend on is stored in
-   DEPENDS_ON.  AT is the statement at that the value is computed.  */
+   DEPENDS_ON.  AT is the statement at that the value is computed.   
+    If autoincrement of CAND can be used in the computation,
+   AUTOINC_DISTANCE is set to the amount by that it can be incremented.*/
 
 static comp_cost
 get_computation_cost_at (struct ivopts_data *data,
 			 struct iv_use *use, struct iv_cand *cand,
-			 bool address_p, bitmap *depends_on, gimple at)
+			 bool address_p, bitmap *depends_on, gimple at,
+			 int *autoinc_distance)	
 {
   tree ubase = use->iv->base, ustep = use->iv->step;
   tree cbase, cstep;
   tree utype = TREE_TYPE (ubase), ctype;
   unsigned HOST_WIDE_INT cstepi, offset = 0;
   HOST_WIDE_INT ratio, aratio;
-  bool var_present, symbol_present;
+  bool var_present, symbol_present,autoinc=0;
   comp_cost cost;
   unsigned n_sums;
   double_int rat;
   bool speed = optimize_bb_for_speed_p (gimple_bb (at));
 
   *depends_on = NULL;
+  if (autoinc_distance)
+      *autoinc_distance = 0;
 
   /* Only consider real candidates.  */
   if (!cand->iv)
@@ -3610,11 +3693,21 @@ get_computation_cost_at (struct ivopts_data *data,
   /* Now the computation is in shape symbol + var1 + const + ratio * var2.
      (symbol/var/const parts may be omitted).  If we are looking for an address,
      find the cost of addressing this.  */
-  if (address_p)
-    return add_costs (cost, get_address_cost (symbol_present, var_present,
-				offset, ratio,
-				TYPE_MODE (TREE_TYPE (*use->op_p)), speed));
-
+  if (address_p){
+  
+    enum machine_mode mmode; 
+  
+    /*  Since I cannot extract it any more, I will create it... */
+    if (gimple_code (use->stmt) == GIMPLE_COND) 
+	   mmode = TYPE_MODE (TREE_TYPE (build2 (gimple_cond_code (use->stmt), 
+		boolean_type_node,gimple_cond_lhs (use->stmt), gimple_cond_rhs (use->stmt))));
+    else mmode = TYPE_MODE (TREE_TYPE (*use->op_p));
+       cost = add_costs (cost,get_address_cost (symbol_present, var_present, offset, ratio,mmode, speed, &autoinc));
+  
+       if (autoinc && autoinc_distance) 	*autoinc_distance = autoincrement_distance (cand, ratio, mmode);
+  
+       return cost;
+     }
   /* Otherwise estimate the costs for computing the expression.  */
   aratio = ratio > 0 ? ratio : -ratio;
   if (!symbol_present && !var_present && !offset)
@@ -3666,10 +3759,11 @@ fallback:
 static comp_cost
 get_computation_cost (struct ivopts_data *data,
 		      struct iv_use *use, struct iv_cand *cand,
-		      bool address_p, bitmap *depends_on)
+		      bool address_p, bitmap *depends_on,
+		      int *autoinc_distance)
 {
   return get_computation_cost_at (data,
-				  use, cand, address_p, depends_on, use->stmt);
+				  use, cand, address_p, depends_on, use->stmt,autoinc_distance);
 }
 
 /* Determines cost of basing replacement of USE on CAND in a generic
@@ -3693,7 +3787,7 @@ determine_use_iv_cost_generic (struct ivopts_data *data,
       return true;
     }
 
-  cost = get_computation_cost (data, use, cand, false, &depends_on);
+  cost = get_computation_cost (data, use, cand, false, &depends_on, NULL);
   set_use_iv_cost (data, use, cand, cost, depends_on, NULL_TREE);
 
   return !infinite_cost_p (cost);
@@ -3706,9 +3800,12 @@ determine_use_iv_cost_address (struct ivopts_data *data,
 			       struct iv_use *use, struct iv_cand *cand)
 {
   bitmap depends_on;
-  comp_cost cost = get_computation_cost (data, use, cand, true, &depends_on);
+  int autoinc_distance;
+  comp_cost cost = get_computation_cost (data, use, cand, true, &depends_on,
+						&autoinc_distance);
 
-  set_use_iv_cost (data, use, cand, cost, depends_on, NULL_TREE);
+  set_use_iv_cost (data, use, cand, cost, depends_on, 
+			(tree) (size_t) autoinc_distance);
 
   return !infinite_cost_p (cost);
 }
@@ -3887,7 +3984,7 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
   gcc_assert (ok);
 
   express_cost = get_computation_cost (data, use, cand, false,
-				       &depends_on_express);
+				       &depends_on_express, NULL);
   fd_ivopts_data = data;
   walk_tree (&cmp_iv->base, find_depends, &depends_on_express, NULL);
 
@@ -4229,6 +4326,41 @@ iv_ca_set_remove_invariants (struct iv_ca *ivs, bitmap invs)
     }
 }
 
+/* Returns true if the candidate CAND is autoincremented according to
+   iv usage assignment IVS.  */
+
+static bool
+cand_autoincremented_p (struct iv_ca *ivs, struct iv_cand *cand)
+{
+
+  if (!cst_and_fits_in_hwi (cand->iv->step))
+    return false;
+  /* TODO: this misses the cases where only some of the memory references
+     expressed by CAND are used for the autoincrements.  */
+  return (int_cst_value (cand->iv->step)
+	  == ivs->cand_autoinc_distance[cand->id]);
+}
+
+/* Adds (if ADD is true) or removes (if ADD is false) a bonus for using
+   autoincrements to express candidate CAND to costs in IVS.  */
+
+static void
+recompute_autoinc_bonus (struct ivopts_data *data,struct iv_ca *ivs, struct iv_cand *cand, bool add)
+{
+  unsigned bonus;
+
+  if (!cand_autoincremented_p (ivs, cand))
+    return;
+
+  /* If the candidate is autoincremented, we do not need to count its increment
+     cost.  */
+  bonus = add_cost (TYPE_MODE (TREE_TYPE (cand->iv->base)), data->speed);
+  if (add)
+    ivs->cand_cost -= bonus;
+  else
+    ivs->cand_cost += bonus;
+}
+
 /* Set USE not to be expressed by any candidate in IVS.  */
 
 static void
@@ -4246,6 +4378,12 @@ iv_ca_set_no_cp (struct ivopts_data *data, struct iv_ca *ivs,
   ivs->bad_uses++;
   ivs->cand_for_use[uid] = NULL;
   ivs->n_cand_uses[cid]--;
+  if (use->type == USE_ADDRESS)
+    {
+      recompute_autoinc_bonus (data,ivs, cp->cand, false);
+      ivs->cand_autoinc_distance[cid] -= CP_AUTOINC_OFFSET (cp);
+      recompute_autoinc_bonus (data,ivs, cp->cand, true);
+    }
 
   if (ivs->n_cand_uses[cid] == 0)
     {
@@ -4255,12 +4393,10 @@ iv_ca_set_no_cp (struct ivopts_data *data, struct iv_ca *ivs,
 	ivs->n_regs--;
       ivs->n_cands--;
       ivs->cand_cost -= cp->cand->cost;
-
       iv_ca_set_remove_invariants (ivs, cp->cand->depends_on);
     }
 
   ivs->cand_use_cost = sub_costs (ivs->cand_use_cost, cp->cost);
-
   iv_ca_set_remove_invariants (ivs, cp->depends_on);
   iv_ca_recount_cost (data, ivs);
 }
@@ -4300,6 +4436,7 @@ iv_ca_set_cp (struct ivopts_data *data, struct iv_ca *ivs,
 
   if (cp)
     {
+	
       cid = cp->cand->id;
 
       ivs->bad_uses--;
@@ -4313,8 +4450,14 @@ iv_ca_set_cp (struct ivopts_data *data, struct iv_ca *ivs,
 	    ivs->n_regs++;
 	  ivs->n_cands++;
 	  ivs->cand_cost += cp->cand->cost;
-
 	  iv_ca_set_add_invariants (ivs, cp->cand->depends_on);
+	}
+
+      if (use->type == USE_ADDRESS)
+	{
+	  recompute_autoinc_bonus (data,ivs, cp->cand, false);
+	  ivs->cand_autoinc_distance[cid] += CP_AUTOINC_OFFSET (cp);
+	  recompute_autoinc_bonus (data,ivs, cp->cand, true);
 	}
 
       ivs->cand_use_cost = add_costs (ivs->cand_use_cost, cp->cost);
@@ -4349,7 +4492,6 @@ iv_ca_add_use (struct ivopts_data *data, struct iv_ca *ivs,
       if (cheaper_cost_pair (cp, best_cp))
 	best_cp = cp;
     }
-
   iv_ca_set_cp (data, ivs, use, best_cp);
 }
 
@@ -4477,6 +4619,7 @@ iv_ca_delta_commit (struct ivopts_data *data, struct iv_ca *ivs,
 
   if (!forward)
     iv_ca_delta_reverse (delta);
+
 }
 
 /* Returns true if CAND is used in IVS.  */
@@ -4522,6 +4665,7 @@ iv_ca_new (struct ivopts_data *data)
   nw->bad_uses = 0;
   nw->cand_for_use = XCNEWVEC (struct cost_pair *, n_iv_uses (data));
   nw->n_cand_uses = XCNEWVEC (unsigned, n_iv_cands (data));
+  nw->cand_autoinc_distance = XCNEWVEC (int, n_iv_cands (data));
   nw->cands = BITMAP_ALLOC (NULL);
   nw->n_cands = 0;
   nw->n_regs = 0;
@@ -4540,6 +4684,7 @@ iv_ca_free (struct iv_ca **ivs)
 {
   free ((*ivs)->cand_for_use);
   free ((*ivs)->n_cand_uses);
+  free ((*ivs)->cand_autoinc_distance);
   BITMAP_FREE ((*ivs)->cands);
   free ((*ivs)->n_invariant_uses);
   free (*ivs);
@@ -4554,9 +4699,18 @@ iv_ca_dump (struct ivopts_data *data, FILE *file, struct iv_ca *ivs)
   const char *pref = "  invariants ";
   unsigned i;
   comp_cost cost = iv_ca_cost (ivs);
+  struct iv_cand *cand;
 
   fprintf (file, "  cost %d (complexity %d)\n", cost.cost, cost.complexity);
   bitmap_print (file, ivs->cands, "  candidates ","\n");
+  for (i = 0; i < n_iv_cands (data); i++)
+    {
+      cand = iv_cand (data, i);
+      if (iv_ca_cand_used_p (ivs, cand))
+	fprintf (file, " %d%s", i,
+		 cand_autoincremented_p (ivs, cand) ? "(autoincremented)" : "");
+    }
+  fprintf (file, "\n");
 
   for (i = 1; i <= data->max_inv_id; i++)
     if (ivs->n_invariant_uses[i])
@@ -4626,7 +4780,7 @@ iv_ca_narrow (struct ivopts_data *data, struct iv_ca *ivs,
   bitmap_iterator bi;
   struct iv_cand *cnd;
   comp_cost cost;
-
+  
   *delta = NULL;
   for (i = 0; i < n_iv_uses (data); i++)
     {
@@ -4722,7 +4876,6 @@ iv_ca_prune (struct ivopts_data *data, struct iv_ca *ivs,
 	continue;
 
       acost = iv_ca_narrow (data, ivs, cand, &act_delta);
-
       if (compare_costs (acost, best_cost) < 0)
 	{
 	  best_cost = acost;
@@ -5301,15 +5454,21 @@ rewrite_use_address (struct ivopts_data *data,
 {
   aff_tree aff;
   gimple_stmt_iterator bsi = gsi_for_stmt (use->stmt);
-  tree ref;
+  tree ref,op_p;
   bool ok;
 
   ok = get_computation_aff (data->current_loop, use, cand, use->stmt, &aff);
   gcc_assert (ok);
   unshare_aff_combination (&aff);
+  
+  /* Since I cannot extract it any more, I will create it... */
+  if (gimple_code (use->stmt) == GIMPLE_COND) 
+	   op_p = build2 (gimple_cond_code (use->stmt), boolean_type_node,
+		gimple_cond_lhs (use->stmt), gimple_cond_rhs (use->stmt));
+  else op_p = *use->op_p;
 
-  ref = create_mem_ref (&bsi, TREE_TYPE (*use->op_p), &aff, data->speed);
-  copy_ref_info (ref, *use->op_p);
+  ref = create_mem_ref (&bsi, TREE_TYPE (op_p), &aff, data->speed);
+  copy_ref_info (ref, op_p);
   *use->op_p = ref;
 }
 
@@ -5351,7 +5510,6 @@ rewrite_use_compare (struct ivopts_data *data,
      giv.  */
   comp = get_computation (data->current_loop, use, cand);
   gcc_assert (comp != NULL_TREE);
-
   ok = extract_cond_operands (data, use->stmt, &var_p, NULL, NULL, NULL);
   gcc_assert (ok);
 

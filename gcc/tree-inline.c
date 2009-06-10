@@ -2888,6 +2888,7 @@ estimate_num_insns (gimple stmt, eni_weights *weights)
   unsigned cost, i;
   enum gimple_code code = gimple_code (stmt);
   tree lhs;
+  tree rhs;
 
   switch (code)
     {
@@ -2941,11 +2942,16 @@ estimate_num_insns (gimple stmt, eni_weights *weights)
 	if (POINTER_TYPE_P (funtype))
 	  funtype = TREE_TYPE (funtype);
 
-	if (decl && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_MD)
+	if (decl && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_MD){ 
 	  cost = weights->target_builtin_call_cost;
+	  /* Assume no additional cost for the builtin function calls */ 
+	  break; 
+ 	}
 	else
 	  cost = weights->call_cost;
-	
+
+	/* Old style cost would break here */ 
+
 	if (decl && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
 	  switch (DECL_FUNCTION_CODE (decl))
 	    {
@@ -2973,21 +2979,27 @@ estimate_num_insns (gimple stmt, eni_weights *weights)
 	if (decl && DECL_ARGUMENTS (decl))
 	  {
 	    tree arg;
-	    for (arg = DECL_ARGUMENTS (decl); arg; arg = TREE_CHAIN (arg))
-	      cost += estimate_move_cost (TREE_TYPE (arg));
+
+	    for (arg = DECL_ARGUMENTS (decl); arg ; arg = TREE_CHAIN (arg)){ 
+	      if (!VOID_TYPE_P (TREE_TYPE (arg)))
+	         cost += estimate_move_cost (TREE_TYPE (arg));
+	    }
 	  }
 	else if (funtype && prototype_p (funtype))
 	  {
 	    tree t;
-	    for (t = TYPE_ARG_TYPES (funtype); t; t = TREE_CHAIN (t))
-	      cost += estimate_move_cost (TREE_VALUE (t));
+	    for (t = TYPE_ARG_TYPES (funtype); t && t != void_list_node; t = TREE_CHAIN (t)){ 
+		if (!VOID_TYPE_P (TREE_VALUE (t)))
+	      	   cost += estimate_move_cost (TREE_VALUE (t));
+	    }
 	  }
 	else
 	  {
 	    for (i = 0; i < gimple_call_num_args (stmt); i++)
 	      {
 		tree arg = gimple_call_arg (stmt, i);
-		cost += estimate_move_cost (TREE_TYPE (arg));
+		if (!VOID_TYPE_P (TREE_TYPE (arg)))
+		   cost += estimate_move_cost (TREE_TYPE (arg));
 	      }
 	  }
 

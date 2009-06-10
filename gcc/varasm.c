@@ -54,6 +54,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfglayout.h"
 #include "basic-block.h"
 #include "tree-iterator.h"
+#include "math.h" 
 
 #ifdef XCOFF_DEBUGGING_INFO
 #include "xcoffout.h"		/* Needed for external data
@@ -545,11 +546,58 @@ get_noswitch_section (unsigned int flags, noswitch_section_callback callback)
 /* Return the named section structure associated with NAME.  Create
    a new section with the given fields if no such structure exists.  */
 
+/* SUPPORT_DATA_SECTION_SORTING speaks for itself */ 
+#define	SUPPORT_DATA_SECTION_SORTING 1
+extern unsigned int		smallest_accessable_entity_in_declaration(tree decl);
+
 section *
 get_section (const char *name, unsigned int flags, tree decl)
 {
   section *sect, **slot;
 
+#if SUPPORT_DATA_SECTION_SORTING
+  char *updated_name; 
+
+  /* LSY If section sorting is enabled, update the name */ 
+  if(TARGET_SECTION_SORTING){ 
+	  if(decl != NULL_TREE){ 
+		unsigned int smallest_unit_size	= smallest_accessable_entity_in_declaration(decl); 
+		/* currently we do not seem to have double digit alignments, but let's be precise */ 
+		/* updated_name		= ggc_alloc_string(name,strlen(name) + 
+				((smallest_unit_size > 9) ? (int)(log10(smallest_unit_size)) + 1 : 1)+4); */ 
+		gcc_assert(smallest_unit_size < 1000); 
+		updated_name		= (char *) ggc_alloc_string(name,strlen(name) + 5);
+		sprintf(updated_name,"%s.%d\0",name,smallest_unit_size);  
+	  }
+	  else	updated_name = ggc_strdup (name);
+  }
+  else	updated_name = ggc_strdup (name); 
+	    
+  slot = (section **) htab_find_slot_with_hash (section_htab, updated_name,
+	                              htab_hash_string (updated_name), INSERT);
+								 
+  flags |= SECTION_NAMED;
+  
+  if (*slot == NULL){
+      sect = GGC_NEW (section);
+      sect->named.common.flags = flags;
+      sect->named.name = ggc_strdup (updated_name);
+      sect->named.decl = decl;
+      *slot = sect;
+  }
+  else{
+      sect = *slot;
+      if ((sect->common.flags & ~SECTION_DECLARED) != flags
+	  && ((sect->common.flags | flags) & SECTION_OVERRIDE) == 0){
+	   	/* Sanity check user variables for flag changes.  */
+		if (decl == 0)	    decl = sect->named.decl;
+		gcc_assert (decl);
+		error("%+D causes a section type conflict", decl);
+	  }
+  }
+  //ggc_free(updated_name); 
+	
+#else 
   slot = (section **)
     htab_find_slot_with_hash (section_htab, name,
 			      htab_hash_string (name), INSERT);
@@ -575,6 +623,8 @@ get_section (const char *name, unsigned int flags, tree decl)
 	  error ("%+D causes a section type conflict", decl);
 	}
     }
+#endif 
+  
   return sect;
 }
 

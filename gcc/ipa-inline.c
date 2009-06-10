@@ -186,7 +186,8 @@ cgraph_estimate_size_after_inlining (int times, struct cgraph_node *to,
   int call_insns = PARAM_VALUE (PARAM_INLINE_CALL_COST);
 
   for (arg = DECL_ARGUMENTS (fndecl); arg; arg = TREE_CHAIN (arg))
-    call_insns += estimate_move_cost (TREE_TYPE (arg));
+    if (!VOID_TYPE_P (TREE_TYPE (arg)))	
+    	call_insns += estimate_move_cost (TREE_TYPE (arg));
   size = (what->global.insns - call_insns) * times + to->global.insns;
   gcc_assert (size >= 0);
   return size;

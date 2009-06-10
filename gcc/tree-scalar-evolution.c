@@ -1395,6 +1395,122 @@ follow_ssa_edge_inner_loop_phi (struct loop *outer_loop,
 			       evolution_of_loop, limit);
 }
 
+static inline int 
+number_of_SSA_memebrs_in_phi(gimple first_phi)
+{
+   int i = 0; 
+   int count = 0; 
+
+   for (i = 0; i < gimple_phi_num_args (first_phi); i++)
+        if(TREE_CODE(gimple_phi_arg_def (first_phi, i)) == SSA_NAME)	count++;
+
+   return count; 
+}
+
+static inline int 
+get_index_of_SSA_memebrs_in_phi(gimple first_phi) 
+{
+   int i = 0;
+
+   for (i = 0; i < gimple_phi_num_args (first_phi); i++)
+        if(TREE_CODE(gimple_phi_arg_def (first_phi, i)) == SSA_NAME)   return i;
+
+   return -1; 
+}
+
+static inline t_bool
+two_phi_arguments_are_identical(gimple first_phi, gimple second_phi)
+{
+   int i; 
+   
+   if(gimple_phi_num_args (first_phi) != gimple_phi_num_args (second_phi))	
+	return t_false; 
+   for (i = 0; i < gimple_phi_num_args (first_phi); i++)
+     {
+		if(gimple_phi_arg_def (first_phi, i) != gimple_phi_arg_def (second_phi, i))   
+			return t_false; 
+     }
+   return t_true;
+}
+
+/* Servise routines to descend into PHI definition.  */ 
+
+static t_bool 
+match_or_resolve_phi_pair(gimple first_phi, gimple second_phi,gimple def,tree st)
+{
+  if(def && (is_gimple_assign(def))){
+	tree opr = gimple_op(def,1); 
+	if(TREE_CODE (gimple_op (def, 1)) == SSA_NAME){
+		if(st == opr){
+			return t_true;			
+		}
+	}
+	switch (TREE_CODE (opr)){
+    	case NOP_EXPR:      /* This assignment is under the form "a_1 = (cast) rhs.  */
+		/* Look at RHS of the type cast */ 
+		if(st == TREE_OPERAND(opr,0)){
+			return t_true;
+		}
+	    break;
+	case SSA_NAME:      /* This assignment is under the form: "a_1 = b_2".  */	
+	case INTEGER_CST:   /* This assignment is under the form "a_1 = 7".  */
+	case POINTER_PLUS_EXPR:
+	case PLUS_EXPR:
+	case MINUS_EXPR:
+	case ASSERT_EXPR: /* This assignment is of the form: "a_1 = ASSERT_EXPR <a_2, ...>"      
+		It must be handled as a copy assignment of the form a_1 = a_2.  */
+	        break;
+	default:	      /* CALL_EXPR,rshift_expr, component_ref */
+		break;
+	}
+    }
+    return t_false; 
+}
+
+/* _LSY_ This function attempts to prove equivalency between two PHI nodes 
+   It looks for a special case:
+        def             : i_14 = PHI <i_20(5), 0(3)>
+        halting_phi: i.0_9 = PHI <i.0_3(5), 0(3)>
+	i.0_3 = (unsigned int) i_20
+*/ 
+static t_bool
+analyze_phi_relationship (struct loop *loop,
+                                  gimple first_phi,
+                                  gimple second_phi,
+                                  tree *evolution_of_loop, int limit)
+{
+  int i;
+  tree st1,st2;
+  gimple def1,def2;
+  tree opr1 = NULL,opr2 = NULL; 
+
+  /* If all sources of the phi are the same... Order sensetive. 
+          It appears that all members are sorted, so this should cover all matches */ 
+  if(two_phi_arguments_are_identical(first_phi,second_phi))	{
+	return t_true; 
+  }
+  
+  /* Do not even look into more complex cases */
+  if((number_of_SSA_memebrs_in_phi(first_phi) != 1) || 
+     (number_of_SSA_memebrs_in_phi(second_phi) != 1))
+	return t_false; 
+    
+    st1    = gimple_phi_arg_def (first_phi, 
+	                get_index_of_SSA_memebrs_in_phi(first_phi)); 
+    st2    = gimple_phi_arg_def (second_phi, 
+	                get_index_of_SSA_memebrs_in_phi(second_phi)); 
+    def1   = SSA_NAME_DEF_STMT (st1); 
+    def2   = SSA_NAME_DEF_STMT (st2); 
+
+    if(match_or_resolve_phi_pair(first_phi,second_phi,def1,st2))	
+		return t_true; 
+	if(match_or_resolve_phi_pair(first_phi,second_phi,def2,st1))	
+		return t_true;
+
+  return t_false;
+}
+
+
 /* Follow an SSA edge from a loop-phi-node to itself, constructing a
    path that is analyzed on the return walk.  */
 
@@ -1416,6 +1532,9 @@ follow_ssa_edge (struct loop *loop, gimple def, gimple halting_phi,
   switch (gimple_code (def))
     {
     case GIMPLE_PHI:
+        /* _LSY_ if we can establish relationship between 
+	def and halting_phi 
+	to be (def = halting_phi;) this will work */ 
       if (!loop_phi_node_p (def))
 	/* DEF is a condition-phi-node.  Follow the branches, and
 	   record their evolutions.  Finally, merge the collected
@@ -1429,6 +1548,9 @@ follow_ssa_edge (struct loop *loop, gimple def, gimple halting_phi,
 	 the halting_phi to itself in the loop.  */
       if (def == halting_phi)
 	return t_true;
+	else if(analyze_phi_relationship(loop, def, 
+	         halting_phi, evolution_of_loop, limit))	
+		return t_true; 
 	  
       /* Otherwise, the evolution of the HALTING_PHI depends
 	 on the evolution of another loop-phi-node, i.e. the

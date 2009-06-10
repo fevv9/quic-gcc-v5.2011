@@ -3,7 +3,7 @@
    marshalling to implement data sharing and copying clauses.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
-   Copyright (C) 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1595,6 +1595,7 @@ create_omp_child_function (omp_context *ctx, bool task_copy)
       DECL_ARG_TYPE (t) = ptr_type_node;
       DECL_CONTEXT (t) = current_function_decl;
       TREE_USED (t) = 1;
+      TREE_ADDRESSABLE (t) = 1;
       TREE_CHAIN (t) = DECL_ARGUMENTS (decl);
       DECL_ARGUMENTS (decl) = t;
     }
@@ -2316,6 +2317,7 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 		  x = create_tmp_var_raw (TREE_TYPE (TREE_TYPE (new_var)),
 					  name);
 		  gimple_add_tmp_var (x);
+		  TREE_ADDRESSABLE (x) = 1;
 		  x = build_fold_addr_expr_with_type (x, TREE_TYPE (new_var));
 		}
 	      else
@@ -3121,7 +3123,6 @@ remove_exit_barrier (struct omp_region *region)
   edge_iterator ei;
   edge e;
   gimple stmt;
-  int any_addressable_vars = -1;
 
   exit_bb = region->exit;
 
@@ -3147,52 +3148,8 @@ remove_exit_barrier (struct omp_region *region)
       if (gsi_end_p (gsi))
 	continue;
       stmt = gsi_stmt (gsi);
-      if (gimple_code (stmt) == GIMPLE_OMP_RETURN
-	  && !gimple_omp_return_nowait_p (stmt))
-	{
-	  /* OpenMP 3.0 tasks unfortunately prevent this optimization
-	     in many cases.  If there could be tasks queued, the barrier
-	     might be needed to let the tasks run before some local
-	     variable of the parallel that the task uses as shared
-	     runs out of scope.  The task can be spawned either
-	     from within current function (this would be easy to check)
-	     or from some function it calls and gets passed an address
-	     of such a variable.  */
-	  if (any_addressable_vars < 0)
-	    {
-	      gimple parallel_stmt = last_stmt (region->entry);
-	      tree child_fun = gimple_omp_parallel_child_fn (parallel_stmt);
-	      tree local_decls = DECL_STRUCT_FUNCTION (child_fun)->local_decls;
-	      tree block;
-
-	      any_addressable_vars = 0;
-	      for (; local_decls; local_decls = TREE_CHAIN (local_decls))
-		if (TREE_ADDRESSABLE (TREE_VALUE (local_decls)))
-		  {
-		    any_addressable_vars = 1;
-		    break;
-		  }
-	      for (block = gimple_block (stmt);
-		   !any_addressable_vars
-		   && block
-		   && TREE_CODE (block) == BLOCK;
-		   block = BLOCK_SUPERCONTEXT (block))
-		{
-		  for (local_decls = BLOCK_VARS (block);
-		       local_decls;
-		       local_decls = TREE_CHAIN (local_decls))
-		    if (TREE_ADDRESSABLE (local_decls))
-		      {
-			any_addressable_vars = 1;
-			break;
-		      }
-		  if (block == gimple_block (parallel_stmt))
-		    break;
-		}
-	    }
-	  if (!any_addressable_vars)
-	    gimple_omp_return_set_nowait (stmt);
-	}
+      if (gimple_code (stmt) == GIMPLE_OMP_RETURN)
+	gimple_omp_return_set_nowait (stmt);
     }
 }
 
@@ -3409,14 +3366,6 @@ expand_omp_taskreg (struct omp_region *region)
       /* Declare local variables needed in CHILD_CFUN.  */
       block = DECL_INITIAL (child_fn);
       BLOCK_VARS (block) = list2chain (child_cfun->local_decls);
-      /* The gimplifier could record temporaries in parallel/task block
-	 rather than in containing function's local_decls chain,
-	 which would mean cgraph missed finalizing them.  Do it now.  */
-      for (t = BLOCK_VARS (block); t; t = TREE_CHAIN (t))
-	if (TREE_CODE (t) == VAR_DECL
-	    && TREE_STATIC (t)
-	    && !DECL_EXTERNAL (t))
-	  varpool_finalize_decl (t);
       DECL_SAVED_TREE (child_fn) = NULL;
       gimple_set_body (child_fn, bb_seq (single_succ (entry_bb)));
       TREE_USED (block) = 1;
@@ -6397,6 +6346,7 @@ lower_omp_taskreg (gimple_stmt_iterator *gsi_p, omp_context *ctx)
       ctx->sender_decl
 	= create_tmp_var (ctx->srecord_type ? ctx->srecord_type
 			  : ctx->record_type, ".omp_data_o");
+      TREE_ADDRESSABLE (ctx->sender_decl) = 1;
       gimple_omp_taskreg_set_data_arg (stmt, ctx->sender_decl);
     }
 

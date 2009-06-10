@@ -1209,7 +1209,7 @@ sms_schedule (void)
 	  if (count_reg && ! count_init)
             {
 	      rtx comp_rtx = gen_rtx_fmt_ee (GT, VOIDmode, count_reg,
-	  				     GEN_INT(stage_count));
+						GEN_INT(stage_count-1)); 
 	      unsigned prob = (PROB_SMS_ENOUGH_ITERATIONS
 			       * REG_BR_PROB_BASE) / 100;
 
