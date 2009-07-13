@@ -3202,6 +3202,10 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
 #define ENDLOOP_INSN(INSN) (   INSN_CODE (INSN) == CODE_FOR_endloop0 \
                             || INSN_CODE (INSN) == CODE_FOR_endloop1)
 
+
+#define QDSP6_LOOP_INSN(INSN) (   INSN_CODE (INSN->insn) == CODE_FOR_loop0 \
+                                || INSN_CODE (INSN->insn) == CODE_FOR_loop1)
+
 /* Implements macro FINAL_PRESCAN_INSN
 
    Looks ahead of the current insn and uses the marks made by qdsp6_pack_insns
@@ -5821,22 +5825,22 @@ static void qdsp6_free_packing_info(void);
 #define QDSP6_ENDLOOP               QDSP6_MASK(1, 7)
 #define QDSP6_CALL                  QDSP6_MASK(1, 8)
 #define QDSP6_EMULATION_CALL        QDSP6_MASK(1, 9)
-#define QDSP6_JUMP \
-  (QDSP6_DIRECT_JUMP | QDSP6_INDIRECT_JUMP | QDSP6_ENDLOOP)
 #define QDSP6_CONTROL (QDSP6_CALL | QDSP6_JUMP)
 
 #define QDSP6_MEM                   QDSP6_MASK(1, 10)
 #define QDSP6_VOLATILE              QDSP6_MASK(1, 11)
 
 #define QDSP6_WANDERED              QDSP6_MASK(1, 12)
+#define QDSP6_REGCOND_JUMP          QDSP6_MASK(1, 13)
+
+#define QDSP6_JUMP \
+  (QDSP6_DIRECT_JUMP | QDSP6_INDIRECT_JUMP | QDSP6_ENDLOOP  | QDSP6_REGCOND_JUMP) 
 
 #define QDSP6_PREDICATE_NUMBER(INSN) \
   ((INSN)->flags & QDSP6_PREDICATE_NUMBER_MASK)
 #define QDSP6_PREDICATE(INSN) ((INSN)->flags & QDSP6_PREDICATE_MASK)
 #define QDSP6_DOT_NEW_P(INSN) (((INSN)->flags & QDSP6_DOT_NEW) != 0)
 #define QDSP6_CONDITION(INSN) ((INSN)->flags & QDSP6_CONDITION_MASK)
-#define QDSP6_CONDITIONAL_P(INSN) \
-  (((INSN)->flags & QDSP6_CONDITION_MASK) != QDSP6_UNCONDITIONAL)
 #define QDSP6_CONFLICT_P(ACCESS0, ACCESS1) \
   (gcc_assert(QDSP6_CONDITION (ACCESS0) && QDSP6_CONDITION (ACCESS1)), \
    ((ACCESS0)->flags & (ACCESS1)->flags & QDSP6_CONDITION_MASK \
@@ -5855,19 +5859,33 @@ static void qdsp6_free_packing_info(void);
 
 #define QDSP6_WANDERED_P(INSN) (((INSN)->flags & QDSP6_WANDERED) != 0)
 
+/* PDB. True if ((insn_info*)INSN)->insn is a register conditional jump */
+#define QDSP6_REGCOND_JUMP_P(INSN) (((INSN)->flags & QDSP6_REGCOND_JUMP) != 0)
 
+#define QDSP6_CONFLICT_P(ACCESS0, ACCESS1) \
+  (gcc_assert(QDSP6_CONDITION (ACCESS0) && QDSP6_CONDITION (ACCESS1)), \
+   ((ACCESS0)->flags & (ACCESS1)->flags & QDSP6_CONDITION_MASK \
+    || QDSP6_PREDICATE (ACCESS0) != QDSP6_PREDICATE (ACCESS1)))
 
+/* PDB. Register conditional jump is also a conditional jump */
+#define QDSP6_CONDITIONAL_P(INSN) \
+  ((((INSN)->flags & QDSP6_CONDITION_MASK) != QDSP6_UNCONDITIONAL) || \
+  (((INSN)->flags & QDSP6_REGCOND_JUMP) != 0))
 
 #define QDSP6_DEP_NONE            0
 #define QDSP6_DEP_UNCONDITIONAL   QDSP6_MASK(1, 0)
 #define QDSP6_DEP_NOT_DOT_NEWABLE QDSP6_MASK(1, 1)
 #define QDSP6_DEP_DOT_NEWABLE     QDSP6_MASK(1, 2)
+/* PDB. Dual jump is a new special kind of dependence between two instructions. */
+#define QDSP6_DEP_DUALJUMP        QDSP6_MASK(1, 3)
 
 #define QDSP6_DEP_NONE_P(DEP) ((DEP) == 0)
 #define QDSP6_DEP_UNCONDITIONAL_P(DEP) (((DEP) & QDSP6_DEP_UNCONDITIONAL) != 0)
 #define QDSP6_DEP_NOT_DOT_NEWABLE_P(DEP) \
   (((DEP) & QDSP6_DEP_NOT_DOT_NEWABLE) != 0)
 #define QDSP6_DEP_DOT_NEWABLE_P(DEP) (((DEP) & QDSP6_DEP_DOT_NEWABLE) != 0)
+/* PDB. True if the dependence DEP is a dual jump dependence. Put the instructions that depend in terms of DEP in one packet. */
+#define QDSP6_DEP_DUALJUMP_P(DEP) (((DEP) & QDSP6_DEP_DUALJUMP) != 0)
 
 
 
@@ -6150,8 +6168,17 @@ qdsp6_wandered_too_far_p(rtx insn)
   }
 }
 
-
-
+/* Return true if TEST is a valid relational operator for a conditional jump */
+static int
+qdsp6_cond_jump_compare_operator (rtx test)
+{
+  enum rtx_code code = GET_CODE (test);
+  /* v3 has more compare codes because of the register conditional jumps. */
+  if (TARGET_V3_FEATURES)
+    return (code == NE || code == EQ || code == LE || code == GE || code == GT || code == LT);
+  else
+    return (code == NE || code == EQ);
+}
 
 static int
 qdsp6_get_flags(rtx insn)
@@ -6173,12 +6200,29 @@ qdsp6_get_flags(rtx insn)
   }
 
   if(test){
-    gcc_assert((GET_CODE (test) == NE || GET_CODE (test) == EQ)
+    if (TARGET_V3_FEATURES)
+      gcc_assert (qdsp6_cond_jump_compare_operator (test)
+		  && XEXP (test,1 ) == const0_rtx);
+    else
+      gcc_assert(qdsp6_cond_jump_compare_operator (test)
                && P_REG_P (XEXP (test, 0))
                && XEXP (test, 1) == const0_rtx);
+    if (P_REG_P (XEXP (test, 0)))
+      {
+	flags |= REGNO (XEXP (test, 0)) - P0_REGNUM;
+	flags |= GET_CODE (test) == NE ? QDSP6_IF_TRUE : QDSP6_IF_FALSE;
+      }
+    else
+      {
+	/* This is a speculative-register-conditional jump. */
+	flags |= QDSP6_REGCOND_JUMP;
 
-    flags |= REGNO (XEXP (test, 0)) - P0_REGNUM;
-    flags |= GET_CODE (test) == NE ? QDSP6_IF_TRUE : QDSP6_IF_FALSE;
+	/* PDB.  **IMPORTANT**.This really is a condition instruction, but here it means that it is not 
+	   predicated on a predicate register. To check whether an instruction is conditional
+	   use QDSP6_CONDITIONAL_P, _not_ QDSP6_UNCONDITIONAL. The latter only tell us if a '!'
+	   needs to be added before a predicate register, if used. */
+	flags |= QDSP6_UNCONDITIONAL;
+      }
   }
   else {
     flags |= QDSP6_UNCONDITIONAL;
@@ -6663,6 +6707,17 @@ qdsp6_insns_truly_dependent(
 
   if(QDSP6_CONTROL_P (writer)){
     /* need to handle calls and multiple jumps */
+    if (TARGET_V3_FEATURES) {
+      if (QDSP6_CONDITIONAL_P(writer) && QDSP6_DIRECT_JUMP_P(writer) &&
+          QDSP6_CONDITIONAL_P(reader) && QDSP6_DIRECT_JUMP_P(reader) &&
+          /* not a dot-new jump */
+          (!QDSP6_DOT_NEW_P(reader) && !QDSP6_DOT_NEW_P(writer)) &&
+          /* not a register-condition jump */
+          (!QDSP6_REGCOND_JUMP_P(reader) && !QDSP6_REGCOND_JUMP_P(writer)) &&
+          (!QDSP6_LOOP_INSN(reader) && !QDSP6_LOOP_INSN(writer))) {
+        *dependence |= QDSP6_DEP_DUALJUMP;
+      }
+    }
     *dependence = QDSP6_DEP_UNCONDITIONAL;
     return;
   }
@@ -6926,6 +6981,15 @@ qdsp6_packet_insn_internal_dependence(
   *dependence = QDSP6_DEP_NONE;
 
   num_insns = packet->num_insns;
+/*   When pulling an insn across a basic block, ignore the jump. */
+  /* PDB. DO NOT ignore register conditional jumps though, because they do read something other than
+     a predicate register.*/
+  if(packet->num_insns
+     && ((QDSP6_JUMP_P (packet->insns[packet->num_insns - 1]))
+	 && (!QDSP6_REGCOND_JUMP_P(packet->insns[packet->num_insns - 1])))){
+    num_insns--;
+  }
+
   /* When pulling an insn across a basic block, ignore the jump. */
   if(packet->num_insns
      && QDSP6_JUMP_P (packet->insns[packet->num_insns - 1])){
@@ -7160,7 +7224,7 @@ qdsp6_pack_insns(void)
        || QDSP6_WANDERED_P (insn_info)
        || state_transition(qdsp6_state, insn) >= 0){
       packet = qdsp6_start_new_packet(insn_info);
-    }
+   } 
     else {
       qdsp6_packet_insn_dependence(packet, insn_info, false, &dependence);
       if(QDSP6_DEP_UNCONDITIONAL_P (dependence)){
@@ -7409,7 +7473,6 @@ qdsp6_count_packets()
   return total; 
 }
 
-
 #define MAX_NUM_EDGES_IN_BB	1024
 
 static void
@@ -7466,30 +7529,30 @@ qdsp6_pull_up_insns(void)
        || !JUMP_P (BB_END (bb))){
       continue;
     }
-	// construct a sorted list of edges 
-	num_edges = 0; 
+    // construct a sorted list of edges 
+    num_edges = 0; 
     FOR_EACH_EDGE (e, ei, bb->succs){
-		edge insert_this = e; 
-		edge tmp; 
-		// Insert in sorted order
-		/* _LSY_ Here we can use a better sorting algorithm, but V2 will not have more than 2 edges
-		so this brut force should work for now */ 
-		for(k=0;k<num_edges;k++){
-			if(e->probability >= sorted_edge_list[k]->probability){
-				int ll; 
-				for(ll=num_edges;ll>k;ll--){
-					sorted_edge_list[ll] = sorted_edge_list[ll-1]; 
-				}
-				insert_this	= sorted_edge_list[num_edges]; 
-				sorted_edge_list[k]	= e; 
-			}
-		}
-		sorted_edge_list[num_edges] = insert_this; 
-		num_edges++; 
-		gcc_assert(num_edges < MAX_NUM_EDGES_IN_BB);
+      edge insert_this = e; 
+      edge tmp; 
+      // Insert in sorted order
+      /* _LSY_ Here we can use a better sorting algorithm, but V2 will not have more than 2 edges
+	 so this brut force should work for now */ 
+      for(k=0;k<num_edges;k++){
+	if(e->probability >= sorted_edge_list[k]->probability){
+	  int ll; 
+	  for(ll=num_edges;ll>k;ll--){
+	    sorted_edge_list[ll] = sorted_edge_list[ll-1]; 
+	  }
+	  insert_this	= sorted_edge_list[num_edges]; 
+	  sorted_edge_list[k]	= e; 
 	}
-	for(k=0;k<num_edges;k++){
-	  e = sorted_edge_list[k]; 
+      }
+      sorted_edge_list[num_edges] = insert_this; 
+      num_edges++; 
+      gcc_assert(num_edges < MAX_NUM_EDGES_IN_BB);
+    }
+    for(k=0;k<num_edges;k++){
+      e = sorted_edge_list[k]; 
       successor_bb = e->dest;
       if(e->flags & EDGE_COMPLEX
          || successor_bb->index == EXIT_BLOCK
@@ -7515,14 +7578,14 @@ qdsp6_pull_up_insns(void)
         for(i = 0; i < packet->num_insns; i++){
           original_insn = packet->insns[i];
           insn = original_insn;
-
+	  
           /* Don't try to reorder the final control flow insn if present. */
           if(control_flow_insn_p (insn->insn)){
             if(packet->num_insns > 1 || packet == back_edge_packet){
               break;
             }
             target_packet = packet->prev;
-            while(target_packet->num_insns == 0 && target_packet != back_edge_packet){
+	    while (target_packet->num_insns == 0 && target_packet != back_edge_packet){
               target_packet = target_packet->prev;
             }
             qdsp6_packet_insn_dependence(target_packet, insn, false, &dependence);
@@ -7533,7 +7596,6 @@ qdsp6_pull_up_insns(void)
                 break;
               }
             }
-
             qdsp6_remove_insn_from_packet(packet, insn);
             qdsp6_add_insn_to_packet(target_packet, insn);
             break;
@@ -7564,7 +7626,11 @@ qdsp6_pull_up_insns(void)
                 break;
               }
               if(QDSP6_CONDITIONAL_P (edge_insn)){
-                if(qdsp6_predicable(insn)){
+
+		/* PDB. EDGE_INSN can be conditional if it is a conditional jump on a predicate regsiter or a register conditional
+		   jump. In the latter case INSN cannot be predicated. Therefore, check for this latter case before predicating 
+		   INSN. */
+                if(!QDSP6_REGCOND_JUMP_P (edge_insn) && qdsp6_predicable(insn)){
                   /* predicate */
                   qdsp6_push_insn(insn, target_packet);
                   insn = qdsp6_predicate_insn(insn, edge_insn,
@@ -7591,7 +7657,7 @@ qdsp6_pull_up_insns(void)
             }
             /* anti-dependent? */
             qdsp6_packet_insn_internal_dependence(target_packet, insn, &dependence);
-            if(dependence){
+	    if(dependence){
               break;
             }
           }
@@ -7734,9 +7800,6 @@ qdsp6_free_packing_info(void)
   free(qdsp6_state);
   dfa_finish();
 }
-
-
-
 
 static void
 qdsp6_packet_optimizations(void)

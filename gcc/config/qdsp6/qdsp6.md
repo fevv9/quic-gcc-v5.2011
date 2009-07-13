@@ -82,7 +82,7 @@
 ;; Used to determine which slots an insn can use when scheduling insns
 
 (define_attr "type"
-             "A,X,Load,Store,LoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,multiple"
+             "A,X,Load,Store,LoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,multiple,J_dotnew"
              (const_string "multiple"))
 
 
@@ -114,9 +114,12 @@
 
 (automata_option "ndfa")
 
-(define_cpu_unit "Slot0,Slot1,Slot2,Slot3,PCadder,endloop0,endloop1" "qdsp6")
+(define_cpu_unit "Slot0,Slot1,Slot2,Slot3,PCadder,PCadder_dualjumps,endloop0,endloop1,
+        endloop0_dualjumps,endloop1_dualjumps" "qdsp6")
+
 
 (define_reservation "control" "(endloop0 + endloop1)")
+(define_reservation "control_dualjumps" "(endloop0_dualjumps + endloop1_dualjumps)")
 
 
 ;;----;;
@@ -212,10 +215,6 @@
                                      (eq_attr "type" "Load")))
  "Slot0")
 
-(define_insn_reservation "v3_Load"      1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "Load"))
- "Slot0 | Slot1")
-
 (define_insn_reservation "v2_Store"     1 (and (eq_attr "arch" "v2,v3")
                                                (eq_attr "type" "Store"))
  "Slot0")
@@ -256,7 +255,66 @@
                                                (eq_attr "type" "endloop1"))
                                             "endloop1")
 
+;;----;;
+;; V3 ;;
+;;----;;
 
+(define_insn_reservation "v3_A"         1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "A"))
+ "Slot0 | Slot1 | Slot2 | Slot3")
+
+(define_insn_reservation "v3_X"         1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "X"))
+                 "Slot2 | Slot3")
+
+(define_insn_reservation "v3_Load"      1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "Load"))
+ "Slot0 | Slot1")
+
+(define_insn_reservation "v3_Store"     1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "Store"))
+ "Slot0")
+
+(define_insn_reservation "v3_LoadStore" 1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "LoadStore"))
+ "Slot0 + Slot1")
+
+(define_insn_reservation "v3_M"         1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "M"))
+                 "Slot2 | Slot3")
+
+(define_insn_reservation "v3_S"         1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "S"))
+                 "Slot2 | Slot3")
+
+(define_insn_reservation "v3_CR"        1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "CR"))
+                         "Slot3")
+
+(define_insn_reservation "v3_loop"      1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "loop"))
+                         "Slot3  + PCadder + PCadder_dualjumps")
+
+(define_insn_reservation "v3_J"         1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "J"))
+                "(Slot2 | Slot3) + (PCadder | PCadder_dualjumps) + (control | control_dualjumps)")
+
+(define_insn_reservation "v3_J_dotnew"  1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "J_dotnew"))
+                "(Slot2 | Slot3) + PCadder + control")
+
+
+(define_insn_reservation "v3_JR"        1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "JR"))
+                 "Slot2 + control")
+
+(define_insn_reservation "v3_endloop0"  1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "endloop0"))
+                                            "endloop0 + endloop0_dualjumps")
+
+(define_insn_reservation "v3_endloop1"  1 (and (eq_attr "arch" "v3")
+                                               (eq_attr "type" "endloop1"))
+                                            "endloop1 + endloop1_dualjumps")
 ;;-------;;
 ;; Other ;;
 ;;-------;;
@@ -1040,6 +1098,17 @@
 )
 
 
+(define_insn "adddisi_v3"
+  [(set (match_operand:DI 0 "gr_register_operand"         "")
+        (plus:DI (match_operand:SI 1 "gr_register_operand" "")
+                  (match_operand:DI 2 "gr_register_operand" "")))]
+  "TARGET_V3_FEATURES"
+  "%0 = add(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+
+
 ;;---------;;
 ;; sub{m}3 ;;
 ;;---------;;
@@ -1201,6 +1270,16 @@
 )
 
 
+(define_insn "umindi3"
+  [(set (match_operand:DI 0 "gr_register_operand"         "=Rg")
+        (umin:DI (match_operand:DI 1 "gr_register_operand" "Rg")
+                 (match_operand:DI 2 "gr_register_operand" "Rg")))]
+  "TARGET_V3_FEATURES"
+  "%0 = minu(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+
 ;;----------;;
 ;; umax{m}3 ;;
 ;;----------;;
@@ -1214,6 +1293,15 @@
   [(set_attr "type" "X")]
 )
 
+
+(define_insn "umaxdi3"
+  [(set (match_operand:DI 0 "gr_register_operand"         "=Rg")
+        (umax:DI (match_operand:DI 1 "gr_register_operand" "Rg")
+                 (match_operand:DI 2 "gr_register_operand" "Rg")))]
+  "TARGET_V3_FEATURES"
+  "%0 = maxu(%1,%2)"
+  [(set_attr "type" "X")]
+)
 
 ;;---------;;
 ;; and{m}3 ;;
@@ -1400,6 +1488,16 @@
 )
 
 
+(define_insn "smindi3"
+  [(set (match_operand:DI 0 "gr_register_operand"         "=Rg")
+        (smin:DI (match_operand:DI 1 "gr_register_operand" "Rg")
+                 (match_operand:DI 2 "gr_register_operand" "Rg")))]
+  "TARGET_V3_FEATURES"
+  "%0 = min(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+
 ;;----------;;
 ;; smax{m}3 ;;
 ;;----------;;
@@ -1409,6 +1507,16 @@
         (smax:SI (match_operand:SI 1 "gr_register_operand" "Rg")
                  (match_operand:SI 2 "gr_register_operand" "Rg")))]
   ""
+  "%0 = max(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+
+(define_insn "smaxdi3"
+  [(set (match_operand:DI 0 "gr_register_operand"         "=Rg")
+        (smax:DI (match_operand:DI 1 "gr_register_operand" "Rg")
+                 (match_operand:DI 2 "gr_register_operand" "Rg")))]
+  "TARGET_V3_FEATURES"
   "%0 = max(%1,%2)"
   [(set_attr "type" "X")]
 )
@@ -2406,7 +2514,6 @@
   }
   [(set_attr "type" "multiple,multiple")]
 )
-
 ;; short -> int 
 (define_insn "zero_extendhisi2"
   [(set (match_operand:SI 0 "gr_register_operand"                 "=Rg,Rg")
@@ -2794,6 +2901,83 @@
 )
 
 ;; Now, the actual branch instruction
+;; GPR conditional jump introduced in v3
+;; PDB - Speculative Register Jump
+ (define_insn "gpr_cond_jump"
+   [(set (pc)
+         (if_then_else (match_operator:BI 0 "gpr_cond_jump_operator"
+                         [(match_operand:SI 1 "gr_register_operand" "*Rg")
+                          (const_int 0)])
+                       (label_ref (match_operand 2 "" ""))
+                       (pc)))]
+   "TARGET_V3_FEATURES"
+   { 
+    rtx prediction;
+    int predict_taken = 0;
+    prediction = find_reg_note(insn, REG_BR_PROB, 0);
+    predict_taken = (prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2);
+
+#define QDSP6_FIXUP_GPR_JUMP(string) ((get_attr_length(insn) == 4) ? string : \
+                                       "jump %l4\n%l2:\;jump %l3\n%l4:\;" string)
+
+    
+    if (get_attr_length(insn) == 8) {
+	/* create a new label and swap that with the real target */
+	operands[3] = operands[2];
+	operands[2] = gen_label_rtx();
+	operands[4] = gen_label_rtx();
+    }
+	
+     if (GET_CODE(operands[0]) == EQ)  {
+       if(predict_taken) {
+         return QDSP6_FIXUP_GPR_JUMP("if (%1==#0) jump:t %l2");
+       } 
+       else {
+          return QDSP6_FIXUP_GPR_JUMP("if (%1==#0) jump:nt %l2");
+       }
+      }
+      else if (GET_CODE(operands[0]) == NE) {
+       if(predict_taken) {
+         return QDSP6_FIXUP_GPR_JUMP("if (%1!=#0) jump:t %l2");
+       } 
+       else {
+         return QDSP6_FIXUP_GPR_JUMP("if (%1!=#0) jump:nt %l2");
+       }
+      }
+      else if (GET_CODE(operands[0]) == GE) {
+       if(predict_taken) {
+         return QDSP6_FIXUP_GPR_JUMP("if (%1>=#0) jump:t %l2");
+       } 
+       else {
+         return QDSP6_FIXUP_GPR_JUMP("if (%1>=#0) jump:nt %l2");
+       }
+      }
+      else if (GET_CODE(operands[0]) == LE) {
+       if(predict_taken) {
+         return QDSP6_FIXUP_GPR_JUMP("if (%1<=#0) jump:t %l2");
+       } 
+       else {
+         return QDSP6_FIXUP_GPR_JUMP("if (%1<=#0) jump:nt %l2");
+       }
+      }
+
+      else {
+        gcc_unreachable();
+      }
+
+
+
+    }
+    [(set (attr "type")
+        (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 15000))
+                      (const_string "CR")
+                      (const_string "multiple")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 15000))
+                      (const_int 4)
+                      (const_int 8)))]
+ )
+
 
 (define_insn "cond_jump"
   [(set (pc)
@@ -3017,7 +3201,21 @@
                       (pc)))
    (use (reg:SI LINK_REGNUM))]
   ""
-  "if %C0 jumpr r31"
+  {
+    rtx prediction;
+    int predict_taken = 0;
+    prediction = find_reg_note (insn, REG_BR_PROB, 0);
+    predict_taken = (prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2);
+    if (TARGET_V3_FEATURES)
+    {
+	if (predict_taken)
+		return "if (%C0) jumpr:t r31";
+	else
+		return "if (%C0) jumpr:nt r31";
+    }
+    else
+	return "if %C0 jumpr r31";
+  }
   [(set_attr "type" "JR")]
 )
 
@@ -3056,6 +3254,43 @@
 ;;---------------;;
 ;; indirect_jump ;;
 ;;---------------;;
+;PDB - Speculative Jump - Register Indirect
+
+(define_insn "cond_jump_reg_indirect"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "predicate_operator"
+                        [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
+                         (const_int 0)])
+                        (match_operand 2 "gr_register_operand" "Rg,Rg")
+                      (pc)))]
+  "TARGET_V3_FEATURES"
+  {
+    rtx prediction;
+    prediction = find_reg_note(insn, REG_BR_PROB, 0);
+   
+    if(which_alternative == 0){
+       if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
+          return "if (%C0) jumpr:t %2";
+       }
+       else {
+          return "if (%C0) jumpr:nt %2";
+       }    
+        
+      }
+      else {
+
+       if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
+          return "if (%I0) jumpr:t %2";
+       }
+       else {
+          return "if (%I0) jumpr:nt %2";
+       }    
+        
+
+      }
+  }
+  [(set_attr "type" "JR")]
+)
 
 (define_insn "indirect_jump"
   [(set (pc) (match_operand:SI 0 "nonimmediate_operand" "Rg"))]

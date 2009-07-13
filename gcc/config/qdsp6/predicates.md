@@ -313,6 +313,10 @@
   (match_code "ne,eq")
 )
 
+(define_predicate "gpr_cond_jump_operator"
+  (match_code "ne,eq,ge,le")
+)
+
 ;;---------------;;
 ;; SDATA sorting ;;
 ;;---------------;;
