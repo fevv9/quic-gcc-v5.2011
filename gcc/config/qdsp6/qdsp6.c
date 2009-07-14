@@ -212,7 +212,8 @@ Run-time Target Specification
 #undef TARGET_DEFAULT_TARGET_FLAGS
 #define TARGET_DEFAULT_TARGET_FLAGS \
   (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
-   | MASK_DOT_NEW | MASK_SECTION_SORTING | MASK_PULLUP |  MASK_SECTION_SORTING_CODE_SUPPORT )
+   | MASK_DOT_NEW | MASK_PULLUP | MASK_SECTION_SORTING \
+   | MASK_SECTION_SORTING_CODE_SUPPORT)
 #endif /* !GCC_3_4_6 */
 
 #if !GCC_3_4_6
@@ -656,7 +657,10 @@ qdsp6_init_expanders(void)
 static struct machine_function *
 qdsp6_init_machine_status(void)
 {
-  return ggc_alloc_cleared(sizeof(struct machine_function));
+  struct machine_function *mf;
+  mf = ggc_alloc_cleared(sizeof(struct machine_function));
+  mf->final_info.insns_left_in_packet = 1;
+  return mf;
 }
 
 
@@ -3014,31 +3018,8 @@ qdsp6_output_operand(FILE *f, rtx x, int code ATTRIBUTE_UNUSED)
   PRINT_OPERAND (f, x, code);
 }
 
-/* globals used to pass information from qdsp6_prescan_insn
-   to qdsp6_asm_output_opcode */
 
-/* ??? Put these in the machine_function struct? */
 
-/* the operands of the current instruction */
-static rtx *qdsp6_insn_ops;
-
-/* whether the current insn starts a packet */
-static int qdsp6_start_packet;
-
-/* whether the current insn ends a packet */
-static int qdsp6_end_packet;
-
-/* whether the current packet ends a hardware loop */
-static int qdsp6_endloop;
-
-/* the label at the start of an inner hardware loop */
-static rtx qdsp6_endloop0_label;
-
-/* whether the current insn should be printed */
-static int qdsp6_do_not_print_insn;
-
-/* whether the current insn should be indented */
-static int qdsp6_indent_insn;
 
 /* Used by macro ASM_OUTPUT_OPCODE
 
@@ -3048,6 +3029,7 @@ static int qdsp6_indent_insn;
 const char *
 qdsp6_asm_output_opcode(FILE *f, const char *ptr)
 {
+  struct qdsp6_final_info *final_info;
   int c;
   int ended_packet = 0;
   int oporder[MAX_RECOG_OPERANDS];
@@ -3058,16 +3040,18 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
     return ptr;
   }
 
+  final_info = &cfun->machine->final_info;
+
   /* Ignore the output template for this insn. */
-  if(qdsp6_do_not_print_insn){
+  if(!final_info->print_insn){
     for(; *ptr; ptr++);
   }
 
   /* Begin packet. */
-  if(qdsp6_start_packet){
+  if(final_info->start_packet){
     fputs("{\n\t\t", f);
   }
-  else if(qdsp6_indent_insn){
+  else if(final_info->indent_insn){
     fputc('\t', f);
   }
 
@@ -3081,7 +3065,7 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
         memset(opoutput, 0, sizeof(opoutput));
 
         putc(c, f);
-        if(qdsp6_indent_insn){
+        if(final_info->indent_insn){
           putc('\t', f);
         }
         break;
@@ -3108,31 +3092,31 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
             output_operand_lossage("operand number missing after %%-letter");
           }
           else if(letter == 'l'){
-            output_asm_label(qdsp6_insn_ops[opnum]);
+            output_asm_label(final_info->insn_ops[opnum]);
           }
           else if(letter == 'a'){
-            output_address(qdsp6_insn_ops[opnum]);
+            output_address(final_info->insn_ops[opnum]);
           }
           else if(letter == 'c'){
-            if(CONSTANT_ADDRESS_P (qdsp6_insn_ops[opnum])){
-              output_addr_const(f, qdsp6_insn_ops[opnum]);
+            if(CONSTANT_ADDRESS_P (final_info->insn_ops[opnum])){
+              output_addr_const(f, final_info->insn_ops[opnum]);
             }
             else {
-              qdsp6_output_operand(f, qdsp6_insn_ops[opnum], 'c');
+              qdsp6_output_operand(f, final_info->insn_ops[opnum], 'c');
             }
           }
           else if(letter == 'n'){
-            if(GET_CODE (qdsp6_insn_ops[opnum]) == CONST_INT){
+            if(GET_CODE (final_info->insn_ops[opnum]) == CONST_INT){
               fprintf(f, HOST_WIDE_INT_PRINT_DEC,
-                      -INTVAL (qdsp6_insn_ops[opnum]));
+                      -INTVAL (final_info->insn_ops[opnum]));
             }
             else {
               putc('-', f);
-              output_addr_const(f, qdsp6_insn_ops[opnum]);
+              output_addr_const(f, final_info->insn_ops[opnum]);
             }
           }
           else {
-            qdsp6_output_operand(f, qdsp6_insn_ops[opnum], letter);
+            qdsp6_output_operand(f, final_info->insn_ops[opnum], letter);
           }
 
           if(!opoutput[opnum]){
@@ -3149,7 +3133,7 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
           char *endptr;
 
           opnum = strtoul(ptr, &endptr, 10);
-          qdsp6_output_operand(f, qdsp6_insn_ops[opnum], 0);
+          qdsp6_output_operand(f, final_info->insn_ops[opnum], 0);
 
           if(!opoutput[opnum]){
             oporder[ops++] = opnum;
@@ -3170,21 +3154,21 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
   }
 
   /* End packet. */
-  if(qdsp6_end_packet && !ended_packet){
-    if(qdsp6_endloop){
+  if(final_info->end_packet && !ended_packet){
+    if(final_info->endloop){
       fputc('}', f);
       /* Print endloops specially. */
-      if(qdsp6_endloop & (1 << 0)){
+      if(final_info->endloop & (1 << 0)){
         fputs(":endloop0 // start=", f);
-        output_asm_label(qdsp6_endloop0_label);
-        if(qdsp6_endloop & (1 << 1)){
+        output_asm_label(final_info->endloop0_label);
+        if(final_info->endloop & (1 << 1)){
           fputs("\n\t :endloop1 // start=", f);
-          output_asm_label(qdsp6_insn_ops[0]);
+          output_asm_label(final_info->insn_ops[0]);
         }
       }
-      else if(qdsp6_endloop & (1 << 1)){
+      else if(final_info->endloop & (1 << 1)){
         fputs(":endloop1 // start=", f);
-        output_asm_label(qdsp6_insn_ops[0]);
+        output_asm_label(final_info->insn_ops[0]);
       }
     }
     else {
@@ -3219,19 +3203,19 @@ qdsp6_final_prescan_insn(
   int numops ATTRIBUTE_UNUSED
 )
 {
-  /* ??? Put these in the machine_function struct? */
-  static int insns_left_in_packet = 1;
-  static int form_packet;
+  struct qdsp6_final_info *final_info;
 
   if(!(optimize && flag_schedule_insns_after_reload)){
     return;
   }
 
-  qdsp6_insn_ops = ops;
-  qdsp6_start_packet = 0;
-  qdsp6_end_packet = 0;
-  qdsp6_do_not_print_insn = 0;
-  qdsp6_indent_insn = 1;
+  final_info = &cfun->machine->final_info;
+
+  final_info->insn_ops = ops;
+  final_info->start_packet = false;
+  final_info->end_packet = false;
+  final_info->print_insn = true;
+  final_info->indent_insn = true;
 
   if(!INSN_P (insn) || INSN_CODE (insn) == -1){
     return;
@@ -3239,48 +3223,48 @@ qdsp6_final_prescan_insn(
 
   /* Don't indent .faligns. */
   if(INSN_CODE (insn) == CODE_FOR_falign){
-    qdsp6_indent_insn = 0;
+    final_info->indent_insn = false;
   }
 
   /* If any instructions in the curent packet have not been printed, then they
      have already been scanned. */
-  if(--insns_left_in_packet > 0){
+  if(--final_info->insns_left_in_packet > 0){
     /* Print endloops specially instead of using the template in the machine
        description. */
-    if(qdsp6_endloop && ENDLOOP_INSN (insn)){
-      qdsp6_do_not_print_insn = 1;
+    if(final_info->endloop && ENDLOOP_INSN (insn)){
+      final_info->print_insn = false;
     }
     /* If we intend to output an endloop0 specially, then save its label. */
-    if(qdsp6_endloop & (1 << 0) && INSN_CODE (insn) == CODE_FOR_endloop0){
-      qdsp6_endloop0_label = ops[0];
+    if(final_info->endloop & (1 << 0) && INSN_CODE (insn) == CODE_FOR_endloop0){
+      final_info->endloop0_label = ops[0];
     }
     /* If this is the last insn in a packet, then end the packet. */
-    if(insns_left_in_packet == 1 && form_packet){
-      qdsp6_end_packet = 1;
+    if(final_info->insns_left_in_packet == 1 && final_info->form_packet){
+      final_info->end_packet = true;
       /* Don't indent endloops. */
-      if(qdsp6_endloop){
-        qdsp6_indent_insn = 0;
+      if(final_info->endloop){
+        final_info->indent_insn = false;
       }
     }
     return;
   }
 
-  qdsp6_endloop = 0;
+  final_info->endloop = 0;
 
   /* Scan all of the insns for the next packet. */
   do {
     /* Record whether this packet ends a hardware loop. */
-    if(ENDLOOP_INSN (insn) && insns_left_in_packet){
+    if(ENDLOOP_INSN (insn) && final_info->insns_left_in_packet){
       if(INSN_CODE (insn) == CODE_FOR_endloop0){
-        qdsp6_endloop |= 1 << 0;
+        final_info->endloop |= 1 << 0;
       }
       else {
-        qdsp6_endloop |= 1 << 1;
+        final_info->endloop |= 1 << 1;
       }
     }
     /* Count the insns in this packet. */
     if(INSN_CODE (insn) != -1){
-      insns_left_in_packet++;
+      final_info->insns_left_in_packet++;
     }
     /* Advance and skip notes. */
     for(insn = NEXT_INSN (insn);
@@ -3289,12 +3273,12 @@ qdsp6_final_prescan_insn(
   }while(insn && INSN_P (insn) && GET_MODE (insn) != TImode);
 
   /* If we counted more than one insn, then form a packet. */
-  if(insns_left_in_packet > 1){
-    form_packet = 1;
-    qdsp6_start_packet = 1;
+  if(final_info->insns_left_in_packet > 1){
+    final_info->form_packet = true;
+    final_info->start_packet = true;
   }
   else {
-    form_packet = 0;
+    final_info->form_packet = false;
   }
 }
 
