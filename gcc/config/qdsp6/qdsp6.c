@@ -6974,12 +6974,6 @@ qdsp6_packet_insn_internal_dependence(
     num_insns--;
   }
 
-  /* When pulling an insn across a basic block, ignore the jump. */
-  if(packet->num_insns
-     && QDSP6_JUMP_P (packet->insns[packet->num_insns - 1])){
-    num_insns--;
-  }
-
   for(i = 0; i < num_insns; i++){
     /* We can have truly dependent insns in the same packet becasue of .new. */
     qdsp6_insns_truly_dependent(packet->insns[i], insn_info, dependence);
