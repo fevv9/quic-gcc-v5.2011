@@ -6965,9 +6965,13 @@ qdsp6_packet_insn_internal_dependence(
   *dependence = QDSP6_DEP_NONE;
 
   num_insns = packet->num_insns;
+
+
 /*   When pulling an insn across a basic block, ignore the jump. */
-  /* PDB. DO NOT ignore register conditional jumps though, because they do read something other than
+  
+/* PDB. DO NOT ignore register conditional jumps though, because they do read something other than
      a predicate register.*/
+
   if(packet->num_insns
      && ((QDSP6_JUMP_P (packet->insns[packet->num_insns - 1]))
 	 && (!QDSP6_REGCOND_JUMP_P(packet->insns[packet->num_insns - 1])))){
