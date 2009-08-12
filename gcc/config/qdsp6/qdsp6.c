@@ -767,14 +767,14 @@ Layout of Source Language Data Types
 #if !GCC_3_4_6
 /* Implements hook TARGET_DEFAULT_SHORT_ENUMS
 
-   As specified by the ABI, enumerated types behave like the smallest integer
-   type that can hold all of the enumerated constants associated with the
-   enumerated type. */
+   The default ABI specifies that enumerated types behave like the smallest
+   integer type that can hold all of the enumerated constants associated with
+   the enumerated type.  Linux requires its ABI to specify non-short enums. */
 
 static bool
 qdsp6_default_short_enums(void)
 {
-  return true;
+  return qdsp6_abi != QDSP6_ABI_LINUX;
 }
 #endif /* !GCC_3_4_6 */
 
@@ -792,15 +792,13 @@ Basic Characteristics of Registers
 void
 qdsp6_conditional_register_usage(void)
 {
-  if(qdsp6_abi == QDSP6_ABI_2){
-    call_used_regs[16] = 0;
-    call_used_regs[17] = 0;
-    call_used_regs[18] = 0;
-    call_used_regs[19] = 0;
-    call_used_regs[20] = 0;
-    call_used_regs[21] = 0;
-    call_used_regs[22] = 0;
-    call_used_regs[23] = 0;
+  int i;
+  if(qdsp6_abi != QDSP6_ABI_1){
+    for(i = 16; i < 24; i++){
+      if(!fixed_regs[i]){
+        call_used_regs[i] = 0;
+      }
+    }
   }
 }
 

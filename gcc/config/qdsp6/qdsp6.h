@@ -1216,6 +1216,7 @@ struct qdsp6_arch_table_entry {
 enum qdsp6_abi {
   QDSP6_ABI_1,
   QDSP6_ABI_2,
+  QDSP6_ABI_LINUX,
   NUM_QDSP6_ABI,
   QDSP6_ABI_UNSPECIFIED
 };
@@ -1233,10 +1234,11 @@ struct qdsp6_abi_table_entry {
 #define QDSP6_ABI_TABLE_INITIALIZER \
   { \
     {"abi1", QDSP6_ABI_1}, \
-    {"abi2", QDSP6_ABI_2} \
+    {"abi2", QDSP6_ABI_2}, \
+    {"linux", QDSP6_ABI_LINUX} \
   }
 
-#define QDSP6_ABI_TABLE_DEFAULT_INDEX 0
+#define QDSP6_ABI_TABLE_DEFAULT_INDEX QDSP6_ABI_1
 
 #if GCC_3_4_6
 extern const char *qdsp6_oslib_string;
