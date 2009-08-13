@@ -6685,26 +6685,12 @@
         (match_operand:SI 1 "gr_register_operand" ""))
    (set (match_operand:SI 2 "gr_register_operand" "")
         (match_operand:SI 3 "gr_register_operand" ""))]
-  "true_regnum(operands[0]) % 2 == 0
-   && true_regnum(operands[0]) + 1 == true_regnum(operands[2])"
+  "   (   true_regnum(operands[0]) % 2 == 0
+       && true_regnum(operands[0]) + 1 == true_regnum(operands[2]))
+   || (   true_regnum(operands[2]) % 2 == 0
+       && true_regnum(operands[2]) + 1 == true_regnum(operands[0]))"
   [(parallel [(set (match_dup 0) (match_dup 1))
               (set (match_dup 2) (match_dup 3))])]
-  {
-    if(true_regnum(operands[3]) == true_regnum(operands[0])){
-      operands[3] = operands[1];
-    }
-  }
-)
-
-(define_peephole2
-  [(set (match_operand:SI 0 "gr_register_operand" "")
-        (match_operand:SI 1 "gr_register_operand" ""))
-   (set (match_operand:SI 2 "gr_register_operand" "")
-        (match_operand:SI 3 "gr_register_operand" ""))]
-  "true_regnum(operands[2]) % 2 == 0
-   && true_regnum(operands[2]) + 1 == true_regnum(operands[0])"
-  [(parallel [(set (match_dup 2) (match_dup 3))
-              (set (match_dup 0) (match_dup 1))])]
   {
     if(true_regnum(operands[3]) == true_regnum(operands[0])){
       operands[3] = operands[1];
@@ -6717,9 +6703,10 @@
         (match_operand:SI 1 "s8_const_int_operand" ""))
    (set (match_operand:SI 2 "gr_register_operand" "")
         (match_operand:SI 3 "s8_const_int_operand" ""))]
-  "TARGET_V2_FEATURES
-   && true_regnum(operands[0]) % 2 == 0
-   && true_regnum(operands[0]) + 1 == true_regnum(operands[2])"
+  "   (   true_regnum(operands[0]) % 2 == 0
+       && true_regnum(operands[0]) + 1 == true_regnum(operands[2]))
+   || (   true_regnum(operands[2]) % 2 == 0
+       && true_regnum(operands[2]) + 1 == true_regnum(operands[0]))"
   [(parallel [(set (match_dup 0) (match_dup 1))
               (set (match_dup 2) (match_dup 3))])]
   ""
@@ -6727,14 +6714,17 @@
 
 (define_peephole2
   [(set (match_operand:SI 0 "gr_register_operand" "")
-        (match_operand:SI 1 "s8_const_int_operand" ""))
+        (match_operand:SI 1 "const_int_operand" ""))
    (set (match_operand:SI 2 "gr_register_operand" "")
-        (match_operand:SI 3 "s8_const_int_operand" ""))]
-  "TARGET_V2_FEATURES
-   && true_regnum(operands[2]) % 2 == 0
-   && true_regnum(operands[2]) + 1 == true_regnum(operands[0])"
-  [(parallel [(set (match_dup 2) (match_dup 3))
-              (set (match_dup 0) (match_dup 1))])]
+        (match_operand:SI 3 "const_int_operand" ""))]
+  "TARGET_CONST64
+   && (
+          (   true_regnum(operands[0]) % 2 == 0
+           && true_regnum(operands[0]) + 1 == true_regnum(operands[2]))
+       || (   true_regnum(operands[2]) % 2 == 0
+           && true_regnum(operands[2]) + 1 == true_regnum(operands[0])))"
+  [(parallel [(set (match_dup 0) (match_dup 1))
+              (set (match_dup 2) (match_dup 3))])]
   ""
 )
 
@@ -6806,59 +6796,6 @@
   ""
 )
 
- (define_peephole2
-   [(set (match_operand:SI 0 "register_operand" "")
-         (match_operand:SI 1 "immediate_operand" ""))
-    (set (match_operand:SI 2 "register_operand" "")
-         (match_operand:SI 3 "immediate_operand" ""))]
-   "  TARGET_CONST64
-      && reload_completed
-      && !(memory_operand(operands[0], SImode))
-      && !(memory_operand(operands[2], SImode))
-      && (GET_CODE (operands[1]) == CONST_INT)
-      && (GET_CODE (operands[3]) == CONST_INT)
-      && !s16_const_int_operand(operands[1], SImode) 
-      && !s16_const_int_operand(operands[3], SImode) 
-      && REGNO (operands[0]) % 2 == 0
-      && REGNO (operands[0]) + 1 == REGNO (operands[2])"
-       [(set (match_dup:DI 0) (match_dup:DI 1) )]
-   {
-       unsigned  int     left    = INTVAL (operands[3]);
-       unsigned  int     right   = INTVAL (operands[1]);
-       unsigned HOST_WIDE_INT    value   = left;
-       value     = value << 32;
-       value     |= right;
-       operands[0]       = gen_rtx_REG (DImode, REGNO (operands[0])); 
-       operands[1]       = gen_int_mode(value,DImode); 
-  }
- )
-
- (define_peephole2
-   [(set (match_operand:SI 0 "register_operand" "")
-         (match_operand:SI 1 "immediate_operand" ""))
-    (set (match_operand:SI 2 "register_operand" "")
-         (match_operand:SI 3 "immediate_operand" ""))]
-   "  TARGET_CONST64
-      && reload_completed
-      && !(memory_operand(operands[0], SImode))
-      && !(memory_operand(operands[2], SImode))
-      && (GET_CODE (operands[1]) == CONST_INT)
-      && (GET_CODE (operands[3]) == CONST_INT)
-      && !s16_const_int_operand(operands[1], SImode)
-      && !s16_const_int_operand(operands[3], SImode) 
-      && REGNO (operands[2]) % 2 == 0
-      && REGNO (operands[2]) + 1 == REGNO (operands[0])"
-       [(set (match_dup:DI 0) (match_dup:DI 1) )]
-   {
-       unsigned	int	left	= INTVAL (operands[1]); 
-       unsigned  int	right	= INTVAL (operands[3]); 
-       unsigned HOST_WIDE_INT	value	= left; 
-       value	= value << 32; 
-       value 	|= right; 
-       operands[0]       = gen_rtx_REG (DImode, REGNO (operands[2]));
-       operands[1]       = gen_int_mode(value,DImode); // Create CONST64 out of two immediates
-  }
- )
 
 
 
@@ -6866,96 +6803,77 @@
 ;; Patterns Produced by Peepholes ;;
 ;;--------------------------------;;
 
- (define_insn_and_split "cond_combinesi"
-   [(cond_exec
-      (match_operator:BI 4 "predicate_operator"
-        [(match_operand:BI 5 "pr_register_operand" "RpRnp")
-         (const_int 0)])
-    (parallel
-    [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-          (match_operand:SI 1 "gr_register_operand"  "Rg"))
-     (set (match_operand:SI 2 "gr_register_operand" "=Rg")
-          (match_operand:SI 3 "gr_register_operand"  "Rg"))]))]
-   "reload_completed
-    && REGNO (operands[0]) % 2 == 0
-    && REGNO (operands[0]) + 1 == REGNO (operands[2])"
-   "if (%C4)     %P0 = combine(%3,%1)"
-   "!(REGNO (operands[0]) % 2 == 0
-      && REGNO (operands[0]) + 1 == REGNO (operands[2]))"
-   [(cond_exec (match_op_dup 4 [(match_dup 5) (const_int 0)]) (set (match_dup 0) (match_dup 1)))
-    (cond_exec (match_op_dup 4 [(match_dup 5) (const_int 0)]) (set (match_dup 2) (match_dup 3)))]
-   {
-     if(REGNO (operands[0]) == REGNO (operands[3])){
-       rtx swap_temp;
-       gcc_assert(REGNO (operands[1]) != REGNO (operands[2]));
-       swap_temp = operands[0];
-       operands[0] = operands[2];
-       operands[2] = swap_temp;
-       swap_temp = operands[1];
-       operands[1] = operands[3];
-       operands[3] = swap_temp;
-     }
-   }
-   [(set_attr "type" "A")]
- )
+
 
 (define_insn_and_split "combinesi"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (match_operand:SI 1 "gr_register_operand"  "Rg"))
-   (set (match_operand:SI 2 "gr_register_operand" "=Rg")
-        (match_operand:SI 3 "gr_register_operand"  "Rg"))]
-  "reload_completed
-   && REGNO (operands[0]) % 2 == 0
-   && REGNO (operands[0]) + 1 == REGNO (operands[2])"
-  "%P0 = combine(%3,%1)"
-  "!(REGNO (operands[0]) % 2 == 0
-     && REGNO (operands[0]) + 1 == REGNO (operands[2]))"
-  [(set (match_dup 0) (match_dup 1))
-   (set (match_dup 2) (match_dup 3))]
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg,Rg")
+        (match_operand:SI 1 "nonmemory_operand"    "Rg,Is8, i"))
+   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg,Rg")
+        (match_operand:SI 3 "nonmemory_operand"    "Rg,Is8, i"))]
+  "reload_completed"
   {
-    if(REGNO (operands[0]) == REGNO (operands[3])){
-      rtx swap_temp;
-      gcc_assert(REGNO (operands[1]) != REGNO (operands[2]));
-      swap_temp = operands[0];
-      operands[0] = operands[2];
-      operands[2] = swap_temp;
-      swap_temp = operands[1];
+    HOST_WIDE_INT high, low;
+    if(REGNO (operands[2]) % 2 == 0){
+      operands[0] = operands[1];
       operands[1] = operands[3];
-      operands[3] = swap_temp;
+      operands[3] = operands[0];
+      operands[0] = operands[2];
+    }
+    switch(which_alternative){
+      case 0:
+        return "%P0 = combine(%3,%1)";
+      case 1:
+        return "%P0 = combine(#%3,#%1)";
+      case 2:
+        gcc_assert(TARGET_CONST64);
+        gcc_assert(const_int_operand(operands[1], SImode));
+        gcc_assert(const_int_operand(operands[3], SImode));
+        low = INTVAL (operands[1]);
+        high = INTVAL (operands[3]);
+        operands[1] = gen_int_mode((high << 32ULL) | (low & 0x0FFFFFFFFULL),
+                                   DImode);
+        return "%P0 = CONST64(#%1)";
+      default:
+        gcc_unreachable();
     }
   }
-  [(set_attr "type" "A")]
+  "!(   (   REGNO (operands[0]) % 2 == 0
+         && REGNO (operands[0]) + 1 == REGNO (operands[2]))
+     || (   REGNO (operands[2]) % 2 == 0
+         && REGNO (operands[2]) + 1 == REGNO (operands[0])))"
+  [(set (match_dup 0) (match_dup 1))
+   (set (match_dup 2) (match_dup 3))]
+  ""
+  [(set_attr "type" "A,A,Load")]
 )
 
-(define_insn_and_split "combineisi"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg")
-        (match_operand:SI 1 "nonmemory_operand"    "Rg,Is8"))
-   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg")
-        (match_operand:SI 3 "nonmemory_operand"    "Rg,Is8"))]
-  "TARGET_V2_FEATURES
-   && reload_completed
-   && REGNO (operands[0]) % 2 == 0
-   && REGNO (operands[0]) + 1 == REGNO (operands[2])"
-  "@
-   %P0 = combine(%3,%1)
-   %P0 = combine(#%3,#%1)"
-  "!(REGNO (operands[0]) % 2 == 0
-     && REGNO (operands[0]) + 1 == REGNO (operands[2]))"
-  [(set (match_dup 0) (match_dup 1))
-   (set (match_dup 2) (match_dup 3))]
+(define_insn_and_split "cond_combinesi"
+  [(cond_exec
+     (match_operator:BI 4 "predicate_operator"
+       [(match_operand:BI 5 "pr_register_operand" "RpRnp")
+        (const_int 0)])
+   (parallel
+   [(set (match_operand:SI 0 "gr_register_operand"  "=Rg")
+         (match_operand:SI 1 "gr_register_operand"   "Rg"))
+    (set (match_operand:SI 2 "gr_register_operand"  "=Rg")
+         (match_operand:SI 3 "gr_register_operand"   "Rg"))]))]
+  "reload_completed"
   {
-    if(REG_P (operands[3]) && REGNO (operands[0]) == REGNO (operands[3])){
-      rtx swap_temp;
-      gcc_assert(REGNO (operands[1]) != REGNO (operands[2]));
-      swap_temp = operands[0];
-      operands[0] = operands[2];
-      operands[2] = swap_temp;
-      swap_temp = operands[1];
-      operands[1] = operands[3];
-      operands[3] = swap_temp;
+    if(REGNO (operands[0]) % 2 == 0){
+      return "if (%C4) %P0 = combine(%3,%1)";
+    }
+    else {
+      return "if (%C4) %P2 = combine(%1,%3)";
     }
   }
-  [(set_attr "type" "A,A")]
+  "!(   (   REGNO (operands[0]) % 2 == 0
+         && REGNO (operands[0]) + 1 == REGNO (operands[2]))
+     || (   REGNO (operands[2]) % 2 == 0
+         && REGNO (operands[2]) + 1 == REGNO (operands[0])))"
+  [(cond_exec (match_op_dup 4 [(match_dup 5) (const_int 0)]) (set (match_dup 0) (match_dup 1)))
+   (cond_exec (match_op_dup 4 [(match_dup 5) (const_int 0)]) (set (match_dup 2) (match_dup 3)))]
+  ""
+  [(set_attr "type" "A")]
 )
 
 
