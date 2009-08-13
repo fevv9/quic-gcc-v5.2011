@@ -601,12 +601,7 @@ qdsp6_override_options(void)
   }
 
   if(!g_switch_set){
-    if(TARGET_G0_LIB && TARGET_BUILDING_MULTILIB){
-      g_switch_value = 0;
-    }
-    else {
-      g_switch_value = 2 * UNITS_PER_WORD;
-    }
+    g_switch_value = 2 * UNITS_PER_WORD;
   }
 
   /* Align functions to 16-byte boundaries to prevent

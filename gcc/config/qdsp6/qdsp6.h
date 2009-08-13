@@ -60,15 +60,9 @@ Controlling the Compilation Driver, gcc
    ABI.  For some reason, RMS wants this bit of implementation defined behavior
    to be consistent for GCC across targets unlike everything else commonly
    specified by ABIs. */
-#if GCC_3_4_6
-#define CC1_SPEC "%{G*} -funsigned-bitfields"
+#define CC1_SPEC "%{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} -funsigned-bitfields"
 
-#define CC1PLUS_SPEC "%{G*} -funsigned-bitfields"
-#else /* !GCC_3_4_6 */
-#define CC1_SPEC "%{G*} -funsigned-bitfields"
-
-#define CC1PLUS_SPEC "%{G*} -funsigned-bitfields"
-#endif /* !GCC_3_4_6 */
+#define CC1PLUS_SPEC "%{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} -funsigned-bitfields"
 
 
 /*---------------------------
