@@ -40,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "flags.h"
 #include "hard-reg-set.h"
 #include "basic-block.h"
+#include "target.h"
 #endif
 
 static FILE *outfile;
@@ -626,6 +627,14 @@ debug_rtx (const_rtx x)
 {
   outfile = stderr;
   sawclose = 0;
+#ifndef GENERATOR_FILE
+  if (targetm.print_rtl_pseudo_asm)
+    {
+      fputs (";; ", stderr);
+      targetm.print_rtl_pseudo_asm (stderr, x);
+      fputc ('\n', stderr);
+    }
+#endif
   print_rtx (x);
   fprintf (stderr, "\n");
 }
@@ -732,6 +741,17 @@ print_rtl (FILE *outf, const_rtx rtx_first)
       case BARRIER:
 	for (tmp_rtx = rtx_first; tmp_rtx != 0; tmp_rtx = NEXT_INSN (tmp_rtx))
 	  {
+#ifndef GENERATOR_FILE
+            if (print_rtx_head[0] == '\0' && targetm.print_rtl_pseudo_asm)
+              {
+                if (sawclose)
+                  fputc ('\n', outfile);
+                fputs (";; ", outfile);
+                targetm.print_rtl_pseudo_asm (outfile, tmp_rtx);
+                if (!sawclose)
+                  fputc ('\n', outfile);
+              }
+#endif
 	    fputs (print_rtx_head, outfile);
 	    print_rtx (tmp_rtx);
 	    fprintf (outfile, "\n");
@@ -739,6 +759,14 @@ print_rtl (FILE *outf, const_rtx rtx_first)
 	break;
 
       default:
+#ifndef GENERATOR_FILE
+        if (print_rtx_head[0] == '\0' && targetm.print_rtl_pseudo_asm)
+          {
+            fputs (";; ", outfile);
+            targetm.print_rtl_pseudo_asm (outfile, rtx_first);
+            fputc ('\n', outfile);
+          }
+#endif
 	fputs (print_rtx_head, outfile);
 	print_rtx (rtx_first);
       }
@@ -752,6 +780,14 @@ print_rtl_single (FILE *outf, const_rtx x)
 {
   outfile = outf;
   sawclose = 0;
+#ifndef GENERATOR_FILE
+  if (print_rtx_head[0] == '\0' && targetm.print_rtl_pseudo_asm)
+    {
+      fputs (";; ", outfile);
+      targetm.print_rtl_pseudo_asm (outfile, x);
+      fputc ('\n', outfile);
+    }
+#endif
   fputs (print_rtx_head, outfile);
   print_rtx (x);
   putc ('\n', outf);
