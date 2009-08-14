@@ -6168,14 +6168,18 @@ bool
 qdsp6_expand_movmem(rtx operands[])
 {
   rtx src_0, dst_0, src_reg, dst_reg, src_mem, dst_mem, value_reg, count_reg;
-  rtx label;
+  rtx label, loopcount_rtx, doloop_fixup_code;
   int count, loopcount, align;
+  bool volatile_p;
 
   align = INTVAL (operands[3]);
 
   if((align & 3) != 0  || GET_CODE (operands[2]) != CONST_INT){
     return false;
   }
+
+  volatile_p = MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
+               || !qdsp6_dual_memory_accesses;
 
   src_0 = operands[1];
   dst_0 = operands[0];
@@ -6185,41 +6189,65 @@ qdsp6_expand_movmem(rtx operands[])
 
   if((align & 7) == 0){
 
+    src_mem = change_address(src_0, DImode, src_reg);
+    dst_mem = change_address(dst_0, DImode, dst_reg);
+
     loopcount = count >> 3;
     if(loopcount > 2){
 
       value_reg = gen_reg_rtx(DImode);
-      src_mem = change_address(src_0, DImode, src_reg);
       count_reg = gen_reg_rtx(SImode);
+      doloop_fixup_code = GEN_INT (REGNO (count_reg));
+      loopcount_rtx = gen_int_mode(volatile_p ? loopcount : loopcount - 1,
+                                   SImode);
       label = gen_label_rtx();
 
-      emit_move_insn(value_reg, src_mem);
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-      emit_insn(gen_doloop_begin0(gen_int_mode(loopcount - 1, SImode),
-                                  GEN_INT (REGNO (count_reg))));
+      if(!volatile_p){
+        emit_move_insn(value_reg, src_mem);
+        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
+      }
+
+      if(TARGET_HARDWARE_LOOPS){
+        emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+      }
+      else {
+        emit_move_insn(count_reg, loopcount_rtx);
+      }
+
       emit_label(label);
 
-      src_mem = change_address(src_0, DImode, src_reg);
-      dst_mem = change_address(dst_0, DImode, dst_reg);
-
-      emit_insn(gen_memcpy_kerneldi(dst_mem, value_reg, value_reg, src_mem));
+      if(volatile_p){
+        emit_move_insn(value_reg, src_mem);
+        emit_move_insn(dst_mem, value_reg);
+      }
+      else {
+        emit_insn(gen_memcpy_kerneldi(dst_mem, value_reg, value_reg, src_mem));
+      }
       emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
       emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-      emit_jump_insn(gen_endloop0(label, GEN_INT (REGNO (count_reg))));
-      qdsp6_hardware_loop();
 
-      dst_mem = change_address(dst_0, DImode, dst_reg);
+      if(TARGET_HARDWARE_LOOPS){
+        emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
+        qdsp6_hardware_loop();
+      }
+      else {
+        rtx pred = gen_reg_rtx(BImode);
+        emit_insn(gen_addsi3(count_reg, count_reg, constm1_rtx));
+        emit_insn(gen_cmpsi_eq(pred, count_reg, const0_rtx));
+        emit_jump_insn(gen_cond_jump(gen_rtx_EQ (BImode, pred, const0_rtx),
+                                     pred, label));
+      }
 
-      emit_move_insn(dst_mem, value_reg);
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
+      if(!volatile_p){
+        emit_move_insn(dst_mem, value_reg);
+        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
+      }
 
     }
     else {
       for(; loopcount; loopcount--){
 
         value_reg = gen_reg_rtx(DImode);
-        src_mem = change_address(src_0, DImode, src_reg);
-        dst_mem = change_address(dst_0, DImode, dst_reg);
 
         emit_move_insn(value_reg, src_mem);
         emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
@@ -6244,41 +6272,65 @@ qdsp6_expand_movmem(rtx operands[])
   }
   else {
 
+    src_mem = change_address(src_0, SImode, src_reg);
+    dst_mem = change_address(dst_0, SImode, dst_reg);
+
     loopcount = count >> 2;
     if(loopcount > 2){
 
       value_reg = gen_reg_rtx(SImode);
-      src_mem = change_address(src_0, SImode, src_reg);
       count_reg = gen_reg_rtx(SImode);
+      doloop_fixup_code = GEN_INT (REGNO (count_reg));
+      loopcount_rtx = gen_int_mode(volatile_p ? loopcount : loopcount - 1,
+                                   SImode);
       label = gen_label_rtx();
 
-      emit_move_insn(value_reg, src_mem);
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-      emit_insn(gen_doloop_begin0(gen_int_mode(loopcount - 1, SImode),
-                                  GEN_INT (REGNO (count_reg))));
+      if(!volatile_p){
+        emit_move_insn(value_reg, src_mem);
+        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
+      }
+
+      if(TARGET_HARDWARE_LOOPS){
+        emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+      }
+      else {
+        emit_move_insn(count_reg, loopcount_rtx);
+      }
+
       emit_label(label);
 
-      src_mem = change_address(src_0, SImode, src_reg);
-      dst_mem = change_address(dst_0, SImode, dst_reg);
-
-      emit_insn(gen_memcpy_kernelsi(dst_mem, value_reg, value_reg, src_mem));
+      if(volatile_p){
+        emit_move_insn(value_reg, src_mem);
+        emit_move_insn(dst_mem, value_reg);
+      }
+      else {
+        emit_insn(gen_memcpy_kernelsi(dst_mem, value_reg, value_reg, src_mem));
+      }
       emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
       emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-      emit_jump_insn(gen_endloop0(label, GEN_INT (REGNO (count_reg))));
-      qdsp6_hardware_loop();
 
-      dst_mem = change_address(dst_0, SImode, dst_reg);
+      if(TARGET_HARDWARE_LOOPS){
+        emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
+        qdsp6_hardware_loop();
+      }
+      else {
+        rtx pred = gen_reg_rtx(BImode);
+        emit_insn(gen_addsi3(count_reg, count_reg, constm1_rtx));
+        emit_insn(gen_cmpsi_eq(pred, count_reg, const0_rtx));
+        emit_jump_insn(gen_cond_jump(gen_rtx_EQ (BImode, pred, const0_rtx),
+                                     pred, label));
+      }
 
-      emit_move_insn(dst_mem, value_reg);
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
+      if(!volatile_p){
+        emit_move_insn(dst_mem, value_reg);
+        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
+      }
 
     }
     else {
       for(; loopcount; loopcount--){
 
         value_reg = gen_reg_rtx(SImode);
-        src_mem = change_address(src_0, SImode, src_reg);
-        dst_mem = change_address(dst_0, SImode, dst_reg);
 
         emit_move_insn(value_reg, src_mem);
         emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
