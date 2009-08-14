@@ -190,6 +190,18 @@ static rtx qdsp6_expand_builtin(
              enum machine_mode mode,
              int ignore);
 static const char *qdsp6_invalid_within_doloop(const_rtx insn);
+static void qdsp6_print_jump(FILE *file, rtx x);
+static void qdsp6_print_transfer(FILE *file, rtx x);
+static void qdsp6_print_condition(FILE *file, rtx x, bool non_inverted);
+static void qdsp6_print_address(FILE *file, rtx x);
+static void qdsp6_print_unary_op(FILE *file, const char *op, rtx x);
+static void qdsp6_print_binary_op(FILE *file, const char *op, rtx x);
+static void qdsp6_print_swapped_binary_op(FILE *file, const char *op, rtx x);
+static void qdsp6_print_binary_op_with_option(FILE *file, const char *op, const char *option, rtx x);
+static void qdsp6_print_trinary_op(FILE *file, const char *op, rtx x);
+static void qdsp6_print_vecexp(FILE *file, const char *open, const char *separator, const char *close, rtx x);
+static void qdsp6_print_rtx(FILE *file, rtx x);
+static void qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x);
 
 static void qdsp6_compute_dwarf_frame_information(void);
 static void qdsp6_allocate_stack(unsigned HOST_WIDE_INT size);
@@ -430,6 +442,9 @@ Miscellaneous Parameters
 /* ??? Should this be GENERAL_REGS? */
 /*int TARGET_BRANCH_TARGET_REGISTER_CLASS (void)*/
 
+#undef TARGET_PRINT_RTL_PSEUDO_ASM
+#define TARGET_PRINT_RTL_PSEUDO_ASM qdsp6_print_rtl_pseudo_asm
+
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -586,12 +601,7 @@ qdsp6_override_options(void)
   }
 
   if(!g_switch_set){
-    if(TARGET_G0_LIB && TARGET_BUILDING_MULTILIB){
-      g_switch_value = 0;
-    }
-    else {
-      g_switch_value = 2 * UNITS_PER_WORD;
-    }
+    g_switch_value = 2 * UNITS_PER_WORD;
   }
 
   /* Align functions to 16-byte boundaries to prevent
@@ -767,14 +777,14 @@ Layout of Source Language Data Types
 #if !GCC_3_4_6
 /* Implements hook TARGET_DEFAULT_SHORT_ENUMS
 
-   As specified by the ABI, enumerated types behave like the smallest integer
-   type that can hold all of the enumerated constants associated with the
-   enumerated type. */
+   The default ABI specifies that enumerated types behave like the smallest
+   integer type that can hold all of the enumerated constants associated with
+   the enumerated type.  Linux requires its ABI to specify non-short enums. */
 
 static bool
 qdsp6_default_short_enums(void)
 {
-  return true;
+  return qdsp6_abi != QDSP6_ABI_LINUX;
 }
 #endif /* !GCC_3_4_6 */
 
@@ -792,15 +802,13 @@ Basic Characteristics of Registers
 void
 qdsp6_conditional_register_usage(void)
 {
-  if(qdsp6_abi == QDSP6_ABI_2){
-    call_used_regs[16] = 0;
-    call_used_regs[17] = 0;
-    call_used_regs[18] = 0;
-    call_used_regs[19] = 0;
-    call_used_regs[20] = 0;
-    call_used_regs[21] = 0;
-    call_used_regs[22] = 0;
-    call_used_regs[23] = 0;
+  int i;
+  if(qdsp6_abi != QDSP6_ABI_1){
+    for(i = 16; i < 24; i++){
+      if(!fixed_regs[i]){
+        call_used_regs[i] = 0;
+      }
+    }
   }
 }
 
@@ -4362,6 +4370,932 @@ qdsp6_invalid_within_doloop(const_rtx insn)
 
 
 
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (set (pc) (...)) */
+
+static void
+qdsp6_print_jump(FILE *stream, rtx x)
+{
+  /* (set (pc) (if_then_else (...) (...) (...))) */
+  if(x && GET_CODE (x) == SET
+     && SET_SRC (x) && GET_CODE (SET_SRC (x)) == IF_THEN_ELSE){
+    /* (set (pc) (if_then_else (...) (pc) (...))) */
+    if(XEXP (SET_SRC (x), 1) && XEXP (SET_SRC (x), 1) == pc_rtx){
+      qdsp6_print_condition(stream, XEXP (SET_SRC (x), 0), false);
+      /* (set (pc) (if_then_else (...) (pc) (label))) */
+      if(GET_CODE (XEXP (SET_SRC (x), 2)) == LABEL_REF){
+        fputs("jump", stream);
+      }
+      else {
+        fputs("jump ", stream);
+        qdsp6_print_rtx(stream, XEXP (SET_SRC (x), 2));
+      }
+    }
+    /* (set (pc) (if_then_else (...) (...) (pc))) */
+    else if(XEXP (SET_SRC (x), 2) && XEXP (SET_SRC (x), 2) == pc_rtx){
+      qdsp6_print_condition(stream, XEXP (SET_SRC (x), 0), true);
+      /* (set (pc) (if_then_else (...) (label) (pc))) */
+      if(GET_CODE (XEXP (SET_SRC (x), 1)) == LABEL_REF){
+        fputs("jump", stream);
+      }
+      else {
+        fputs("jump ", stream);
+        qdsp6_print_rtx(stream, XEXP (SET_SRC (x), 1));
+      }
+    }
+    else {
+      fputs("jump ", stream);
+      qdsp6_print_rtx(stream, SET_SRC (x));
+    }
+  }
+  /* (set (pc) (reg)) */
+  else if(x && GET_CODE (x) == SET
+          && SET_DEST (x) == pc_rtx
+          && SET_SRC (x) && REG_P (SET_SRC (x))){
+    fputs("jump ", stream);
+    qdsp6_print_rtx(stream, SET_SRC (x));
+  }
+  else {
+    fputs("jump", stream);
+  }
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (set (...) (...)) */
+
+static void
+qdsp6_print_transfer(FILE *stream, rtx x)
+{
+  if(!x){
+    qdsp6_print_rtx(stream, x);
+  }
+  /* (set (pc) (...)) */
+  else if(XEXP (x, 0) == pc_rtx){
+    qdsp6_print_jump(stream, x);
+  }
+  /* (set (reg) (call)) */
+  else if(XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == CALL){
+    fputs("call", stream);
+  }
+  /* (set (zero_extract (...) (...) (...)) (...)) */
+  else if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == ZERO_EXTRACT){
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 0));
+    fputs(" = insert(", stream);
+    qdsp6_print_rtx(stream, XEXP (x, 1));
+    fputc(',', stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 1));
+    fputc(',', stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 2));
+    fputc(')', stream);
+  }
+  /* (set (...) (high (...))) */
+  else if(XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == HIGH){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputs(".h = ", stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 0));
+  }
+  /* (set (reg X) (lo_sum (reg X) (...))) */
+  else if(XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == LO_SUM
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && XEXP (XEXP (x, 1), 0) && REG_P (XEXP (XEXP (x, 1), 0))
+          && REGNO (XEXP (x, 0)) == REGNO (XEXP (XEXP (x, 1), 0))){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputs(".l = ", stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 1));
+  }
+/*
+  else if(XEXP (x, 1) && (   GET_CODE (XEXP (x, 1)) == PLUS
+                          || GET_CODE (XEXP (x, 1)) == MINUS
+                          || GET_CODE (XEXP (x, 1)) == MULT
+                          || GET_CODE (XEXP (x, 1)) == AND
+                          || GET_CODE (XEXP (x, 1)) == IOR
+                          || GET_CODE (XEXP (x, 1)) == XOR)
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && XEXP (XEXP (x, 1), 0) && REG_P (XEXP (XEXP (x, 1), 0))){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputc(' ', stream);
+    switch(GET_CODE (XEXP (x, 1))){
+      case PLUS:
+        fputc('+', stream);
+        break;
+      case MINUS:
+        fputc('-', stream);
+        break;
+      case MULT:
+        fputc('*', stream);
+        break;
+      case AND:
+        fputc('&', stream);
+        break;
+      case IOR:
+        fputc('|', stream);
+        break;
+      case XOR:
+        fputc('^', stream);
+        break;
+      default:
+        break;
+    }
+    fputs("= ", stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 1));
+  }
+  else if(XEXP (x, 1) && (   GET_CODE (XEXP (x, 1)) == PLUS
+                          || GET_CODE (XEXP (x, 1)) == MULT
+                          || GET_CODE (XEXP (x, 1)) == AND
+                          || GET_CODE (XEXP (x, 1)) == IOR
+                          || GET_CODE (XEXP (x, 1)) == XOR)
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && XEXP (XEXP (x, 1), 1) && REG_P (XEXP (XEXP (x, 1), 1))){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputc(' ', stream);
+    switch(GET_CODE (XEXP (x, 1))){
+      case PLUS:
+        fputc('+', stream);
+        break;
+      case MULT:
+        fputc('*', stream);
+        break;
+      case AND:
+        fputc('&', stream);
+        break;
+      case IOR:
+        fputc('|', stream);
+        break;
+      case XOR:
+        fputc('^', stream);
+        break;
+      default:
+        break;
+    }
+    fputs("= ", stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 0));
+  }
+*/
+  else {
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputs(" = ", stream);
+    qdsp6_print_rtx(stream, XEXP (x, 1));
+  }
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm */
+
+static void
+qdsp6_print_condition(FILE *stream, rtx x, bool non_inverted)
+{
+  fputs("if (", stream);
+  if(!x){
+    qdsp6_print_rtx(stream, x);
+  }
+  /* (reg) */
+  else if(REG_P (x)){
+    if(GET_MODE (x) == BImode && !non_inverted){
+      fputc('!', stream);
+    }
+    qdsp6_print_rtx(stream, x);
+    if(GET_MODE (x) != BImode){
+      fputs(non_inverted ? "!=#0" : "==#0", stream);
+    }
+  }
+  /* (ne (reg) (const_int 0)) */
+  else if(GET_CODE (x) == NE && XEXP (x, 1) == const0_rtx
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))){
+    if(GET_MODE (XEXP (x, 0)) == BImode && !non_inverted){
+      fputc('!', stream);
+    }
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(GET_MODE (XEXP (x, 0)) != BImode){
+      fputs(non_inverted ? "!=#0" : "==#0", stream);
+    }
+  }
+  /* (eq (reg) (const_int 0)) */
+  else if(GET_CODE (x) == EQ && XEXP (x, 1) == const0_rtx
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))){
+    if(GET_MODE (XEXP (x, 0)) == BImode && non_inverted){
+      fputc('!', stream);
+    }
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(GET_MODE (XEXP (x, 0)) != BImode){
+      fputs(non_inverted ? "==#0" : "!=#0", stream);
+    }
+  }
+  /* (gt (reg) (const_int 0/-1)) */
+  else if(GET_CODE (x) == GT
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && GET_MODE (XEXP (x, 0)) != BImode
+          && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == constm1_rtx)){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(XEXP (x, 1) == const0_rtx){
+      fputs(non_inverted ? ">#0" : "<=#0", stream);
+    }
+    else {
+      fputs(non_inverted ? ">=#0" : "<#0", stream);
+    }
+  }
+  /* (ge (reg) (const_int 0/1)) */
+  else if(GET_CODE (x) == GE
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && GET_MODE (XEXP (x, 0)) != BImode
+          && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == const1_rtx)){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(XEXP (x, 1) == const0_rtx){
+      fputs(non_inverted ? ">=#0" : "<#0", stream);
+    }
+    else {
+      fputs(non_inverted ? ">#0" : "<=#0", stream);
+    }
+  }
+  /* (lt (reg) (const_int 0/1)) */
+  else if(GET_CODE (x) == LT
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && GET_MODE (XEXP (x, 0)) != BImode
+          && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == const1_rtx)){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(XEXP (x, 1) == const0_rtx){
+      fputs(non_inverted ? "<#0" : ">=#0", stream);
+    }
+    else {
+      fputs(non_inverted ? "<=#0" : ">#0", stream);
+    }
+  }
+  /* (le (reg) (const_int 0/-1)) */
+  else if(GET_CODE (x) == LE
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && GET_MODE (XEXP (x, 0)) != BImode
+          && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == constm1_rtx)){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(XEXP (x, 1) == const0_rtx){
+      fputs(non_inverted ? "<=#0" : ">#0", stream);
+    }
+    else {
+      fputs(non_inverted ? "<#0" : ">=#0", stream);
+    }
+  }
+  else {
+    qdsp6_print_rtx(stream, x);
+  }
+  fputs(") ", stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm */
+
+static void
+qdsp6_print_address(FILE *stream, rtx x)
+{
+  /* (plus (...) (...)) */
+  if(x && GET_CODE (x) == PLUS){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputc('+', stream);
+    qdsp6_print_rtx(stream, XEXP (x, 1));
+  }
+  else {
+    qdsp6_print_rtx(stream, x);
+  }
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...)) */
+
+static void
+qdsp6_print_unary_op(FILE *stream, const char *op, rtx x)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(')', stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...) (...)) */
+
+static void
+qdsp6_print_binary_op(FILE *stream, const char *op, rtx x)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 1));
+  fputc(')', stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...) (...)) */
+
+static void
+qdsp6_print_swapped_binary_op(FILE *stream, const char *op, rtx x)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 1));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(')', stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...) (...)) */
+
+static void
+qdsp6_print_binary_op_with_option(
+  FILE *stream,
+  const char *op,
+  const char *option,
+  rtx x
+)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 1));
+  fputs("):", stream);
+  fputs(option, stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...) (...) (...)) */
+
+static void
+qdsp6_print_trinary_op(FILE *stream, const char *op, rtx x)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 1));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 2));
+  fputc(')', stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (parallel/unspec/unspec_volatile [...]) */
+
+static void
+qdsp6_print_vecexp(
+  FILE *stream,
+  const char *open,
+  const char *separator,
+  const char *close,
+  rtx x
+)
+{
+  int i;
+  fputs(open, stream);
+  for(i = 0; i < XVECLEN (x, 0); i++){
+    if(i > 0){
+      fputs(separator, stream);
+    }
+    qdsp6_print_rtx(stream, XVECEXP (x, 0, i));
+  }
+  fputs(close, stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm */
+
+static void
+qdsp6_print_rtx(FILE *stream, rtx x)
+{
+  const char *op;
+  int size_in_bytes;
+  int i;
+
+  if(!x){
+    fputs("[nil]", stream);
+    return;
+  }
+  else if(GET_CODE (x) > NUM_RTX_CODE){
+    fprintf(stream, "[??? bade code %d]", GET_CODE (x));
+    return;
+  }
+
+  switch(GET_CODE (x)){
+    case SET:
+      qdsp6_print_transfer(stream, x);
+      break;
+    case COND_EXEC:
+      qdsp6_print_condition(stream, XEXP (x, 0), true);
+      qdsp6_print_rtx(stream, XEXP (x, 1));
+      break;
+    case PARALLEL:
+      for(i = XVECLEN (x, 0) - 1; i >= 0; i--){
+        if(XVECEXP (x, 0, i) && GET_CODE (XVECEXP (x, 0, i)) == CLOBBER
+           && i > 0 && XVECEXP (x, 0, i - 1)
+           && (GET_CODE (XVECEXP (x, 0, i - 1)) == CALL
+               || (GET_CODE (XVECEXP (x, 0, i - 1)) == SET
+                   && XEXP (XVECEXP (x, 0, i - 1), 0)
+                   && REG_P (XEXP (XVECEXP (x, 0, i - 1), 0))
+                   && XEXP (XVECEXP (x, 0, i - 1), 1)
+                   && GET_CODE (XEXP (XVECEXP (x, 0, i - 1), 1)) == CALL))){
+        }
+      }
+      qdsp6_print_vecexp(stream, "{ ", "; ", " }", x);
+      break;
+    case UNSPEC:
+      fprintf(stream, "unspec" HOST_WIDE_INT_PRINT_DEC, XINT (x, 1));
+      qdsp6_print_vecexp(stream, "(", ",", ")", x);
+      break;
+    case UNSPEC_VOLATILE:
+      fprintf(stream, "unspec_volatile" HOST_WIDE_INT_PRINT_DEC, XINT (x, 1));
+      qdsp6_print_vecexp(stream, "(", ",", ")", x);
+      break;
+    case PREFETCH:
+      qdsp6_print_unary_op(stream, "dcfetch", x);
+      break;
+    case USE:
+      qdsp6_print_unary_op(stream, "use", x);
+      break;
+    case CLOBBER:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputs(" = clobber()", stream);
+      break;
+    case CALL:
+      fputs("call", stream);
+      break;
+    case RETURN:
+      fputs("jumpr r31", stream);
+      break;
+    case CONST_INT:
+      fputc('#', stream);
+      PRINT_OPERAND (stream, x, 0);
+      break;
+    case CONST_DOUBLE:
+      if(reload_completed){
+        fputc('#', stream);
+        PRINT_OPERAND (stream, x, 0);
+      }
+      else {
+        fputs("#float", stream);
+      }
+      break;
+    case CONST:
+      if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == PLUS
+         && XEXP (XEXP (x, 0), 0)
+         && GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF
+         && XEXP (XEXP (x, 0), 1)
+         && GET_CODE (XEXP (XEXP (x, 0), 1)) == CONST_INT){
+        fputs("#symbol", stream);
+      }
+      else {
+        fputc('#', stream);
+      }
+      break;
+    case PC:
+      fputs("pc", stream);
+      break;
+    case REG:
+      if(reload_completed){
+        PRINT_OPERAND (stream, x, 0);
+      }
+      else {
+        if(C_REG_P (x)){
+          fputs(reg_names[REGNO (x)], stream);
+        }
+        else {
+          switch(GET_MODE (x)){
+            case DFmode:
+              fputs("R:Rf", stream);
+              break;
+            case DImode:
+              fputs("R:R", stream);
+              break;
+            case SFmode:
+              fputs("Rf", stream);
+              break;
+            case BImode:
+              fputc('p', stream);
+              break;
+            default:
+              fputc('R', stream);
+          }
+        }
+      }
+      break;
+    case SCRATCH:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      break;
+    case SUBREG:
+      if(reload_completed){
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+      }
+      else {
+        if(GET_MODE (x) == SImode
+           && XEXP (x, 0) && REG_P (XEXP (x, 0))
+           && GET_MODE (XEXP (x, 0)) == DImode
+           && (XINT (x, 1) == 0 || XINT (x, 1) == 4)){
+          fputc('R', stream);
+        }
+        else {
+          qdsp6_print_rtx(stream, XEXP (x, 0));
+/*
+          fputc('.', stream);
+          size_in_bytes = 1;
+          switch(GET_MODE (x)){
+            case DImode:
+            case DFmode:
+              fputc('d', stream);
+              size_in_bytes = 8;
+              break;
+            case SImode:
+            case SFmode:
+              fputc('w', stream);
+              size_in_bytes = 4;
+              break;
+            case HImode:
+              fputc('h', stream);
+              size_in_bytes = 2;
+              break;
+            case QImode:
+              fputc('b', stream);
+              size_in_bytes = 1;
+              break;
+            default:
+              fputc('?', stream);
+              return;
+          }
+          fputc('[', stream);
+          fprintf(stream, "%d", XINT (x, 1) / size_in_bytes);
+          fputc(']', stream);
+*/
+        }
+      }
+      break;
+    case MEM:
+      fputs("mem", stream);
+      switch(GET_MODE (x)){
+        case DImode:
+          fputc('d', stream);
+          break;
+        case HImode:
+          fputc('h', stream);
+          break;
+        case QImode:
+          fputc('b', stream);
+          break;
+        default:
+          fputc('w', stream);
+      }
+      fputc('(', stream);
+      qdsp6_print_address(stream, XEXP (x, 0));
+      fputc(')', stream);
+      break;
+    case LABEL_REF:
+      fputs(".L", stream);
+      break;
+    case SYMBOL_REF:
+      fputs("#symbol", stream);
+      break;
+    case IF_THEN_ELSE:
+      if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == NE
+         && XEXP (XEXP (x, 0), 1) == const0_rtx){
+        fputs("mux(", stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 0));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (x, 1));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (x, 2));
+        fputc(')', stream);
+      }
+      else if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == EQ
+              && XEXP (XEXP (x, 0), 1) == const0_rtx){
+        fputs("mux(", stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 0));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (x, 2));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (x, 1));
+        fputc(')', stream);
+      }
+      else {
+        qdsp6_print_trinary_op(stream, "mux", x);
+      }
+      break;
+    case PLUS:
+      qdsp6_print_binary_op(stream, "add", x);
+      break;
+    case MINUS:
+      qdsp6_print_binary_op(stream, "sub", x);
+      break;
+    case NEG:
+      qdsp6_print_unary_op(stream, "neg", x);
+      break;
+    case MULT:
+      qdsp6_print_binary_op(stream, "mpyi", x);
+      break;
+    case AND:
+      qdsp6_print_binary_op(stream, "and", x);
+      break;
+    case IOR:
+      qdsp6_print_binary_op(stream, "or", x);
+      break;
+    case XOR:
+      qdsp6_print_binary_op(stream, "xor", x);
+      break;
+    case NOT:
+      qdsp6_print_unary_op(stream, "not", x);
+      break;
+    case ASHIFT:
+      qdsp6_print_binary_op(stream, "asl", x);
+      break;
+    case ROTATE:
+      if(XEXP (x, 0) && REG_P (XEXP (x, 0)) && GET_MODE (XEXP (x, 0)) == SImode
+         && XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == CONST_INT
+         && INTVAL (XEXP (x, 1)) == 16){
+        fputs("combine(", stream);
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(".l,", stream);
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(".h)", stream);
+      }
+      else {
+        qdsp6_print_binary_op(stream, "rotate_left", x);
+      }
+      break;
+    case ASHIFTRT:
+      qdsp6_print_binary_op(stream, "asr", x);
+      break;
+    case LSHIFTRT:
+      qdsp6_print_binary_op(stream, "lsr", x);
+      break;
+    case ROTATERT:
+      if(XEXP (x, 0) && REG_P (XEXP (x, 0)) && GET_MODE (XEXP (x, 0)) == SImode
+         && XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == CONST_INT
+         && INTVAL (XEXP (x, 1)) == 16){
+        fputs("combine(", stream);
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(".l,", stream);
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(".h)", stream);
+      }
+      else {
+        qdsp6_print_binary_op(stream, "rotate_right", x);
+      }
+      break;
+    case SMIN:
+      qdsp6_print_binary_op(stream, "min", x);
+      break;
+    case SMAX:
+      qdsp6_print_binary_op(stream, "max", x);
+      break;
+    case UMIN:
+      qdsp6_print_binary_op(stream, "minu", x);
+      break;
+    case UMAX:
+      qdsp6_print_binary_op(stream, "maxu", x);
+      break;
+    case POST_DEC:
+    case POST_INC:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputs("++#", stream);
+      break;
+    case POST_MODIFY:
+      if(XEXP (x, 0) && REG_P (XEXP (x, 0))
+         && XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == PLUS
+         && XEXP (XEXP (x, 1), 0) && REG_P (XEXP (XEXP (x, 1), 0))
+         && REGNO (XEXP (x, 0)) == REGNO (XEXP (XEXP (x, 1), 0))){
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs("++", stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 1));
+      }
+      else {
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(", ", stream);
+        qdsp6_print_transfer(stream, x);
+      }
+      break;
+    case NE:
+    case EQ:
+      if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == ZERO_EXTRACT
+         && XEXP (XEXP (x, 0), 1) == const1_rtx
+         && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == const1_rtx)){
+        if(XEXP (x, 1) == (GET_CODE (x) == NE ? const1_rtx : const0_rtx)){
+          fputc('!', stream);
+        }
+        fputs("tstbit(", stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 0));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 2));
+        fputc(')', stream);
+      }
+      else {
+        qdsp6_print_binary_op(stream, GET_CODE (x) == NE ? "cmp.ne" : "cmp.eq",
+                              x);
+      }
+      break;
+    case GE:
+      qdsp6_print_binary_op(stream, "cmp.ge", x);
+      break;
+    case GT:
+      qdsp6_print_binary_op(stream, "cmp.gt", x);
+      break;
+    case LE:
+      qdsp6_print_swapped_binary_op(stream, "cmp.gt", x);
+      break;
+    case LT:
+      qdsp6_print_swapped_binary_op(stream, "cmp.ge", x);
+      break;
+    case GEU:
+      qdsp6_print_binary_op(stream, "cmp.geu", x);
+      break;
+    case GTU:
+      qdsp6_print_binary_op(stream, "cmp.gtu", x);
+      break;
+    case LEU:
+      qdsp6_print_swapped_binary_op(stream, "cmp.gtu", x);
+      break;
+    case LTU:
+      qdsp6_print_swapped_binary_op(stream, "cmp.geu", x);
+      break;
+    case SIGN_EXTEND:
+    case ZERO_EXTEND:
+      op = GET_CODE (x) == SIGN_EXTEND ? "sxt" : "zxt";
+      if(!XEXP (x, 0)){
+        qdsp6_print_unary_op(stream, op, XEXP (x, 0));
+      }
+      else {
+        if(GET_CODE (XEXP (x, 0)) == MEM){
+          op = GET_CODE (x) == SIGN_EXTEND ? "mem" : "memu";
+        }
+        fputs(op, stream);
+        switch(GET_MODE (XEXP (x, 0))){
+          case DImode:
+            fputc('d', stream);
+            break;
+          case HImode:
+            fputc('h', stream);
+            break;
+          case QImode:
+            fputc('b', stream);
+            break;
+          default:
+            fputc('w', stream);
+        }
+        if(GET_CODE (XEXP (x, 0)) == MEM){
+          fputc('(', stream);
+          qdsp6_print_address(stream, XEXP (XEXP (x, 0), 0));
+          fputc(')', stream);
+        }
+        else {
+          qdsp6_print_unary_op(stream, "", x);
+        }
+      }
+      break;
+    case TRUNCATE:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputc('.', stream);
+      switch(GET_MODE (x)){
+        case DImode:
+        case DFmode:
+          fputc('d', stream);
+          break;
+        case SImode:
+        case SFmode:
+          fputc('w', stream);
+          break;
+        case HImode:
+          fputc('h', stream);
+          break;
+        case QImode:
+          fputc('b', stream);
+          break;
+        default:
+          fputc('?', stream);
+          return;
+      }
+      fputs("[0]", stream);
+      break;
+    case ABS:
+      qdsp6_print_unary_op(stream, "abs", x);
+      break;
+    case CLZ:
+      qdsp6_print_unary_op(stream, "cl0", x);
+      break;
+    case CTZ:
+      qdsp6_print_unary_op(stream, "ct0", x);
+      break;
+    case POPCOUNT:
+      qdsp6_print_unary_op(stream, "count_ones", x);
+      break;
+    case PARITY:
+      qdsp6_print_unary_op(stream, "parity", x);
+      break;
+    case SIGN_EXTRACT:
+      qdsp6_print_trinary_op(stream, "extract", x);
+      break;
+    case ZERO_EXTRACT:
+      qdsp6_print_trinary_op(stream, "extractu", x);
+      break;
+    case HIGH:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputs(".h", stream);
+      break;
+    case LO_SUM:
+      fputs("add(", stream);
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputc(',', stream);
+      qdsp6_print_rtx(stream, XEXP (x, 1));
+      fputs(".l)", stream);
+      break;
+    case SS_PLUS:
+      qdsp6_print_binary_op_with_option(stream, "add", "sat", x);
+      break;
+    case US_PLUS:
+      qdsp6_print_binary_op_with_option(stream, "add", "satu", x);
+      break;
+    case SS_MINUS:
+      qdsp6_print_binary_op_with_option(stream, "sub", "sat", x);
+      break;
+    case US_MINUS:
+      qdsp6_print_binary_op_with_option(stream, "sub", "satu", x);
+      break;
+    case SS_TRUNCATE:
+      switch(GET_MODE (x)){
+        case HImode:
+          qdsp6_print_unary_op(stream, "sath", x);
+          break;
+        case QImode:
+          qdsp6_print_unary_op(stream, "satb", x);
+          break;
+        default:
+          qdsp6_print_unary_op(stream, "sat", x);
+      }
+      break;
+    case US_TRUNCATE:
+      switch(GET_MODE (x)){
+        case HImode:
+          qdsp6_print_unary_op(stream, "satuh", x);
+          break;
+        case QImode:
+          qdsp6_print_unary_op(stream, "satub", x);
+          break;
+        default:
+          qdsp6_print_unary_op(stream, "satu", x);
+      }
+      break;
+    default:
+      fprintf(stream, "[%s]", GET_RTX_NAME (GET_CODE (x)));
+  }
+}
+
+
+
+
+/* Implements hook TARGET_PRINT_RTL_PSEUDO_ASM */
+
+void
+qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x)
+{
+  if(x && INSN_P (x)){
+    qdsp6_print_rtx(stream, PATTERN (x));
+  }
+  else {
+    qdsp6_print_rtx(stream, x);
+  }
+}
+
+
+
+
 /*----------------------------
 Machine Description Predicates
 ----------------------------*/
@@ -5234,14 +6168,18 @@ bool
 qdsp6_expand_movmem(rtx operands[])
 {
   rtx src_0, dst_0, src_reg, dst_reg, src_mem, dst_mem, value_reg, count_reg;
-  rtx label;
+  rtx label, loopcount_rtx, doloop_fixup_code;
   int count, loopcount, align;
+  bool volatile_p;
 
   align = INTVAL (operands[3]);
 
   if((align & 3) != 0  || GET_CODE (operands[2]) != CONST_INT){
     return false;
   }
+
+  volatile_p = MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
+               || !qdsp6_dual_memory_accesses;
 
   src_0 = operands[1];
   dst_0 = operands[0];
@@ -5251,41 +6189,65 @@ qdsp6_expand_movmem(rtx operands[])
 
   if((align & 7) == 0){
 
+    src_mem = change_address(src_0, DImode, src_reg);
+    dst_mem = change_address(dst_0, DImode, dst_reg);
+
     loopcount = count >> 3;
     if(loopcount > 2){
 
       value_reg = gen_reg_rtx(DImode);
-      src_mem = change_address(src_0, DImode, src_reg);
       count_reg = gen_reg_rtx(SImode);
+      doloop_fixup_code = GEN_INT (REGNO (count_reg));
+      loopcount_rtx = gen_int_mode(volatile_p ? loopcount : loopcount - 1,
+                                   SImode);
       label = gen_label_rtx();
 
-      emit_move_insn(value_reg, src_mem);
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-      emit_insn(gen_doloop_begin0(gen_int_mode(loopcount - 1, SImode),
-                                  GEN_INT (REGNO (count_reg))));
+      if(!volatile_p){
+        emit_move_insn(value_reg, src_mem);
+        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
+      }
+
+      if(TARGET_HARDWARE_LOOPS){
+        emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+      }
+      else {
+        emit_move_insn(count_reg, loopcount_rtx);
+      }
+
       emit_label(label);
 
-      src_mem = change_address(src_0, DImode, src_reg);
-      dst_mem = change_address(dst_0, DImode, dst_reg);
-
-      emit_insn(gen_memcpy_kerneldi(dst_mem, value_reg, value_reg, src_mem));
+      if(volatile_p){
+        emit_move_insn(value_reg, src_mem);
+        emit_move_insn(dst_mem, value_reg);
+      }
+      else {
+        emit_insn(gen_memcpy_kerneldi(dst_mem, value_reg, value_reg, src_mem));
+      }
       emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
       emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-      emit_jump_insn(gen_endloop0(label, GEN_INT (REGNO (count_reg))));
-      qdsp6_hardware_loop();
 
-      dst_mem = change_address(dst_0, DImode, dst_reg);
+      if(TARGET_HARDWARE_LOOPS){
+        emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
+        qdsp6_hardware_loop();
+      }
+      else {
+        rtx pred = gen_reg_rtx(BImode);
+        emit_insn(gen_addsi3(count_reg, count_reg, constm1_rtx));
+        emit_insn(gen_cmpsi_eq(pred, count_reg, const0_rtx));
+        emit_jump_insn(gen_cond_jump(gen_rtx_EQ (BImode, pred, const0_rtx),
+                                     pred, label));
+      }
 
-      emit_move_insn(dst_mem, value_reg);
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
+      if(!volatile_p){
+        emit_move_insn(dst_mem, value_reg);
+        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
+      }
 
     }
     else {
       for(; loopcount; loopcount--){
 
         value_reg = gen_reg_rtx(DImode);
-        src_mem = change_address(src_0, DImode, src_reg);
-        dst_mem = change_address(dst_0, DImode, dst_reg);
 
         emit_move_insn(value_reg, src_mem);
         emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
@@ -5310,41 +6272,65 @@ qdsp6_expand_movmem(rtx operands[])
   }
   else {
 
+    src_mem = change_address(src_0, SImode, src_reg);
+    dst_mem = change_address(dst_0, SImode, dst_reg);
+
     loopcount = count >> 2;
     if(loopcount > 2){
 
       value_reg = gen_reg_rtx(SImode);
-      src_mem = change_address(src_0, SImode, src_reg);
       count_reg = gen_reg_rtx(SImode);
+      doloop_fixup_code = GEN_INT (REGNO (count_reg));
+      loopcount_rtx = gen_int_mode(volatile_p ? loopcount : loopcount - 1,
+                                   SImode);
       label = gen_label_rtx();
 
-      emit_move_insn(value_reg, src_mem);
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-      emit_insn(gen_doloop_begin0(gen_int_mode(loopcount - 1, SImode),
-                                  GEN_INT (REGNO (count_reg))));
+      if(!volatile_p){
+        emit_move_insn(value_reg, src_mem);
+        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
+      }
+
+      if(TARGET_HARDWARE_LOOPS){
+        emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+      }
+      else {
+        emit_move_insn(count_reg, loopcount_rtx);
+      }
+
       emit_label(label);
 
-      src_mem = change_address(src_0, SImode, src_reg);
-      dst_mem = change_address(dst_0, SImode, dst_reg);
-
-      emit_insn(gen_memcpy_kernelsi(dst_mem, value_reg, value_reg, src_mem));
+      if(volatile_p){
+        emit_move_insn(value_reg, src_mem);
+        emit_move_insn(dst_mem, value_reg);
+      }
+      else {
+        emit_insn(gen_memcpy_kernelsi(dst_mem, value_reg, value_reg, src_mem));
+      }
       emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
       emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-      emit_jump_insn(gen_endloop0(label, GEN_INT (REGNO (count_reg))));
-      qdsp6_hardware_loop();
 
-      dst_mem = change_address(dst_0, SImode, dst_reg);
+      if(TARGET_HARDWARE_LOOPS){
+        emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
+        qdsp6_hardware_loop();
+      }
+      else {
+        rtx pred = gen_reg_rtx(BImode);
+        emit_insn(gen_addsi3(count_reg, count_reg, constm1_rtx));
+        emit_insn(gen_cmpsi_eq(pred, count_reg, const0_rtx));
+        emit_jump_insn(gen_cond_jump(gen_rtx_EQ (BImode, pred, const0_rtx),
+                                     pred, label));
+      }
 
-      emit_move_insn(dst_mem, value_reg);
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
+      if(!volatile_p){
+        emit_move_insn(dst_mem, value_reg);
+        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
+      }
 
     }
     else {
       for(; loopcount; loopcount--){
 
         value_reg = gen_reg_rtx(SImode);
-        src_mem = change_address(src_0, SImode, src_reg);
-        dst_mem = change_address(dst_0, SImode, dst_reg);
 
         emit_move_insn(value_reg, src_mem);
         emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
