@@ -2185,7 +2185,7 @@ extract_range_from_binary_expr (value_range_t *vr,
 
 	  return;
 	}
-      gcc_assert (code == POINTER_PLUS_EXPR);
+      /* gcc_assert (code == POINTER_PLUS_EXPR); */
       /* For pointer types, we are really only interested in asserting
 	 whether the expression evaluates to non-NULL.  */
       if (range_is_nonnull (&vr0) || range_is_nonnull (&vr1))

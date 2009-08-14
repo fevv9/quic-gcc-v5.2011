@@ -25,6 +25,9 @@ versions of GCC.  This macro and some includes in the machine description
 are used to switch between the two implementations.
 -----------------------------------------------------------------------*/
 
+#ifndef GCC_QDSP6_H
+#define GCC_QDSP6_H
+
 #define GCC_3_4_6 0
 
 #if GCC_3_4_6
@@ -57,15 +60,9 @@ Controlling the Compilation Driver, gcc
    ABI.  For some reason, RMS wants this bit of implementation defined behavior
    to be consistent for GCC across targets unlike everything else commonly
    specified by ABIs. */
-#if GCC_3_4_6
-#define CC1_SPEC "%{G*} -funsigned-bitfields"
+#define CC1_SPEC "%{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} -funsigned-bitfields"
 
-#define CC1PLUS_SPEC "%{G*} -funsigned-bitfields"
-#else /* !GCC_3_4_6 */
-#define CC1_SPEC "%{G*} -funsigned-bitfields"
-
-#define CC1PLUS_SPEC "%{G*} -funsigned-bitfields"
-#endif /* !GCC_3_4_6 */
+#define CC1PLUS_SPEC "%{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} -funsigned-bitfields"
 
 
 /*---------------------------
@@ -1213,6 +1210,7 @@ struct qdsp6_arch_table_entry {
 enum qdsp6_abi {
   QDSP6_ABI_1,
   QDSP6_ABI_2,
+  QDSP6_ABI_LINUX,
   NUM_QDSP6_ABI,
   QDSP6_ABI_UNSPECIFIED
 };
@@ -1230,10 +1228,11 @@ struct qdsp6_abi_table_entry {
 #define QDSP6_ABI_TABLE_INITIALIZER \
   { \
     {"abi1", QDSP6_ABI_1}, \
-    {"abi2", QDSP6_ABI_2} \
+    {"abi2", QDSP6_ABI_2}, \
+    {"linux", QDSP6_ABI_LINUX} \
   }
 
-#define QDSP6_ABI_TABLE_DEFAULT_INDEX 0
+#define QDSP6_ABI_TABLE_DEFAULT_INDEX QDSP6_ABI_1
 
 #if GCC_3_4_6
 extern const char *qdsp6_oslib_string;
@@ -1337,11 +1336,35 @@ struct qdsp6_frame_info GTY(()) {
   bool computed;  /* true if frame info has already been computed */
 };
 
+struct qdsp6_final_info GTY(()) {
+  /* the operands of the current instruction */
+  rtx * GTY ((skip)) insn_ops;
+  /* whether the current insn starts a packet */
+  bool start_packet;
+  /* whether the current insn ends a packet */
+  bool end_packet;
+  /* whether the current packet ends a hardware loop */
+  int endloop;
+  /* the label at the start of an inner hardware loop */
+  rtx endloop0_label;
+  /* whether the current insn should be printed */
+  bool print_insn;
+  /* whether the current insn should be indented */
+  bool indent_insn;
+  int insns_left_in_packet;
+  bool form_packet;
+  bool dot_new_predicate_p;
+  bool dot_new_gpr_p;
+};
+
 struct machine_function GTY(()) {
   struct qdsp6_frame_info frame_info;
+  struct qdsp6_final_info final_info;
   rtx compare_op0;
   rtx compare_op1;
   int calls_builtin_return_address;
   int has_hardware_loops;
 };
 #endif /* !USED_FOR_TARGET */
+
+#endif /* !GCC_QDSP6_H */
