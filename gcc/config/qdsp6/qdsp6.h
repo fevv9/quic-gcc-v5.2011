@@ -53,7 +53,8 @@ Controlling the Compilation Driver, gcc
 #define TARGET_OPTION_TRANSLATE_TABLE \
   {"-mv1", "-march=qdsp6v1"}, \
   {"-mv2", "-march=qdsp6v2"}, \
-  {"-mv3", "-march=qdsp6v3"}
+  {"-mv3", "-march=qdsp6v3"}, \
+  {"-mv4", "-march=qdsp6v4"}
 
 /* As specified by the ABI, plain bitfields are unsigned.  This is a hack to
    compensate for the lack of a target hook for specifying this aspect of the
@@ -84,6 +85,10 @@ Run-time Target Specification
       case QDSP6_ARCH_V3: \
         builtin_define_std ("__QDSP6_V3__"); \
         builtin_define_std ("__QDSP6_ARCH__=3"); \
+        break; \
+      case QDSP6_ARCH_V4: \
+        builtin_define_std ("__QDSP6_V4__"); \
+        builtin_define_std ("__QDSP6_ARCH__=4"); \
         break; \
       default: \
         abort(); \
@@ -132,9 +137,6 @@ extern int target_flags;
 #define MASK_LITERAL_INTRINSICS (1 << 10)
 #define TARGET_LITERAL_INTRINSICS \
   ((target_flags & MASK_LITERAL_INTRINSICS) != 0)
-
-#define MASK_INTERIM_ABI (1 << 11)
-#define TARGET_INTERIM_ABI ((target_flags & MASK_INTERIM_ABI) != 0)
 
 #define MASK_UNCACHED_DATA (1 << 12)
 #define TARGET_UNCACHED_DATA ((target_flags & MASK_UNCACHED_DATA) != 0)
@@ -203,8 +205,6 @@ extern int target_flags;
     {"no-literal-intrinsics",           -MASK_LITERAL_INTRINSICS,           \
      N_("Internally expand some intrinsics into the corresponding "         \
         "operation to allow optimization (default)")},                      \
-    {"interim-abi",                      MASK_INTERIM_ABI,                  \
-     N_("Deprecated")},                                                     \
     {"v1-v2-uncached-data",              MASK_UNCACHED_DATA,                \
      ""},                                                                   \
     {"no-sort-sda",               -MASK_SECTION_SORTING,              	    \
@@ -270,7 +270,6 @@ Storage Layout
 #define UNITS_PER_WORD 4
 
 /* QDSP6 can operate on doubleword vectors, i.e. 8 units. */
-// _LSY_ #define UNITS_PER_SIMD_WORD 8
 #define UNITS_PER_SIMD_WORD(MODE)   \
   (((MODE) == DFmode || (MODE) == SFmode) ? 8 : 8)
 
@@ -396,24 +395,6 @@ Basic Characteristics of Registers
   qdsp6_conditional_register_usage();
 
 
-/*------------------------------
-Order of Allocation of Registers
-------------------------------*/
-
-/* Allocate the callee-save registers in reverse numerical order. */
-#define REG_ALLOC_ORDER \
-  { \
-     0,  1,  2,  3,  4,  5,  6,  7, /*  0 -  7 */ \
-     8,  9, 10, 11, 12, 13, 14, 15, /*  8 - 15 */ \
-    27, 26, 25, 24, 23, 22, 21, 20, /* 27 - 20 */ \
-    19, 18, 17, 16, 28, 29, 30, 31, /* 19 - 16, 28 - 31 */ \
-    32, 33, 34, 35,                 /* p0 - p3 */ \
-    36, 37, 38, 39,                 /* p0 - p3 .new */ \
-    40, 41, 42, 43, 44, 45, 46, 47, /* sa0, lc0, sa1, lc1, m0, m1, usr, ugp */ \
-    48, 49,                         /* fake _fp and _ap */ \
-  }
-
-
 /*-------------------------
 How Values Fit in Registers
 -------------------------*/
@@ -515,11 +496,13 @@ enum reg_class {
   : (REGNO) < (32 + 4 + 4 + 8 + 2) ? FAKE_REGS \
   : ALL_REGS)
 
-/* In base+offset addressing, the base must be a general purpose register. */
+/* In base+offset and base+index addressing, the base must be a general purpose
+   register. */
 #define BASE_REG_CLASS GENERAL_REGS
 
-/* QDSP6 does not have base+index addressing. */
-#define INDEX_REG_CLASS NO_REGS
+/* In base+index addressing, the index must be a general purpose register. */
+#define INDEX_REG_CLASS \
+  ((TARGET_V4_FEATURES && TARGET_BASE_PLUS_INDEX) ? GENERAL_REGS : NO_REGS)
 
 /* The following macro defines cover classes for Integrated Register
    Allocator.  Cover classes is a set of non-intersected register
@@ -529,10 +512,10 @@ enum reg_class {
    array of register classes with LIM_REG_CLASSES used as the end
    marker.  */
 /* _LSY_ GENERAL_REGS, PREDICATE_DOT_OLD_REGS, PREDICATE_DOT_NEW_REGS, */  
-#define IRA_COVER_CLASSES                                                    \
-{                                                                            \
-  ALL_REGS,\
-  LIM_REG_CLASSES                                                            \
+#define IRA_COVER_CLASSES \
+{                 \
+  ALL_REGS,       \
+  LIM_REG_CLASSES \
 }
 
 
@@ -549,39 +532,66 @@ enum reg_class {
 /* used by CONSTRAINT_LEN
    See qdsp6_const_ok_for_constraint_p for meanings. */
 #define CONSTRAINT_LEN_FOR_I(CHAR, STR) \
-  ((   (STR)[1] == 's' \
-    || (STR)[1] == 'u' \
-    || (STR)[1] == 'n' \
-    || (STR)[1] == 'm') \
-   && ISDIGIT ((STR)[2]) ? ISDIGIT ((STR)[3]) ? 4 : 3 \
+  ( (   (STR)[1] == 's' \
+     || (STR)[1] == 'u' \
+     || (STR)[1] == 'n' \
+     || (STR)[1] == 'm') \
+    && ISDIGIT ((STR)[2]) ? ISDIGIT ((STR)[3]) ? 4 : 3 \
   : DEFAULT_CONSTRAINT_LEN(CHAR, STR))
-
-/* Gotta love preprocessing. */
-#define QDSP6_KOOKY_KONSTANTS(STR) \
-  QDSP6_KOOKY_KONSTANT(STR, 16) \
-  QDSP6_KOOKY_KONSTANT(STR, 32) \
-  QDSP6_KOOKY_KONSTANT(STR, s8s8) \
-  QDSP6_KOOKY_KONSTANT(STR, onehot32) \
-  QDSP6_KOOKY_KONSTANT(STR, onenot32)
-
-/* assumes the first letter in STR is 'K' */
-#define QDSP6_KOOKY_KONSTANT_P(STR, KONSTRAINT) \
-  (!strncmp(&(STR)[1], #KONSTRAINT, strlen(#KONSTRAINT)))
-
-#define QDSP6_KOOKY_KONSTANT(STR, KONSTRAINT) \
-  QDSP6_KOOKY_KONSTANT_P(STR, KONSTRAINT) ? (signed) strlen(#KONSTRAINT) + 1 :
 
 /* used by CONSTRAINT_LEN
    See qdsp6_const_ok_for_constraint_p for meanings. */
-#define CONSTRAINT_LEN_FOR_K(CHAR, STR) \
-  (QDSP6_KOOKY_KONSTANTS(STR) DEFAULT_CONSTRAINT_LEN(CHAR, STR))
+#define CONSTRAINT_LEN_FOR_J(CHAR, STR) \
+  ( (   (STR)[1] == 's' \
+     || (STR)[1] == 'u' \
+     || (STR)[1] == 'n' \
+     || (STR)[1] == 'm') \
+    && ISDIGIT ((STR)[2]) \
+    && (((STR)[3] == '_' && ISDIGIT ((STR)[4])) \
+        || (ISDIGIT ((STR)[3]) && (STR)[4] == '_' && ISDIGIT ((STR)[5]))) \
+  ? (STR)[3] == '_' ? 5 : 6 \
+  : DEFAULT_CONSTRAINT_LEN(CHAR, STR))
 
-/* Don't use 'E'-'P' 'V' 'X' 'g' 'i' 'm' 'n' 'o' 'p' 'r' 's' as an initial
-   character. */
+/* does not check the first letter in STR */
+#define QDSP6_CONSTRAINT_P(STR, CONSTRAINT) \
+  (!strncmp(&(STR)[1], #CONSTRAINT, strlen(#CONSTRAINT)))
+
+/* Gotta love preprocessing. */
+#define QDSP6_CONSTRAINT_LEN(STR, CONSTRAINT) \
+  QDSP6_CONSTRAINT_P(STR, CONSTRAINT) ? (signed) strlen(#CONSTRAINT) + 1 :
+
+/* See qdsp6_const_ok_for_constraint_p for meanings. */
+#define QDSP6_KOOKY_KONSTANT_LENS(STR) \
+  QDSP6_CONSTRAINT_LEN(STR, 16) \
+  QDSP6_CONSTRAINT_LEN(STR, 32) \
+  QDSP6_CONSTRAINT_LEN(STR, s8s8) \
+  QDSP6_CONSTRAINT_LEN(STR, onehot32) \
+  QDSP6_CONSTRAINT_LEN(STR, onenot32)
+
+/* used by CONSTRAINT_LEN */
+#define CONSTRAINT_LEN_FOR_K(CHAR, STR) \
+  (QDSP6_KOOKY_KONSTANT_LENS(STR) DEFAULT_CONSTRAINT_LEN(CHAR, STR))
+
+/* See qdsp6_legitimate_address_p for meanings. */
+#define QDSP6_MEM_TYPE_LENS(STR) \
+  QDSP6_CONSTRAINT_LEN(STR, noext) \
+  QDSP6_CONSTRAINT_LEN(STR, cond) \
+  QDSP6_CONSTRAINT_LEN(STR, econd) \
+  QDSP6_CONSTRAINT_LEN(STR, si) \
+  QDSP6_CONSTRAINT_LEN(STR, csi) \
+  QDSP6_CONSTRAINT_LEN(STR, memop) \
+  QDSP6_CONSTRAINT_LEN(STR, ememop)
+
+/* used by CONSTRAINT_LEN */
+#define CONSTRAINT_LEN_FOR_A(CHAR, STR) \
+  (QDSP6_MEM_TYPE_LENS(STR) DEFAULT_CONSTRAINT_LEN(CHAR, STR))
+
 #define CONSTRAINT_LEN(CHAR, STR) \
   ( (CHAR) == 'R' ? CONSTRAINT_LEN_FOR_R(CHAR, STR) \
   : (CHAR) == 'I' ? CONSTRAINT_LEN_FOR_I(CHAR, STR) \
+  : (CHAR) == 'J' ? CONSTRAINT_LEN_FOR_J(CHAR, STR) \
   : (CHAR) == 'K' ? CONSTRAINT_LEN_FOR_K(CHAR, STR) \
+  : (CHAR) == 'A' ? CONSTRAINT_LEN_FOR_A(CHAR, STR) \
   : DEFAULT_CONSTRAINT_LEN(CHAR, STR))
 
 /* Rg  means general purpose register (r0-r31)
@@ -636,24 +646,42 @@ enum reg_class {
 
 /* used by EXTRA_CONSTRAINT */
 #define EXTRA_CONSTRAINT_FOR_Q(VALUE) \
-  (GET_CODE (VALUE) == SYMBOL_REF)
+  (CONSTANT_P (VALUE))
 
 /* used by EXTRA_CONSTRAINT */
-#define EXTRA_CONSTRAINT_FOR_U(VALUE) \
+#define EXTRA_CONSTRAINT_FOR_A(VALUE, CONSTRAINT) \
   (GET_CODE (VALUE) == MEM \
    && qdsp6_legitimate_address_p(GET_MODE (VALUE), XEXP (VALUE, 0), \
-                                 REG_OK_STRICT_P, true))
+                                 REG_OK_STRICT_P, #CONSTRAINT))
 
-/* Don't use 'E'-'P' 'V' 'X' 'g' 'i' 'm' 'n' 'o' 'p' 'r' 's'.
+/* Don't use 'E'-'P' 'V' 'X' 'g' 'i' 'm' 'n' 'o' 'p' 'r' 's' for the initial
+   character.
 
-   Q is for a symbol or label.
-   U is for conditional memory references, which have smaller offset ranges. */
-#define EXTRA_CONSTRAINT(VALUE, C) \
+   Q  is for a symbol or label.
+   A* is for MEMs with reduced addressing modes.  See qdsp6_legitimate_address_p
+      for meanings. */
+#define EXTRA_CONSTRAINT_STR(VALUE, C, STR) \
   ( (C) == 'Q' ? EXTRA_CONSTRAINT_FOR_Q(VALUE) \
-  : (C) == 'U' ? EXTRA_CONSTRAINT_FOR_U(VALUE) \
+  : (C) == 'A' ? \
+      QDSP6_CONSTRAINT_P (STR, noext)  ? EXTRA_CONSTRAINT_FOR_A(VALUE, noext) \
+    : QDSP6_CONSTRAINT_P (STR, cond)   ? EXTRA_CONSTRAINT_FOR_A(VALUE, cond) \
+    : QDSP6_CONSTRAINT_P (STR, econd)  ? EXTRA_CONSTRAINT_FOR_A(VALUE, econd) \
+    : QDSP6_CONSTRAINT_P (STR, si)     ? EXTRA_CONSTRAINT_FOR_A(VALUE, si) \
+    : QDSP6_CONSTRAINT_P (STR, csi)    ? EXTRA_CONSTRAINT_FOR_A(VALUE, csi) \
+    : QDSP6_CONSTRAINT_P (STR, memop)  ? EXTRA_CONSTRAINT_FOR_A(VALUE, memop) \
+    : QDSP6_CONSTRAINT_P (STR, ememop) ? EXTRA_CONSTRAINT_FOR_A(VALUE, ememop) \
+    : 0 \
   : 0)
 
-#define EXTRA_MEMORY_CONSTRAINT(C, STR) ((C) == 'U')
+#define EXTRA_MEMORY_CONSTRAINT(C, STR) \
+  ((C) == 'A' \
+   && (   QDSP6_CONSTRAINT_P (STR, noext) \
+       || QDSP6_CONSTRAINT_P (STR, cond) \
+       || QDSP6_CONSTRAINT_P (STR, econd) \
+       || QDSP6_CONSTRAINT_P (STR, si) \
+       || QDSP6_CONSTRAINT_P (STR, csi) \
+       || QDSP6_CONSTRAINT_P (STR, memop) \
+       || QDSP6_CONSTRAINT_P (STR, ememop)))
 
 
 /*----------------
@@ -680,7 +708,8 @@ Basic Stack Layout
 Exception Handling Support
 ------------------------*/
 
-#define EH_RETURN_DATA_REGNO(N) ((N) < 4 ? (N + 20) : INVALID_REGNUM)
+#define EH_RETURN_DATA_REGNO(N) \
+  ((N) < 4 ? (N) + (qdsp6_abi != QDSP6_ABI_1 ? 0 : 20) : INVALID_REGNUM)
 
 #define EH_RETURN_STACKADJ_RTX gen_rtx_REG (Pmode, 28)
 
@@ -881,8 +910,8 @@ Addressing Modes
 /*#define CONSTANT_ADDRESS_P(X) (GET_CODE (X) == LABEL_REF)*/
 #define CONSTANT_ADDRESS_P(X) CONSTANT_P (X)
 
-/* QDSP6 does not have base + index addressing. */
-#define MAX_REGS_PER_ADDRESS 1
+/* QDSP6 V4 and later has base + index addressing. */
+#define MAX_REGS_PER_ADDRESS 2
 
 #ifdef REG_OK_STRICT
 #define REG_OK_STRICT_P true
@@ -891,7 +920,7 @@ Addressing Modes
 #endif
 
 #define GO_IF_LEGITIMATE_ADDRESS(MODE, X, LABEL) \
-  if(qdsp6_legitimate_address_p(MODE, X, REG_OK_STRICT_P, false)){ \
+  if(qdsp6_legitimate_address_p(MODE, X, REG_OK_STRICT_P, "m")){ \
     goto LABEL; \
   }
 
@@ -947,22 +976,16 @@ Describing Relative Costs of Operations
 /* Loads and stores are cheap on QDSP6.  Yay, IMT. */
 #define MEMORY_MOVE_COST(MODE, CLASS, IN) 4
 
-/* _LSY_ ARM Moves to and from memory are quite expensive */
-//#define MEMORY_MOVE_COST(M, CLASS, IN)                  \
-//  (TARGET_32BIT ? 10 :                                  \
-//   ((GET_MODE_SIZE (M) < 4 ? 8 : 2 * GET_MODE_SIZE (M)) \
-//    * (CLASS == LO_REGS ? 1 : 2)))
-
-/* Try to generate sequences that don't involve branches, we can then use
-   conditional instructions */
-//#define BRANCH_COST(speed_p, predictable_p) \
-//  (TARGET_32BIT ? 4 : (optimize > 0 ? 2 : 0))
-
 /* Branches are very cheap on QDSP6, but they restrict scheduling. */
 #define BRANCH_COST(speed_p, predictable_p) (speed_p ? (predictable_p ? 1 : 3) : (predictable_p ? 1 : 3))
 
 /* Load and store cycles are independent of access size. */
 #define SLOW_BYTE_ACCESS 1
+
+/* V4's store-immediate instructions allow efficient copying of constant
+   strings. */
+#define STORE_BY_PIECES_P(SIZE, ALIGNMENT) \
+  qdsp6_store_by_pieces_p(SIZE, ALIGNMENT)
 
 /* Direct calls can be executed on more slots than indirect calls. */
 #define NO_FUNCTION_CSE 1
@@ -990,7 +1013,6 @@ Dividing the Output into Sections (Texts, Data, ...)
 #define SBSS_SECTION_ASM_OP "\t.section .sbss"
 #endif /* !GCC_3_4_6 */
 
-//#define EXTRA_SECTIONS in_sorted_data_1, in_sorted_data_2, in_sorted_data_4, in_sorted_data_8 
 
 /*----------------------------------------
 The Overall Framework of an Assembler File
@@ -1169,6 +1191,7 @@ enum qdsp6_architecture {
   QDSP6_ARCH_V1,
   QDSP6_ARCH_V2,
   QDSP6_ARCH_V3,
+  QDSP6_ARCH_V4,
   NUM_QDSP6_ARCH,
   QDSP6_ARCH_UNSPECIFIED
 };
@@ -1181,12 +1204,14 @@ extern const char *qdsp6_arch_string;
 #define QDSP6_FEAT_V1 (1 << QDSP6_ARCH_V1)
 #define QDSP6_FEAT_V2 (1 << QDSP6_ARCH_V2)
 #define QDSP6_FEAT_V3 (1 << QDSP6_ARCH_V3)
+#define QDSP6_FEAT_V4 (1 << QDSP6_ARCH_V4)
 
 extern int qdsp6_features;
 
 #define TARGET_V1_FEATURES ((qdsp6_features & QDSP6_FEAT_V1) != 0)
 #define TARGET_V2_FEATURES ((qdsp6_features & QDSP6_FEAT_V2) != 0)
 #define TARGET_V3_FEATURES ((qdsp6_features & QDSP6_FEAT_V3) != 0)
+#define TARGET_V4_FEATURES ((qdsp6_features & QDSP6_FEAT_V4) != 0)
 
 struct qdsp6_arch_table_entry {
   const char *const name;
@@ -1196,15 +1221,22 @@ struct qdsp6_arch_table_entry {
 
 #define QDSP6_ARCH_TABLE_INITIALIZER \
   { \
-    {"qdsp6v1", QDSP6_ARCH_V1, QDSP6_FEAT_V1}, \
-    {"qdsp6v2", QDSP6_ARCH_V2, QDSP6_FEAT_V1 | QDSP6_FEAT_V2}, \
-    {"qdsp6v3", QDSP6_ARCH_V3, QDSP6_FEAT_V1 | QDSP6_FEAT_V2 | QDSP6_FEAT_V3} \
+    {"qdsp6v1", QDSP6_ARCH_V1,   QDSP6_FEAT_V1}, \
+    {"qdsp6v2", QDSP6_ARCH_V2,   QDSP6_FEAT_V1 \
+                               | QDSP6_FEAT_V2}, \
+    {"qdsp6v3", QDSP6_ARCH_V3,   QDSP6_FEAT_V1 \
+                               | QDSP6_FEAT_V2 \
+                               | QDSP6_FEAT_V3}, \
+    {"qdsp6v4", QDSP6_ARCH_V4,   QDSP6_FEAT_V1 \
+                               | QDSP6_FEAT_V2 \
+                               | QDSP6_FEAT_V3 \
+                               | QDSP6_FEAT_V4} \
   }
 
 #if GCC_3_4_6
-#define QDSP6_ARCH_DEFAULT_STRING "qdsp6v2"
+#define QDSP6_ARCH_DEFAULT_STRING "qdsp6v4"
 #else /* !GCC_3_4_6 */
-#define QDSP6_ARCH_TABLE_DEFAULT_INDEX 1
+#define QDSP6_ARCH_TABLE_DEFAULT_INDEX QDSP6_ARCH_V4
 #endif /* !GCC_3_4_6 */
 
 enum qdsp6_abi {
@@ -1232,7 +1264,7 @@ struct qdsp6_abi_table_entry {
     {"linux", QDSP6_ABI_LINUX} \
   }
 
-#define QDSP6_ABI_TABLE_DEFAULT_INDEX QDSP6_ABI_1
+#define QDSP6_ABI_TABLE_DEFAULT_INDEX (TARGET_V3_FEATURES ? QDSP6_ABI_2 : QDSP6_ABI_1)
 
 #if GCC_3_4_6
 extern const char *qdsp6_oslib_string;

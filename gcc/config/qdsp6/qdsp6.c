@@ -141,13 +141,26 @@ static bool qdsp6_legit_addr_const_p(
 #if !GCC_3_4_6
 static bool qdsp6_reg_ok_for_base_p(rtx x, bool reg_ok_strict_p);
 #endif /* !GCC_3_4_6 */
+static bool qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p);
 #if !GCC_3_4_6
 static tree qdsp6_vectorize_builtin_mask_for_load(void);
 #endif /* !GCC_3_4_6 */
 
 static bool qdsp6_free_immediate(rtx x, int outer_code, int value);
-static bool qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total);
-static int qdsp6_address_cost(rtx address);
+static bool qdsp6_rtx_costs(
+              rtx x,
+              int code,
+              int outer_code,
+              int *total,
+              bool speed);
+static bool qdsp6_rtx_costs_debug(
+              rtx x,
+              int code,
+              int outer_code,
+              int *total,
+              bool speed);
+static int qdsp6_address_cost(rtx address, bool speed);
+static int qdsp6_address_cost_debug(rtx address, bool speed);
 
 static int qdsp6_sched_issue_rate(void);
 #if GCC_3_4_6
@@ -218,13 +231,12 @@ static void qdsp6_final_pack_insns(void);
 /*---------------------------
 Run-time Target Specification
 ---------------------------*/
-/* _LSY_ Added MASK_PULLUP as default back again */ 
 
 #if !GCC_3_4_6
 #undef TARGET_DEFAULT_TARGET_FLAGS
 #define TARGET_DEFAULT_TARGET_FLAGS \
   (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
-   | MASK_DOT_NEW | MASK_PULLUP | MASK_SECTION_SORTING \
+   | MASK_DOT_NEW | MASK_BASE_PLUS_INDEX | MASK_MEMOPS | MASK_SECTION_SORTING \
    | MASK_SECTION_SORTING_CODE_SUPPORT)
 #endif /* !GCC_3_4_6 */
 
@@ -579,14 +591,6 @@ qdsp6_override_options(void)
   }
 #endif /* GCC_3_4_6 */
 
-  if(TARGET_INTERIM_ABI){
-#if GCC_3_4_6
-    warning("Ignoring the deprecated -minterim-abi option.");
-#else /* !GCC_3_4_6 */
-    warning(0, "Ignoring the deprecated -minterim-abi option.");
-#endif /* !GCC_3_4_6 */
-  }
-
   if(TARGET_UNCACHED_DATA){
     if(qdsp6_arch == QDSP6_ARCH_V1 || qdsp6_arch == QDSP6_ARCH_V2){
       qdsp6_dual_memory_accesses = false;
@@ -602,6 +606,16 @@ qdsp6_override_options(void)
 
   if(!g_switch_set){
     g_switch_value = 2 * UNITS_PER_WORD;
+  }
+
+  if(TARGET_COMPRESSED){
+    flag_schedule_insns = 0;
+    flag_schedule_insns_after_reload = 0;
+    target_flags &= ~MASK_PACKETS;
+  }
+
+  if(!TARGET_PACKETS){
+    target_flags &= ~MASK_PULLUP;
   }
 
   /* Align functions to 16-byte boundaries to prevent
@@ -627,6 +641,11 @@ qdsp6_override_options(void)
 void
 qdsp6_optimization_options(int level, int size)
 {
+  if(level >= 2){
+    target_flags |= MASK_PACKETS;
+    target_flags |= MASK_PULLUP;
+  }
+
   qdsp6_falign = QDSP6_NO_FALIGN;
 
   if(level >= 3 && !size){
@@ -826,6 +845,8 @@ Register Classes
    InN means negative integers in [-(2^N - 1), 0]
    ImN means signed magnitude integers in [-(2^(N-1) - 1), 2^(N-1) - 1]
 
+   J[sunm]N_M means I[sunm]N shifted left M bits
+
    K16 means 16
    K32 means 32
    Ks8s8 means integers that can be formed using combine(#s8,#s8)
@@ -839,15 +860,23 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
   HOST_WIDE_INT bits;
   HOST_WIDE_INT low;
   HOST_WIDE_INT high;
+  HOST_WIDE_INT scale;
+  HOST_WIDE_INT scale_bits;
 
   switch(c){
     case 'I':
+    case 'J':
       if(!((str[1] == 's' || str[1] == 'u' || str[1] == 'n' || str[1] == 'm')
            && ISDIGIT (str[2]))){
         return false;
       }
 
       bits = 0;
+      low = 0;
+      high = 0;
+      scale = 0;
+      scale_bits = 0;
+
       p = &str[2];
       do {
         bits = (10 * bits) + (*p++ - '0');
@@ -875,26 +904,41 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
         low = -high;
       }
 
-      return low <= value && value <= high;
+      if(c == 'J'){
+        if(!(p[0] == '_' && ISDIGIT (p[1]))){
+          return false;
+        }
+
+        p++;
+        do {
+          scale = (10 * scale) + (*p++ - '0');
+        }while(ISDIGIT (*p));
+
+        high <<= scale;
+        low <<= scale;
+        scale_bits = value & ((1 << scale) - 1);
+      }
+
+      return low <= value && value <= high && scale_bits == 0;
 
     case 'K':
-      if(QDSP6_KOOKY_KONSTANT_P(str, 16)){
+      if(QDSP6_CONSTRAINT_P(str, 16)){
         return value == 16;
       }
-      else if(QDSP6_KOOKY_KONSTANT_P(str, 32)){
+      else if(QDSP6_CONSTRAINT_P(str, 32)){
         return value == 32;
       }
-      else if(QDSP6_KOOKY_KONSTANT_P(str, s8s8)){
+      else if(QDSP6_CONSTRAINT_P(str, s8s8)){
         high = value >> 32ULL;
         low = value & 0xFFFFFFFFULL;
         return ((high & 0xFFFFFF00) == (high & 0x80 ? 0xFFFFFF00 : 0))
             && ((low  & 0xFFFFFF00) == (low  & 0x80 ? 0xFFFFFF00 : 0));
       }
-      else if(QDSP6_KOOKY_KONSTANT_P(str, onehot32)){
+      else if(QDSP6_CONSTRAINT_P(str, onehot32)){
         value &= 0xFFFFFFFFULL;
         return value == (value & -value);
       }
-      else if(QDSP6_KOOKY_KONSTANT_P(str, onenot32)){
+      else if(QDSP6_CONSTRAINT_P(str, onenot32)){
         value = ~value & 0xFFFFFFFFULL;
         return value == (value & -value);
       }
@@ -1002,12 +1046,12 @@ Eliminating Frame Pointer and Arg Pointer
                                         | (8 bytes total)       |
                                   FP+0->+-----------------------+
                                         |                       |
-                                        |  local variables      |
+                                        |  register save area   |
+                                        |  (callee saved)       |
                                         |                       |
                                         +-----------------------+
                                         |                       |
-                                        |  register save area   |
-                                        |  (callee saved)       |
+                                        |  local variables      |
                                         |                       |
                                         +-----------------------+
                                         |                       |
@@ -1088,7 +1132,7 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
     enum insn_code sibcall_epilogue_function;
     unsigned int num_sibcall_function_restored_pairs;
   }
-  const prologue_epilogue_functions[] =
+  prologue_epilogue_functions_abi1[] =
     {
       {
         CODE_FOR_nothing, 0,
@@ -1097,38 +1141,85 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
       },
       {
         CODE_FOR_nothing, 0,
-        CODE_FOR_restore_r27_through_r26_and_deallocframe, 1,
-        CODE_FOR_restore_r27_through_r26_and_deallocframe_before_sibcall, 1
+        CODE_FOR_restore_r24_through_r25_and_deallocframe, 1,
+        CODE_FOR_restore_r24_through_r25_and_deallocframe_before_sibcall, 1
       },
       {
-        CODE_FOR_save_r27_through_r24, 2,
-        CODE_FOR_restore_r27_through_r24_and_deallocframe, 2,
-        CODE_FOR_restore_r27_through_r24_and_deallocframe_before_sibcall, 2
-      },
-      {
-        CODE_FOR_save_r27_through_r22, 3,
-        CODE_FOR_restore_r27_through_r22_and_deallocframe, 3,
-        CODE_FOR_restore_r27_through_r22_and_deallocframe_before_sibcall, 3
-      },
-      {
-        CODE_FOR_save_r27_through_r20, 4,
-        CODE_FOR_restore_r27_through_r20_and_deallocframe, 4,
-        CODE_FOR_restore_r27_through_r20_and_deallocframe_before_sibcall, 4
-      },
-      {
-        CODE_FOR_save_r27_through_r18, 5,
-        CODE_FOR_restore_r27_through_r18_and_deallocframe, 5,
-        CODE_FOR_restore_r27_through_r18_and_deallocframe_before_sibcall, 5
-      },
-      {
-        CODE_FOR_save_r27_through_r16, 6,
-        CODE_FOR_restore_r27_through_r16_and_deallocframe, 6,
-        CODE_FOR_restore_r27_through_r16_and_deallocframe_before_sibcall, 6
+        CODE_FOR_save_r24_through_r27, 2,
+        CODE_FOR_restore_r24_through_r27_and_deallocframe, 2,
+        CODE_FOR_restore_r24_through_r27_and_deallocframe_before_sibcall, 2
       }
-    };
+    },
+  prologue_epilogue_functions_abi2[] =
+    {
+      {
+        CODE_FOR_nothing, 0,
+        CODE_FOR_deallocframe_function, 0,
+        CODE_FOR_nothing, 0
+      },
+      {
+        CODE_FOR_nothing, 0,
+        CODE_FOR_restore_r16_through_r17_and_deallocframe, 1,
+        CODE_FOR_restore_r16_through_r17_and_deallocframe_before_sibcall, 1
+      },
+      {
+        CODE_FOR_save_r16_through_r19, 2,
+        CODE_FOR_restore_r16_through_r19_and_deallocframe, 2,
+        CODE_FOR_restore_r16_through_r19_and_deallocframe_before_sibcall, 2
+      },
+      {
+        CODE_FOR_save_r16_through_r21, 3,
+        CODE_FOR_restore_r16_through_r21_and_deallocframe, 3,
+        CODE_FOR_restore_r16_through_r21_and_deallocframe_before_sibcall, 3
+      },
+      {
+        CODE_FOR_save_r16_through_r23, 4,
+        CODE_FOR_restore_r16_through_r23_and_deallocframe, 4,
+        CODE_FOR_restore_r16_through_r23_and_deallocframe_before_sibcall, 4
+      },
+      {
+        CODE_FOR_save_r16_through_r25, 5,
+        CODE_FOR_restore_r16_through_r25_and_deallocframe, 5,
+        CODE_FOR_restore_r16_through_r25_and_deallocframe_before_sibcall, 5
+      },
+      {
+        CODE_FOR_save_r16_through_r27, 6,
+        CODE_FOR_restore_r16_through_r27_and_deallocframe, 6,
+        CODE_FOR_restore_r16_through_r27_and_deallocframe_before_sibcall, 6
+      }
+    },
+  *prologue_epilogue_functions;
+
+  unsigned int max_function_saved_pairs = 0;
+  unsigned int first_function_saved_regno = 0;
   unsigned int regno;
-  unsigned int i;
+  unsigned int i = 0;
   unsigned int j;
+
+  /* Select the set of prologue and epilogue functions for the target ABI. */
+  if(qdsp6_abi == QDSP6_ABI_2){
+    prologue_epilogue_functions = prologue_epilogue_functions_abi2;
+    max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi2)
+                               - 1;
+    first_function_saved_regno = 16;
+  }
+  else {
+    prologue_epilogue_functions = prologue_epilogue_functions_abi1;
+    max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi1)
+                               - 1;
+    first_function_saved_regno = 24;
+  }
+
+  /* For V4, don't call the __deallocframe function, since we have the
+     dealloc_return instruction. */
+  if(TARGET_V4_FEATURES){
+    prologue_epilogue_functions[0].epilogue_function
+      = CODE_FOR_nothing;
+  }
+  else {
+    prologue_epilogue_functions[0].epilogue_function
+      = CODE_FOR_deallocframe_function;
+  }
 
   /* Can we omit the allocframe and deallocframe instructions? */
   if(info->lrfp_size == 0){
@@ -1148,8 +1239,16 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
       info->allocframe_size = MAX_ALLOCFRAME_IMMED;
       info->sp_adjustment = info->frame_size - MAX_ALLOCFRAME_IMMED;
     }
-    info->base_reg = hard_frame_pointer_rtx;
-    info->offset = 0;
+    /* Use SP as the base if the offset would be small, making the loads and
+       stores candidates for duplexes. */
+    if(!TARGET_COMPRESSED && info->frame_size <= 256){
+      info->base_reg = stack_pointer_rtx;
+      info->offset = info->frame_size;
+    }
+    else {
+      info->base_reg = hard_frame_pointer_rtx;
+      info->offset = 0;
+    }
   }
 
   info->prologue_function = CODE_FOR_nothing;
@@ -1165,18 +1264,27 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
        allows it to be saved and/or restored via a function call, then do so. */
     if(info->num_saved_singles % 2 == 1){
 
-      for(i = info->num_saved_pairs, regno = 26;
-          i > 0 && info->saved_pairs[i - 1] == regno;
-          i--, regno -= 2);
+      /* Count the number of callee-save register pairs that can be saved or
+         restored by function calls in the prologue and epilogue so far. */
+      for(i = 0, regno = first_function_saved_regno;
+          i < info->num_saved_pairs && info->saved_pairs[i] == regno;
+          i++, regno += 2);
 
-      if(info->num_saved_pairs - i < ARRAY_SIZE (prologue_epilogue_functions)
-         && (info->saved_singles[info->num_saved_singles - 1] == regno + 1
-             || info->saved_singles[info->num_saved_singles - 1] == regno)){
+      /* If the first single callee-save register is part of the next pair that
+         could be saved, then remove it from the list of single callee-save
+         registers and insert it into the list of paired callee-save
+         registers. */
+      if(i < max_function_saved_pairs
+         && (info->saved_singles[0] == regno
+             || info->saved_singles[0] == regno + 1)){
 
+        for(j = 0; j < info->num_saved_singles - 1; j++){
+          info->saved_singles[j] = info->saved_singles[j + 1];
+        }
         for(j = info->num_saved_pairs; j > i; j--){
           info->saved_pairs[j] = info->saved_pairs[j - 1];
         }
-        info->saved_pairs[i] = regno;
+        info->saved_pairs[i] = regno & -2;
         info->num_saved_pairs++;
         info->num_saved_singles--;
 
@@ -1191,12 +1299,11 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
 
     /* Count the number of callee-save register pairs that can be saved or
        restored by function calls in the prologue and epilogue. */
-    for(i = info->num_saved_pairs, regno = 26;
-        i > 0 && info->saved_pairs[i - 1] == regno;
-        i--, regno -= 2);
-    i = info->num_saved_pairs - i;
-    if(i > ARRAY_SIZE (prologue_epilogue_functions) - 1){
-      i = ARRAY_SIZE (prologue_epilogue_functions) - 1;
+    for(i = 0, regno = first_function_saved_regno;
+        i < info->num_saved_pairs && info->saved_pairs[i] == regno;
+        i++, regno += 2);
+    if(i > max_function_saved_pairs){
+      i = max_function_saved_pairs;
     }
 
     #define SET_PROLOGUE_EPILOGUE_FUNCTION_INFO(FIELD) \
@@ -1767,39 +1874,113 @@ static bool
 qdsp6_reg_ok_for_base_p(rtx x, bool reg_ok_strict_p)
 {
   if(reg_ok_strict_p){
-    return REGNO (x) < 32 || REGNO (x) == FRAME_POINTER_REGNUM
-                          || REGNO (x) == ARG_POINTER_REGNUM;
+    return G_REG_P (x) || REGNO (x) == FRAME_POINTER_REGNUM
+                       || REGNO (x) == ARG_POINTER_REGNUM;
   }
   else {
-    return REGNO (x) < 32 || REGNO (x) == FRAME_POINTER_REGNUM
-                          || REGNO (x) == ARG_POINTER_REGNUM
-                          || REGNO (x) >= FIRST_PSEUDO_REGISTER;
+    return G_REG_P (x) || REGNO (x) == FRAME_POINTER_REGNUM
+                       || REGNO (x) == ARG_POINTER_REGNUM
+                       || REGNO (x) >= FIRST_PSEUDO_REGISTER;
   }
 }
 
 
 
 
-/* Used by macro GO_IF_LEGITIMATE_ADDRESS */
+/* Helper function for qdsp6_legitimate_address_p */
+
+static bool
+qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p)
+{
+  if(reg_ok_strict_p){
+    return G_REG_P (x);
+  }
+  else {
+    return G_REG_P (x) || REGNO (x) >= FIRST_PSEUDO_REGISTER;
+  }
+}
+
+
+
+
+/* Used by macro GO_IF_LEGITIMATE_ADDRESS
+
+   The CONSTRAINT argument is the constraint string excluding any initial 'A'.
+   The different constraints correspond to differnt types of instuctions, each
+   of which can utilize a different set of addressing modes.  The possible
+   values for the constraint string are:
+
+   m       basic loads and stores, allowing an immediate extender
+   noext   basic loads and stores
+   cond    conditional loads and stores
+   econd   conditional loads and stores, allowing an immediate extender
+   si      store immediate
+   csi     conditional store immediate
+   memop   load-op-stores
+   ememop  load-op-stores, allowing an immediate extender */
 
 bool
 qdsp6_legitimate_address_p(
   enum machine_mode mode,
   rtx x,
   bool reg_ok_strict_p,
-  bool conditional
+  const char *constraint
 )
 {
+  rtx xop0 = NULL_RTX;
+  rtx xop1 = NULL_RTX;
+  rtx xop1op0 = NULL_RTX;
+  rtx xop1op1 = NULL_RTX;
   bool check_mode;
-  int offset_bits;
+  bool allow_extension = false;
+  bool allow_gp = false;
+  bool allow_absolute = false;
+  bool allow_immediate_base = false;
+  bool allow_base_plus_index = false;
+  bool allow_post_inc = false;
+  int offset_bits = 6;
 
-  if(TARGET_V2_FEATURES && sdata_symbolic_operand(x, Pmode) && !conditional){
-    /* Will be GP relative */
-    return true;
+  if(TARGET_V4_FEATURES
+     && (crtl->combine_in_progress || crtl->combine_completed)
+     && (   !strcmp(constraint, "m")
+         || !strcmp(constraint, "econd")
+         || !strcmp(constraint, "ememop"))){
+    allow_extension = true;
   }
 
-  if(GET_CODE (x) == REG && qdsp6_reg_ok_for_base_p(x, reg_ok_strict_p))
-    return true;
+  if(!strcmp(constraint, "m") || !strcmp(constraint, "noext")){
+    if(TARGET_V4_FEATURES){
+      allow_absolute = true;
+      allow_immediate_base = true;
+      allow_base_plus_index = true;
+    }
+    allow_gp = true;
+    allow_post_inc = true;
+    offset_bits = -11;
+  }
+  else if(!strcmp(constraint, "cond") || !strcmp(constraint, "econd")){
+    if(TARGET_V4_FEATURES){
+      allow_absolute = true;
+      allow_base_plus_index = true;
+    }
+    allow_post_inc = true;
+  }
+  else if(!TARGET_V4_FEATURES){
+    return false;
+  }
+  else if(!strcmp(constraint, "si")){
+  }
+  else if(!strcmp(constraint, "csi")){
+  }
+  else if(!strcmp(constraint, "memop") || !strcmp(constraint, "ememop")){
+  }
+  else {
+    gcc_unreachable();
+  }
+
+  if(!TARGET_BASE_PLUS_INDEX){
+    allow_base_plus_index = false;
+  }
 
   /* ??? DFmode? BImode? Why do we check the mode anyway? */
   check_mode =    mode == DImode
@@ -1813,56 +1994,123 @@ qdsp6_legitimate_address_p(
                || mode == V2HImode
                || mode == V4QImode;
 
+  /* Extract operands and canonicalize commutitive operators. */
+  if(GET_CODE (x) == PLUS || GET_CODE (x) == POST_MODIFY){
+    xop0 = XEXP (x, 0);
+    xop1 = XEXP (x, 1);
+    if(GET_CODE (x) == PLUS && GET_CODE (x) != POST_MODIFY
+       && ((REG_P (xop1) || CONSTANT_P (xop1)) && !REG_P (xop0))){
+      xop0 = XEXP (x, 1);
+      xop1 = XEXP (x, 0);
+    }
+    if(   GET_CODE (xop1) == PLUS
+       || GET_CODE (xop1) == MULT
+       || GET_CODE (xop1) == ASHIFT){
+      xop1op0 = XEXP (xop1, 0);
+      xop1op1 = XEXP (xop1, 1);
+      if(GET_CODE (xop1) != ASHIFT && !REG_P (xop1op0)){
+        xop1op0 = XEXP (xop1, 1);
+        xop1op1 = XEXP (xop1, 0);
+      }
+    }
+  }
+  else if(GET_CODE (x) == POST_INC || GET_CODE (x) == POST_DEC){
+    xop0 = XEXP (x, 0);
+  }
+
+  /* GP-relative address */
+  if(allow_gp){
+    if(sdata_symbolic_operand(x, Pmode)){
+      return true;
+    }
+  }
+
+  /* absolute address */
+  if(allow_absolute && allow_extension && CONSTANT_P (x)){
+    return true;
+  }
+
+  /* register-indirect address */
+  if(REG_P (x)){
+    return qdsp6_reg_ok_for_base_p(x, reg_ok_strict_p);
+  }
+
   /* We allow FP+offset addresses here because that is necessary for SP+offset
      addresses later.  Note that we don't check the range of the constant. */
   if(!reg_ok_strict_p
      && GET_CODE (x) == PLUS
      && check_mode
-     && GET_CODE (XEXP (x, 0)) == REG
-     && REGNO (XEXP (x, 0)) == FRAME_POINTER_REGNUM
-     && GET_CODE (XEXP (x, 1)) == CONST_INT){
+     && REG_P (xop0)
+     && REGNO (xop0) == FRAME_POINTER_REGNUM
+     && GET_CODE (xop1) == CONST_INT){
     return true;
   }
 
-  offset_bits = conditional ? 6 : -11;
-
-  /* base+offset address */
+  /* base+offset/index address */
   if(   GET_CODE (x) == PLUS
      && check_mode
-     && GET_CODE (XEXP (x, 0)) == REG
-     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)
-     && GET_CODE (XEXP (x, 1)) == CONST_INT
-     && qdsp6_legit_addr_const_p(INTVAL (XEXP (x, 1)), mode, offset_bits)){
-    return true;
+     && ((REG_P (xop0) && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p))
+         || (allow_immediate_base && allow_extension
+             && CONSTANT_P (xop0) && !CONSTANT_P (xop1)))){
+    rtx offset = xop1;
+    rtx index = xop1op0;
+    rtx scale = xop1op1;
+
+    /* base+extended offset address */
+    if(allow_extension && CONSTANT_P (offset)){
+      if(GET_CODE (offset) == CONST_INT){
+        return (INTVAL (offset) & (GET_MODE_SIZE (mode) - 1)) == 0;
+      }
+      return allow_immediate_base;
+    }
+
+    /* base+offset address */
+    if(GET_CODE (offset) == CONST_INT){
+      return qdsp6_legit_addr_const_p(INTVAL (offset), mode, offset_bits);
+    }
+
+    /* base+index address */
+    if(allow_base_plus_index){
+      if(REG_P (offset)){
+        return qdsp6_reg_ok_for_base_p(offset, reg_ok_strict_p);
+      }
+      if(GET_CODE (offset) == MULT){
+        return    REG_P (index)
+               && qdsp6_reg_ok_for_index_p(index, reg_ok_strict_p)
+               && GET_CODE (scale) == CONST_INT
+               && (   INTVAL (scale) == 1
+                   || INTVAL (scale) == 2
+                   || INTVAL (scale) == 4
+                   || INTVAL (scale) == 8);
+      }
+      if(GET_CODE (offset) == ASHIFT){
+        return    REG_P (index)
+               && qdsp6_reg_ok_for_index_p(index, reg_ok_strict_p)
+               && GET_CODE (scale) == CONST_INT
+               && IN_RANGE (INTVAL (scale), 0, 3);
+      }
+    }
   }
 
-  /* We don't check the constant for post inc/dec because it */
-  /* is always the size of the element */
-  if(   GET_CODE (x) == POST_INC
-     && (reg_ok_strict_p || check_mode) /* ??? Is this right? */
-     && GET_CODE (XEXP (x, 0)) == REG
-     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
-    return true;
-  }
+  if(allow_post_inc){
+    /* post increment/decrement address with the increment/decrement equal to
+       the access size */
+    if(GET_CODE (x) == POST_INC || GET_CODE (x) == POST_DEC){
+      return    (reg_ok_strict_p || check_mode) /* ??? Is this right? */
+             && REG_P (xop0)
+             && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p);
+    }
 
-  if(   GET_CODE (x) == POST_DEC
-     && (reg_ok_strict_p || check_mode) /* ??? Is this right? */
-     && GET_CODE (XEXP (x, 0)) == REG
-     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
-    return true;
-  }
-
-  if(   GET_CODE (x) == POST_MODIFY
-     && check_mode
-     && GET_CODE (XEXP (x, 0)) == REG
-     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
-    rtx mod = XEXP (x, 1);
-    if(   GET_CODE (mod) == PLUS
-       && GET_CODE (XEXP (mod, 0)) == REG
-       && REGNO (XEXP (mod, 0)) == REGNO (XEXP (x, 0))
-       && GET_CODE (XEXP (mod, 1)) == CONST_INT
-       && qdsp6_legit_addr_const_p(INTVAL (XEXP (mod, 1)), mode, -4)){
-      return true;
+    /* post increment/decrement address */
+    if(GET_CODE (x) == POST_MODIFY){
+      return    check_mode
+             && REG_P (xop0)
+             && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p)
+             && GET_CODE (xop1) == PLUS
+             && REG_P (xop1op0)
+             && REGNO (xop1op0) == REGNO (xop0)
+             && GET_CODE (xop1op1) == CONST_INT
+             && qdsp6_legit_addr_const_p(INTVAL (xop1op1), mode, -4);
     }
   }
 
@@ -2108,7 +2356,7 @@ qdsp6_GP_or_reg_operand_c (rtx op, enum machine_mode mode)
 int
 qdsp6_nonimmediate_operand_with_GP_c (rtx op, enum machine_mode mode)
 {
-  return (! CONSTANT_P (op) && qdsp6_GP_or_reg_operand (op, mode));
+  return (! CONSTANT_P (op) && GP_or_reg_operand (op, mode));
 }
 
 
@@ -2131,6 +2379,32 @@ qdsp6_vectorize_builtin_mask_for_load(void)
 Describing Relative Costs of Operations
 -------------------------------------*/
 
+/* Implements hook STORE_BY_PIECES_P */
+
+bool
+qdsp6_store_by_pieces_p(unsigned HOST_WIDE_INT size, unsigned int alignment)
+{
+  unsigned HOST_WIDE_INT ninsns;
+  unsigned int store_width = MIN (MAX (alignment, 1), 4);
+
+  ninsns = size / store_width * (TARGET_V4_FEATURES ? 2 : 3);
+  size %= store_width;   
+  if(optimize_size){
+    while(size){
+      store_width /= 2;
+      ninsns += size / store_width * 2;
+      size %= store_width;   
+    }
+    return ninsns <= 3;
+  }
+  else {
+    return ninsns <= 16;
+  }
+}
+
+
+
+
 /* Helper function for qdsp6_rtx_costs */
 
 static bool
@@ -2145,7 +2419,7 @@ qdsp6_free_immediate(rtx x, int outer_code, int value)
 /* Implements hook TARGET_RTX_COSTS */
 
 static bool
-qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total)
+qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed)
 {
   enum machine_mode mode = GET_MODE (x);
 
@@ -2345,47 +2619,121 @@ qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total)
 
 
 
+static bool
+qdsp6_rtx_costs_debug(rtx x, int code, int outer_code, int *total, bool speed)
+{
+  bool retval;
+
+  debug_rtx(x);
+  retval = qdsp6_rtx_costs(x, code, outer_code, total, speed);
+  fprintf(stderr, "rtx_cost:  %d, %s\n\n", *total, retval ? "true" : "false");
+
+  return retval;
+}
+
+
+
+
 /* Implements hook TARGET_ADDRESS_COST */
 
 static int
-qdsp6_address_cost(rtx address)
+qdsp6_address_cost(rtx address, bool speed)
 {
   enum rtx_code code = GET_CODE(address);
   rtx mod;
 
   switch(code){
+    case SYMBOL_REF:
+    case CONST:
+      if(g_switch_value > 0){
+        return COSTS_N_INSNS (1) - 2;
+      }
+      if(TARGET_V4_FEATURES){
+        return COSTS_N_INSNS (1) + 1;
+      }
+      return COSTS_N_INSNS (3);
     case PRE_INC:
     case PRE_DEC:
-      fprintf(stderr, "Cost requested for unsupported PRE_{INC,DEC}\n");
-      return COSTS_N_INSNS (10);
+      return COSTS_N_INSNS (3);
     case POST_INC:
     case POST_DEC:
-      return 0;
+      return COSTS_N_INSNS (1) - 3;
     case POST_MODIFY:
       mod = XEXP (address, 1);
       if(GET_CODE (mod) == PLUS
-         && GET_CODE (XEXP (mod, 0)) == REG
+         && REG_P (XEXP (mod, 0))
          && GET_CODE (XEXP (mod, 1)) == CONST_INT){
-        return 0;
+        return COSTS_N_INSNS (1) - 3;
       }
-      fprintf(stderr, "Unknown POST_MODIFY address type:\n");
-      debug_rtx(address);
-      return COSTS_N_INSNS (2);
+      return COSTS_N_INSNS (3);
     case REG:
-      /* Not doing anything! */
-      return COSTS_N_INSNS (2);
+      return COSTS_N_INSNS (1);
     case PLUS:
-    case MINUS:
-      if(GET_CODE (XEXP (address, 0)) == REG
-         && GET_CODE (XEXP (address, 1)) == CONST_INT){
-        return COSTS_N_INSNS (1);
+      {
+        rtx base = XEXP (address, 0);
+        rtx offset = XEXP (address, 1);
+        if((REG_P (offset) || CONSTANT_P (offset)) && !REG_P (base)){
+          base = XEXP (address, 1);
+          offset = XEXP (address, 0);
+        }
+        if(REG_P (base)
+           || (TARGET_V4_FEATURES && CONSTANT_P (base))){
+          if(GET_CODE (offset) == CONST_INT
+             && IN_RANGE (INTVAL (offset), -(1 << 12), (1 << 12) - 4)){
+            return COSTS_N_INSNS (1) - 2;
+          }
+          if(TARGET_V4_FEATURES && CONSTANT_P (offset)){
+            return COSTS_N_INSNS (1) + 2;
+          }
+          if(TARGET_V4_FEATURES && TARGET_BASE_PLUS_INDEX){
+            if(REG_P (offset)){
+              return COSTS_N_INSNS (1) - 1;
+            }
+            if(GET_CODE (offset) == MULT || GET_CODE (offset) == ASHIFT){
+              rtx index = XEXP (offset, 0);
+              rtx scale = XEXP (offset, 1);
+              if(GET_CODE (offset) == MULT && !REG_P (index)){
+                index = XEXP (offset, 1);
+                scale = XEXP (offset, 0);
+              }
+              if(REG_P (index)
+                 && GET_CODE (scale) == CONST_INT){
+                if(REG_P (base)){
+                  return COSTS_N_INSNS (1) - 2;
+                }
+                return COSTS_N_INSNS (1) + 1;
+              }
+            }
+          }
+        }
       }
-      return COSTS_N_INSNS (2);
-    default: /* ?? Label and such */
-      return COSTS_N_INSNS (10);
+      return COSTS_N_INSNS (3);
+    case CONST_INT:
+    case LABEL_REF:
+      if(TARGET_V4_FEATURES){
+        return COSTS_N_INSNS (1) + 1;
+      }
+      /* FALL THROUGH */
+    default:
+      return COSTS_N_INSNS (3);
   }
   /* Should never get here */
-  return COSTS_N_INSNS (30);
+  gcc_unreachable();
+}
+
+
+
+
+static int
+qdsp6_address_cost_debug(rtx address, bool speed)
+{
+  int retval;
+
+  debug_rtx(address);
+  retval = qdsp6_address_cost(address, speed);
+  fprintf(stderr, "address_cost:  %d\n\n", retval);
+
+  return retval;
 }
 
 
@@ -3044,7 +3392,7 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
   char opoutput[MAX_RECOG_OPERANDS];
   int ops = 0;
 
-  if(!(optimize && flag_schedule_insns_after_reload)){
+  if(!(TARGET_PACKETS && optimize)){
     return ptr;
   }
 
@@ -3213,7 +3561,7 @@ qdsp6_final_prescan_insn(
 {
   struct qdsp6_final_info *final_info;
 
-  if(!(optimize && flag_schedule_insns_after_reload)){
+  if(!(TARGET_PACKETS && optimize)){
     return;
   }
 
@@ -3293,20 +3641,28 @@ qdsp6_final_prescan_insn(
 
 
 
+/* globals used to pass information from qdsp6_print_operand to
+   qdsp6_print_operand_address */
+
+/* whether the current operand contains an extended constant */
+static bool qdsp6_extended_constant;
+
+/* the mode of the current address being printed */
+static enum machine_mode qdsp6_address_mode;
+
 /* Implements macro PRINT_OPERAND */
 
 void
-qdsp6_print_operand(FILE *file, rtx x, int code)
+qdsp6_print_operand(FILE *stream, rtx x, int code)
 {
-  rtx x0;
+  qdsp6_extended_constant = false;
 
   switch(code){
     case 'P':
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fprintf(file, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
+        fprintf(stream, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
       }
       else {
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%P");
       }
       return;
@@ -3314,7 +3670,7 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
     case 'H':
       /* Output the second register of a 64 bit register pair. */
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fputs(reg_names[REGNO (x) + 1], file);
+        fputs(reg_names[REGNO (x) + 1], stream);
       }
       else {
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%H");
@@ -3324,7 +3680,7 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
     case 'L':
       /* Output the first register of a 64 bit register pair. */
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fputs(reg_names[REGNO (x)], file);
+        fputs(reg_names[REGNO (x)], stream);
       }
       else {
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%L");
@@ -3336,9 +3692,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
       if((GET_CODE (x) == NE || GET_CODE (x) == EQ)
          && P_REG_P (XEXP (x, 0)) && XEXP (x, 1) == const0_rtx){
         if((GET_CODE (x) == EQ) ^ (code == 'I')){
-          fputc('!', file);
+          fputc('!', stream);
         }
-        fputs(reg_names[REGNO (XEXP (x, 0))], file);
+        fputs(reg_names[REGNO (XEXP (x, 0))], stream);
       }
       else {
         if(code == 'C'){
@@ -3356,11 +3712,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHH = (bits & 0xffff0000UL) >> 16;
-        fprintf(file, "%u", immValueHH);
+        fprintf(stream, "%u", immValueHH);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%S");
       }
       return;
@@ -3369,11 +3723,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHL = bits & 0x0000ffffUL;
-        fprintf(file, "%u", immValueHL);
+        fprintf(stream, "%u", immValueHL);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%T");
       }
       return;
@@ -3382,11 +3734,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLH = (bits & 0xffff0000UL) >> 16;
-        fprintf(file, "%u", immValueLH);
+        fprintf(stream, "%u", immValueLH);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%U");
       }
       return;
@@ -3395,11 +3745,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLL = bits & 0x0000ffffUL;
-        fprintf(file, "%u", immValueLL);
+        fprintf(stream, "%u", immValueLL);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%V");
       }
       return;
@@ -3410,11 +3758,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHH = (bits & 0xffff0000UL) >> 16;
-        fprintf(file, "%u", immValueHH);
+        fprintf(stream, "%u", immValueHH);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%W");
       }
       return;
@@ -3423,11 +3769,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHL = bits & 0x0000ffffUL;
-        fprintf(file, "%u", immValueHL);
+        fprintf(stream, "%u", immValueHL);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%X");
       }
       return;
@@ -3436,11 +3780,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLH = (bits & 0xffff0000UL) >> 16;
-        fprintf(file, "%u", immValueLH);
+        fprintf(stream, "%u", immValueLH);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%Y");
       }
       return;
@@ -3449,11 +3791,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLL = bits & 0x0000ffffUL;
-        fprintf(file, "%u", immValueLL);
+        fprintf(stream, "%u", immValueLL);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%Z");
       }
       return;
@@ -3465,7 +3805,7 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
           output_operand_lossage("qdsp6_print_operand: invalid operand for %%J");
         }
         else {
-          fprintf(file, "%d", log);
+          fprintf(stream, "%d", log);
         }
       }
       return;
@@ -3477,10 +3817,16 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
           output_operand_lossage("qdsp6_print_operand: invalid operand for %%K");
         }
         else {
-          fprintf(file, "%d", log);
+          fprintf(stream, "%d", log);
         }
       }
       return;
+
+    case 'E':
+      gcc_assert(TARGET_V4_FEATURES);
+      qdsp6_extended_constant = true;
+      /* handled below */
+      break;
 
     case 0:
       /* handled below */
@@ -3496,10 +3842,10 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
       {
         if(REGNO (x) < FIRST_PSEUDO_REGISTER){
           if(G_REG_P (x) && GET_MODE_SIZE (GET_MODE (x)) > UNITS_PER_WORD){
-            fprintf(file, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
+            fprintf(stream, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
           }
           else {
-            fputs(reg_names[REGNO (x)], file);
+            fputs(reg_names[REGNO (x)], stream);
           }
         }
         else {
@@ -3509,85 +3855,17 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
       break;
 
     case MEM:
-      x0 = XEXP (x,0);
+      qdsp6_address_mode = GET_MODE (x);
+      output_address(XEXP (x, 0));
 
-      switch(GET_CODE (x0)){
-        case REG:
-          if(G_REG_P (x0)){
-            fputs(reg_names[REGNO (x0)], file);
-          }
-          else {
-            output_operand_lossage("qdsp6_print_operand: invalid base register");
-          }
-          break;
-
-        case PLUS:
-          if(   G_REG_P (XEXP (x0, 0))
-             && GET_CODE (XEXP (x0, 1)) == CONST_INT){
-            fprintf(file, "%s+#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (XEXP (x0, 0))], INTVAL (XEXP (x0, 1)));
-          }
-          else {
-            output_operand_lossage("qdsp6_print_operand: invalid base+offset");
-          }
-          break;
-
-        case POST_INC:
-          if(G_REG_P (XEXP (x0, 0))){
-            fprintf(file, "%s++#%d", reg_names[REGNO (XEXP (x0, 0))], GET_MODE_SIZE (GET_MODE (x)));
-          }
-          else {
-            output_operand_lossage("qdsp6_print_operand: invalid post increment base register");
-          }
-          break;
-
-        case POST_DEC:
-          if(G_REG_P (XEXP (x0, 0))){
-            fprintf(file, "%s++#-%d", reg_names[REGNO (XEXP (x0, 0))], GET_MODE_SIZE (GET_MODE (x)));
-          }
-          else {
-            output_operand_lossage("qdsp6_print_operand: invalid post decrement base register");
-          }
-          break;
-
-        case POST_MODIFY:
-          {
-            rtx basereg = XEXP (x0, 0);
-            rtx mod = XEXP (x0, 1);
-            if(G_REG_P (XEXP (x0, 0))){
-              fprintf(file, "%s++#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (basereg)], INTVAL (XEXP (mod, 1)));
-            }
-            else {
-              output_operand_lossage("qdsp6_print_operand: invalid post modify base register");
-            }
-          }
-          break;
-
-        case SYMBOL_REF:
-          if(TARGET_V2_FEATURES && sdata_symbolic_operand(x0, Pmode)){
-            fputc('#', file);
-          }
-          output_address(x0);
-          break;
-
-        case CONST:
-          if(TARGET_V2_FEATURES && sdata_symbolic_operand(x0, Pmode)){
-            fputc('#', file);
-          }
-          output_address(x0);
-          break;
-
-        default:
-          output_operand_lossage("qdsp6_print_operand: invalid address code 0x%x", GET_CODE (x0));
-          break;
-      }
       break;
 
     case CONST_INT:
       if(INTVAL (x) < -0xFFFFFFFFLL){
-        fprintf(file, HOST_WIDE_INT_PRINT_HEX, INTVAL (x));
+        fprintf(stream, HOST_WIDE_INT_PRINT_HEX, INTVAL (x));
       }
       else {
-        fprintf(file, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
+        fprintf(stream, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
       }
       break;
 
@@ -3601,7 +3879,7 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         REAL_VALUE_FROM_CONST_DOUBLE (rv, x);
         REAL_VALUE_TO_TARGET_SINGLE (rv, l);
         l &= 0xFFFFFFFFUL;
-        fprintf(file, "0x%08lx", l);
+        fprintf(stream, "0x%08lx", l);
         break;
       }
       else if(GET_MODE (x) == DFmode){
@@ -3612,13 +3890,13 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         REAL_VALUE_TO_TARGET_DOUBLE (rv, l);
         l[0] &= 0xFFFFFFFFUL;
         l[1] &= 0xFFFFFFFFUL;
-        fprintf(file, "0x%08lx%08lx", l[1], l[0]);
+        fprintf(stream, "0x%08lx%08lx", l[1], l[0]);
         break;
       }
       /* FALL THROUGH.  Let output_addr_const deal with it. */
 
     default:
-      output_addr_const(file, x);
+      output_addr_const(stream, x);
       break;
   }
 
@@ -3633,19 +3911,137 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
    Print a memory address as an operand to reference that memory location. */
 
 void
-qdsp6_print_operand_address(FILE *stream, rtx address)
+qdsp6_print_operand_address(FILE *stream, rtx x)
 {
-  switch(GET_CODE (address)){
-    case SYMBOL_REF:
-      output_addr_const(stream, address);
+  switch(GET_CODE (x)){
+    case REG:
+      if(G_REG_P (x)){
+        fputs(reg_names[REGNO (x)], stream);
+        fputs("+#0", stream);
+      }
+      else {
+        output_operand_lossage("qdsp6_print_operand_address: invalid base register");
+      }
       break;
 
+    case PLUS:
+      {
+        rtx base = XEXP (x, 0);
+        rtx offset = XEXP (x, 1);
+        rtx index = NULL_RTX;
+        rtx scale = NULL_RTX;
+
+        if(!(REG_P (base)
+             || (CONSTANT_P (base) && GET_CODE (base) != CONST_INT))
+           || (CONSTANT_P (offset) && GET_CODE (offset) != CONST_INT)){
+          base = XEXP (x, 1);
+          offset = XEXP (x, 0);
+        }
+        if(GET_CODE (offset) == MULT || GET_CODE (offset) == ASHIFT){
+          index = XEXP (offset, 0);
+          scale = XEXP (offset, 1);
+          if(!REG_P (index)){
+            index = XEXP (offset, 1);
+            scale = XEXP (offset, 0);
+          }
+        }
+
+        if(G_REG_P (base)){
+          fprintf(stream, "%s", reg_names[REGNO (base)]);
+          fputc('+', stream);
+        }
+        else if(!CONSTANT_P (base)){
+          output_operand_lossage("qdsp6_print_operand_address: invalid base+index base");
+          break;
+        }
+
+        if(CONSTANT_P (offset)){
+          fputc('#', stream);
+          if(qdsp6_extended_constant){
+            fputc('#', stream);
+          }
+          output_addr_const(stream, offset);
+        }
+        else if(REG_P (offset)){
+          fprintf(stream, "%s<<#0", reg_names[REGNO (offset)]);
+        }
+        else if(   GET_CODE (offset) == MULT
+                && REG_P (index)
+                && GET_CODE (scale) == CONST_INT){
+          int log = exact_log2(INTVAL (scale) & 0xFFFFFFFFULL);
+          if(log == -1){
+            output_operand_lossage("qdsp6_print_operand_address: invalid base+index scale amount");
+          }
+          else {
+            fprintf(stream, "%s<<#%d", reg_names[REGNO (index)], log);
+          }
+        }
+        else if(   GET_CODE (offset) == ASHIFT
+                && REG_P (index)
+                && GET_CODE (scale) == CONST_INT){
+          fprintf(stream, "%s<<#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (index)], INTVAL (scale));
+        }
+        else {
+          output_operand_lossage("qdsp6_print_operand_address: invalid base+index index");
+        }
+
+        if(CONSTANT_P (base)){
+          fputc('+', stream);
+          fputc('#', stream);
+          if(qdsp6_extended_constant){
+            fputc('#', stream);
+          }
+          output_addr_const(stream, base);
+        }
+        break;
+      }
+
+    case POST_INC:
+      if(G_REG_P (XEXP (x, 0))){
+        fprintf(stream, "%s++#%d", reg_names[REGNO (XEXP (x, 0))], GET_MODE_SIZE (qdsp6_address_mode));
+      }
+      else {
+        output_operand_lossage("qdsp6_print_operand_address: invalid post increment base register");
+      }
+      break;
+
+    case POST_DEC:
+      if(G_REG_P (XEXP (x, 0))){
+        fprintf(stream, "%s++#-%d", reg_names[REGNO (XEXP (x, 0))], GET_MODE_SIZE (qdsp6_address_mode));
+      }
+      else {
+        output_operand_lossage("qdsp6_print_operand_address: invalid post decrement base register");
+      }
+      break;
+
+    case POST_MODIFY:
+      {
+        rtx basereg = XEXP (x, 0);
+        rtx mod = XEXP (x, 1);
+        if(G_REG_P (XEXP (x, 0))){
+          fprintf(stream, "%s++#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (basereg)], INTVAL (XEXP (mod, 1)));
+        }
+        else {
+          output_operand_lossage("qdsp6_print_operand_address: invalid post modify base register");
+        }
+      }
+      break;
+
+    case SYMBOL_REF:
     case CONST:
-      output_addr_const(stream, address);
+    case CONST_INT:
+    case LABEL_REF:
+      if(sdata_symbolic_operand(x, Pmode) && !qdsp6_extended_constant){
+        fputc('#', stream);
+      }
+      else if(CONSTANT_P (x)){
+        fputs("##", stream);
+      }
+      output_addr_const(stream, x);
       break;
 
     default:
-      output_operand_lossage("qdsp6_print_operand_address: invalid address operand");
+      output_operand_lossage("qdsp6_print_operand_address: invalid address code 0x%x", GET_CODE (x));
       break;
   }
 }
@@ -3803,7 +4199,7 @@ qdsp6_machine_dependent_reorg(void)
 #endif /* 0 */
 
   if(cfun->machine->has_hardware_loops
-     || (TARGET_PULLUP && optimize && flag_schedule_insns_after_reload)){
+     || (TARGET_PULLUP && optimize)){
     qdsp6_fixup_cfg();
   }
 
@@ -3812,7 +4208,7 @@ qdsp6_machine_dependent_reorg(void)
     qdsp6_fixup_doloops();
   }
 
-  if(TARGET_PULLUP && optimize && flag_schedule_insns_after_reload){
+  if(TARGET_PULLUP && optimize){
     qdsp6_packet_optimizations();
   }
 
@@ -3916,12 +4312,12 @@ qdsp6_init_builtins(void)
   tree DI_ftype_SI       ATTRIBUTE_UNUSED;
   tree DI_ftype_SISI     ATTRIBUTE_UNUSED;
   tree UDI_ftype_SISI    ATTRIBUTE_UNUSED;
+  tree DI_ftype_SIDI     ATTRIBUTE_UNUSED;
   tree DI_ftype_SISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_DI       ATTRIBUTE_UNUSED;
   tree SI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree SI_ftype_DISISI   ATTRIBUTE_UNUSED;
   tree DI_ftype_DI       ATTRIBUTE_UNUSED;
-  tree DI_ftype_SIDI     ATTRIBUTE_UNUSED;
   tree DI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree DI_ftype_DISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_SIDI     ATTRIBUTE_UNUSED;
@@ -3937,10 +4333,14 @@ qdsp6_init_builtins(void)
   tree SI_ftype_SISIDI   ATTRIBUTE_UNUSED;
 
   tree QI_ftype_SISI     ATTRIBUTE_UNUSED;
+  tree QI_ftype_SIDI     ATTRIBUTE_UNUSED;
+  tree QI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree QI_ftype_DIDI     ATTRIBUTE_UNUSED;
   tree QI_ftype_QI       ATTRIBUTE_UNUSED;
   tree QI_ftype_SI       ATTRIBUTE_UNUSED;
+  tree QI_ftype_DI       ATTRIBUTE_UNUSED;
   tree QI_ftype_QIQI     ATTRIBUTE_UNUSED;
+  tree QI_ftype_QIQIQI   ATTRIBUTE_UNUSED;
   tree SI_ftype_QIQI     ATTRIBUTE_UNUSED;
   tree SI_ftype_QISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_QISI     ATTRIBUTE_UNUSED;
@@ -4005,6 +4405,10 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink))));
+  DI_ftype_SIDI =     build_function_type(   DI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        endlink)));
   SI_ftype_DI =       build_function_type(   SI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         endlink));
@@ -4020,10 +4424,6 @@ qdsp6_init_builtins(void)
   DI_ftype_DI =       build_function_type(   DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         endlink));
-  DI_ftype_SIDI =     build_function_type(   DI_type_node,
-                        tree_cons(NULL_TREE, SI_type_node,
-                        tree_cons(NULL_TREE, DI_type_node,
-                        endlink)));
   DI_ftype_DISI =     build_function_type(   DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         tree_cons(NULL_TREE, SI_type_node,
@@ -4092,6 +4492,16 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink)));
 
+  QI_ftype_SIDI   =   build_function_type(   QI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        endlink)));
+
+  QI_ftype_DISI   =   build_function_type(   QI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink)));
+
   QI_ftype_DIDI   =   build_function_type(   QI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
@@ -4105,10 +4515,20 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink));
 
+  QI_ftype_DI     =   build_function_type(   QI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        endlink));
+
   QI_ftype_QIQI   =   build_function_type(   QI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
                         endlink)));
+
+  QI_ftype_QIQIQI =   build_function_type(   QI_type_node,
+                        tree_cons(NULL_TREE, QI_type_node,
+                        tree_cons(NULL_TREE, QI_type_node,
+                        tree_cons(NULL_TREE, QI_type_node,
+                        endlink))));
 
   SI_ftype_QISISI =   build_function_type(   SI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
@@ -4318,7 +4738,7 @@ qdsp6_invalid_within_doloop(const_rtx insn)
       /* FALL THROUGH */
     case SET:
           reg = SET_DEST (side_effect);
-          if(GET_CODE (reg) == REG){
+          if(REG_P (reg)){
             switch(REGNO (reg)){
               case LC0_REGNUM:
                 return "lc0 is set in the loop.";
@@ -4341,7 +4761,7 @@ qdsp6_invalid_within_doloop(const_rtx insn)
       /* FALL THROUGH */
     case CLOBBER:
           reg = XEXP (side_effect, 0);
-          if(GET_CODE (reg) == REG){
+          if(REG_P (reg)){
             switch(REGNO (reg)){
               case LC0_REGNUM:
                 return "lc0 is clobbered in the loop.";
@@ -5707,7 +6127,7 @@ conditional_dest_operand(rtx op, enum machine_mode mode)
                            : (memory_operand(op, mode)
                               && qdsp6_legitimate_address_p(GET_MODE (op),
                                                             XEXP (op, 0),
-                                                            true, true))
+                                                            true, "cond"))
                              || gr_register_operand(op, mode);
 }
 
@@ -5744,7 +6164,7 @@ conditional_src_operand(rtx op, enum machine_mode mode)
                            : (memory_operand(op, mode)
                               && qdsp6_legitimate_address_p(GET_MODE (op),
                                                             XEXP (op, 0),
-                                                            true, true))
+                                                            true, "cond"))
                              || gr_register_operand(op, mode)
                              || s12_const_int_operand(op, mode);
 }
@@ -5865,7 +6285,7 @@ qdsp6_expand_prologue(void)
   struct qdsp6_frame_info *frame;
   rtx base_reg;
   HOST_WIDE_INT offset;
-  int i;
+  unsigned int i;
 
   frame = qdsp6_frame_info();
 
@@ -5885,14 +6305,13 @@ qdsp6_expand_prologue(void)
   offset = frame->offset - 2 * UNITS_PER_WORD * frame->num_function_saved_pairs;
   /* Save any callee-save registers that can be stored as pairs and have not
      been saved by a common prologue function. */
-  i = frame->num_saved_pairs - frame->num_function_saved_pairs - 1;
-  for(; i >= 0; i--){
+  for(i = frame->num_function_saved_pairs; i < frame->num_saved_pairs; i++){
     offset -= 2 * UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (DImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (DImode, frame->saved_pairs[i]));
   }
   /* Save any remaining callee-save registers. */
-  for(i = frame->num_saved_singles - 1; i >= 0; i--){
+  for(i = 0; i < frame->num_saved_singles; i++){
     offset -= UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (SImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (SImode, frame->saved_singles[i]));
@@ -5911,7 +6330,9 @@ qdsp6_direct_return(void)
 {
   struct qdsp6_frame_info *frame = qdsp6_frame_info();
 
-  return reload_completed && frame->total_size == 0;
+  return reload_completed && (frame->total_size == 0
+                              || (TARGET_V4_FEATURES && frame->lrfp_size != 0
+                                                     && frame->reg_size == 0));
 }
 
 
@@ -5969,25 +6390,23 @@ qdsp6_expand_epilogue(bool sibcall)
 
   /* Restore callee-save registers. */
   base_reg = frame->base_reg;
-  offset = frame->offset
-           - (2 * UNITS_PER_WORD
-              * (sibcall ? frame->num_sibcall_function_restored_pairs
-                         : frame->num_function_restored_pairs));
-  /* Restore any callee-save registers that can be loaded as pairs and will not
-     be loaded by a common epilogue function. */
-  i = frame->num_saved_pairs
-      - (sibcall ? frame->num_sibcall_function_restored_pairs
-                 : frame->num_function_restored_pairs) - 1;
-  for(; i >= 0; i--){
-    offset -= 2 * UNITS_PER_WORD;
-    emit_move_insn(gen_rtx_REG (DImode, frame->saved_pairs[i]),
-                   gen_rtx_MEM (DImode, plus_constant(base_reg, offset)));
-  }
-  /* Restore any remaining callee-save registers. */
-  for(i = frame->num_saved_singles - 1; i >= 0; i--){
-    offset -= UNITS_PER_WORD;
+  offset = frame->offset - (2 * frame->num_saved_pairs
+                              + frame->num_saved_singles) * UNITS_PER_WORD;
+  /* Restore any callee-save registers not stored as part of a pair. */
+  for(i = (int) frame->num_saved_singles - 1; i >= 0; i--){
     emit_move_insn(gen_rtx_REG (SImode, frame->saved_singles[i]),
                    gen_rtx_MEM (SImode, plus_constant(base_reg, offset)));
+    offset += UNITS_PER_WORD;
+  }
+  /* Restore any callee-save registers that can be loaded as pairs and will not
+     be loaded by a common epilogue function. */
+  for(i = (int) frame->num_saved_pairs - 1;
+      i >= (int) (sibcall ? frame->num_sibcall_function_restored_pairs
+                          : frame->num_function_restored_pairs);
+      i--){
+    emit_move_insn(gen_rtx_REG (DImode, frame->saved_pairs[i]),
+                   gen_rtx_MEM (DImode, plus_constant(base_reg, offset)));
+    offset += 2 * UNITS_PER_WORD;
   }
 
   /* Can we omit the deallocframe instruction? */
@@ -6000,6 +6419,11 @@ qdsp6_expand_epilogue(bool sibcall)
   }
   else if(sibcall && frame->sibcall_epilogue_function != CODE_FOR_nothing){
     emit_insn(GEN_FCN (frame->sibcall_epilogue_function)(NULL_RTX));
+  }
+  else if(TARGET_V4_FEATURES && emit_return
+          && !crtl->calls_eh_return){
+    emit_jump_insn(gen_deallocframe_return());
+    emit_return = false;
   }
   else {
     emit_insn(gen_deallocframe());
@@ -6029,14 +6453,14 @@ qdsp6_expand_compare(enum rtx_code code)
   rtx op1 = cfun->machine->compare_op1;
   enum rtx_code compare_code, jump_code;
   rtx p_reg, const_reg;
-  bool offset = false;
+  int offset = 0;
 
   if(GET_MODE (op0) == BImode){
     gcc_assert(REG_P (op0) && (code == NE || code == EQ) && op1 == const0_rtx);
     return gen_rtx_fmt_ee(code, BImode, op0, op1);
   }
 
-  if(REG_P (op1)){
+  if(REG_P (op1) || GET_CODE (op1) == SUBREG){
     switch(code) {
       case EQ:
         SET_CODES (EQ, NE); break;
@@ -6064,89 +6488,59 @@ qdsp6_expand_compare(enum rtx_code code)
         SET_CODES (GTU, EQ); SWAP_OPERANDS; break;
 
       default:
-        abort();
+        gcc_unreachable();
     }
   }
   else {
-    gcc_assert(GET_MODE(op0) != DImode && GET_MODE(op1) != DImode);
+    gcc_assert(GET_MODE (op0) != DImode && GET_MODE (op1) != DImode);
+
     switch(code) {
       case EQ:
-/*
-        if(cfun->machine->compare_op1 == const0_rtx){
-          SET_CODES (NE, EQ); break;
-        }
-        else {
-*/
-          SET_CODES (EQ, NE); break;
-/*
-        }
-*/
+        SET_CODES (EQ, NE); break;
       case NE:
         SET_CODES (EQ, EQ); break;
 
       /* Signed compares */
       case LT:
-        SET_CODES (GT, EQ); offset = true; break;
+        SET_CODES (GT, EQ); offset = -1; break;
       case LE:
         SET_CODES (GT, EQ); break;
       case GT:
         SET_CODES (GT, NE); break;
       case GE:
-        SET_CODES (GT, NE); offset = true; break;
+        SET_CODES (GT, NE); offset = -1; break;
 
       /* Unsigned compares */
       case LTU:
-        SET_CODES (GTU, EQ); offset = true; break;
+        SET_CODES (GTU, EQ); offset = -1; break;
       case LEU:
         SET_CODES (GTU, EQ); break;
       case GTU:
         SET_CODES (GTU, NE); break;
       case GEU:
-        SET_CODES (GTU, NE); offset = true; break;
+        SET_CODES (GTU, NE); offset = -1; break;
 
       default:
-        abort();
+        gcc_unreachable();
     }
 
-    if(TARGET_V2_FEATURES){
-      if(   INTVAL (op1) >= (compare_code == GTU ? offset ?    0 + 1 :    0
-                                                 : offset ? -512 + 1 : -512)
-         && INTVAL (op1) <= (offset ? 511 + 1 : 511)){
-        if(offset){
-          op1 = GEN_INT (INTVAL (op1) - 1);
-        }
-      }
-      else {
-        const_reg = gen_reg_rtx(SImode);
-        emit_move_insn(const_reg, op1);
-        if(offset){
-          jump_code = jump_code == EQ ? NE : EQ;
-          op1 = op0;
-          op0 = const_reg;
-        }
-        else {
-          op1 = const_reg;
-        }
+    if(GET_CODE (op1) == CONST_INT
+       && INTVAL (op1) >= (compare_code == GTU ? 0 - offset : -512 - offset)
+       && INTVAL (op1) <= 511 - offset){
+      if(offset != 0){
+        op1 = GEN_INT (INTVAL (op1) + offset);
       }
     }
     else {
-      if(   INTVAL (op1) >= (compare_code == GTU ?   0 : -128)
-         && INTVAL (op1) <= (compare_code == GTU ? 255 :  127)){
-        if(offset){
-          compare_code = compare_code == GT ? GE : GEU;
-        }
+      const_reg = gen_reg_rtx(SImode);
+      emit_move_insn(const_reg, op1);
+      if(offset != 0){
+        jump_code = jump_code == EQ ? NE : EQ;
+        op1 = op0;
+        op0 = const_reg;
       }
       else {
-        const_reg = gen_reg_rtx(SImode);
-        emit_move_insn(const_reg, op1);
-        if(offset){
-          jump_code = jump_code == EQ ? NE : EQ;
-          op1 = op0;
-          op0 = const_reg;
-        }
-        else {
-          op1 = const_reg;
-        }
+        op1 = const_reg;
       }
     }
   }
@@ -8432,7 +8826,7 @@ qdsp6_sanity_check_cfg_packet_info(void)
 
 
 static unsigned int 
-qdsp6_count_packets()
+qdsp6_count_packets(void)
 {
   unsigned int total = 0; 
   struct qdsp6_packet_info *packet	= NULL; 
@@ -8772,8 +9166,7 @@ qdsp6_free_packing_info(void)
 static void
 qdsp6_packet_optimizations(void)
 {
-
-  if(!(optimize && flag_schedule_insns_after_reload)){
+  if(!(TARGET_PACKETS && optimize)){
     return;
   }
 
@@ -8795,7 +9188,7 @@ qdsp6_packet_optimizations(void)
 static void
 qdsp6_final_pack_insns(void)
 {
-  if(!(optimize && flag_schedule_insns_after_reload)){
+  if(!(TARGET_PACKETS && optimize)){
     return;
   }
 

@@ -24,6 +24,7 @@ extern void qdsp6_init_expanders(void);
 extern void qdsp6_conditional_register_usage(void);
 extern bool qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT, char, const char *);
 extern HOST_WIDE_INT qdsp6_initial_elimination_offset(int, int);
+extern bool qdsp6_store_by_pieces_p(unsigned HOST_WIDE_INT, unsigned int);
 extern const char *qdsp6_asm_output_opcode(FILE *, const char *);
 extern void qdsp6_expand_prologue(void);
 extern void qdsp6_expand_epilogue(bool);
@@ -58,7 +59,7 @@ extern void qdsp6_asm_output_aligned_decl_local(
 extern enum reg_class qdsp6_secondary_reload_class(rtx, enum reg_class);
 #endif /* GCC_3_4_6 */
 extern rtx  qdsp6_return_addr_rtx(int, rtx);
-extern bool qdsp6_legitimate_address_p(enum machine_mode, rtx, bool, bool);
+extern bool qdsp6_legitimate_address_p(enum machine_mode, rtx, bool, const char *);
 #if GCC_3_4_6
 extern bool qdsp6_reg_ok_for_base_p(rtx, bool);
 #endif /* GCC_3_4_6 */
