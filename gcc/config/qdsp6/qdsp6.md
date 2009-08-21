@@ -3460,7 +3460,7 @@
                           (const_int 0)])
                        (label_ref (match_operand 2 "" ""))
                        (pc)))]
-   "TARGET_V3_FEATURES"
+   "TARGET_V3_FEATURES && !TARGET_V4_FEATURES"
    {
     rtx prediction;
     int predict_taken = 0;
