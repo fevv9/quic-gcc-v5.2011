@@ -12991,6 +12991,8 @@ rest_of_handle_combine (void)
 {
   int rebuild_jump_labels_after_combine;
 
+  crtl->combine_in_progress = 1;
+
   df_set_flags (DF_LR_RUN_DCE + DF_DEFER_INSN_RESCAN);
   df_note_add_problem ();
   df_analyze ();
@@ -13012,6 +13014,10 @@ rest_of_handle_combine (void)
     }
 
   regstat_free_n_sets_and_refs ();
+
+  crtl->combine_in_progress = 0;
+  crtl->combine_completed = 1;
+
   return 0;
 }
 
