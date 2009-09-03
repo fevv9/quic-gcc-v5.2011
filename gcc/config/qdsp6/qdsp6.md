@@ -561,13 +561,13 @@
     if(TARGET_SECTION_SORTING_CODE_SUPPORT && TARGET_SECTION_SORTING
        && can_create_pseudo_p()){
       if(MEM_P (operands[0])
-         && sdata_symbolic_operand(XEXP (operands[0], 0), Pmode)){
+         && !GP_or_reg_operand(operands[0], QImode)){
         reg = gen_reg_rtx(Pmode);
         emit_move_insn(reg, XEXP (operands[0], 0));
         operands[0] = change_address(operands[0], QImode, reg);
       }
       else if(MEM_P (operands[1])
-              && sdata_symbolic_operand(XEXP (operands[1], 0), Pmode)){
+              && !GP_or_reg_operand(operands[1], QImode)){
         reg = gen_reg_rtx(Pmode);
         emit_move_insn(reg, XEXP (operands[1], 0));
         operands[1] = change_address(operands[1], QImode, reg);
@@ -663,13 +663,13 @@
     if(TARGET_SECTION_SORTING_CODE_SUPPORT && TARGET_SECTION_SORTING
        && can_create_pseudo_p()){
       if(MEM_P (operands[0])
-         && sdata_symbolic_operand(XEXP (operands[0], 0), Pmode)){
+         && !GP_or_reg_operand(operands[0], HImode)){
         reg = gen_reg_rtx(Pmode);
         emit_move_insn(reg, XEXP (operands[0], 0));
         operands[0] = change_address(operands[0], HImode, reg);
       }
       else if(MEM_P (operands[1])
-              && sdata_symbolic_operand(XEXP (operands[1], 0), Pmode)){
+              && !GP_or_reg_operand(operands[1], HImode)){
         reg = gen_reg_rtx(Pmode);
         emit_move_insn(reg, XEXP (operands[1], 0));
         operands[1] = change_address(operands[1], HImode, reg);
@@ -766,13 +766,13 @@
     if(TARGET_SECTION_SORTING_CODE_SUPPORT && TARGET_SECTION_SORTING
        && can_create_pseudo_p()){
       if(MEM_P (operands[0])
-         && sdata_symbolic_operand(XEXP (operands[0], 0), Pmode)){
+         && !GP_or_reg_operand(operands[0], SImode)){
         reg = gen_reg_rtx(Pmode);
         emit_move_insn(reg, XEXP (operands[0], 0));
         operands[0] = change_address(operands[0], SImode, reg);
       }
       else if(MEM_P (operands[1])
-              && sdata_symbolic_operand(XEXP (operands[1], 0), Pmode)){
+              && !GP_or_reg_operand(operands[1], SImode)){
         reg = gen_reg_rtx(Pmode);
         emit_move_insn(reg, XEXP (operands[1], 0));
         operands[1] = change_address(operands[1], SImode, reg);
@@ -1046,13 +1046,13 @@
     if(TARGET_SECTION_SORTING_CODE_SUPPORT && TARGET_SECTION_SORTING
        && can_create_pseudo_p()){
       if(MEM_P (operands[0])
-         && sdata_symbolic_operand(XEXP (operands[0], 0), Pmode)){
+         && !GP_or_reg_operand(operands[0], SFmode)){
         reg = gen_reg_rtx(Pmode);
         emit_move_insn(reg, XEXP (operands[0], 0));
         operands[0] = change_address(operands[0], SFmode, reg);
       }
       else if(MEM_P (operands[1])
-              && sdata_symbolic_operand(XEXP (operands[1], 0), Pmode)){
+              && !GP_or_reg_operand(operands[1], SFmode)){
         reg = gen_reg_rtx(Pmode);
         emit_move_insn(reg, XEXP (operands[1], 0));
         operands[1] = change_address(operands[1], SFmode, reg);
