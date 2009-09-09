@@ -1256,8 +1256,8 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
 
   /* Determine whether we can save code size by using functions to implement
      common prologue or epilogue sequences. */
-  if(optimize_size && !crtl->calls_eh_return
-     && info->lrfp_size != 0){
+  if((optimize_size || optimize == 2)
+     && !crtl->calls_eh_return && info->lrfp_size != 0){
 
     /* If saving and restoring one of the single callee-save registers as a pair
        allows it to be saved and/or restored via a function call, then do so. */
@@ -1273,7 +1273,8 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
          could be saved, then remove it from the list of single callee-save
          registers and insert it into the list of paired callee-save
          registers. */
-      if(i < max_function_saved_pairs
+      if((optimize_size || i >= 2)
+         && i < max_function_saved_pairs
          && (info->saved_singles[0] == regno
              || info->saved_singles[0] == regno + 1)){
 
@@ -1305,14 +1306,18 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
       i = max_function_saved_pairs;
     }
 
-    #define SET_PROLOGUE_EPILOGUE_FUNCTION_INFO(FIELD) \
-      info->FIELD = prologue_epilogue_functions[i].FIELD
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (prologue_function);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_saved_pairs);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (epilogue_function);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_restored_pairs);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (sibcall_epilogue_function);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_sibcall_function_restored_pairs);
+    /* At -O2, use the common prologe and epilogue functions only if they save
+       and restore 3 or more pairs of callee-save registers. */
+    if(optimize_size || i >= 3){
+      #define SET_PROLOGUE_EPILOGUE_FUNCTION_INFO(FIELD) \
+        info->FIELD = prologue_epilogue_functions[i].FIELD
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (prologue_function);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_saved_pairs);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (epilogue_function);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_restored_pairs);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (sibcall_epilogue_function);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_sibcall_function_restored_pairs);
+    }
   }
 }
 
