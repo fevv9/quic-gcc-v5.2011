@@ -1375,16 +1375,18 @@ struct qdsp6_final_info GTY(()) {
   bool start_packet;
   /* whether the current insn ends a packet */
   bool end_packet;
-  /* whether the current packet ends a hardware loop */
-  int endloop;
-  /* the label at the start of an inner hardware loop */
-  rtx endloop0_label;
-  /* whether the current insn should be printed */
-  bool print_insn;
   /* whether the current insn should be indented */
   bool indent_insn;
-  int insns_left_in_packet;
-  bool form_packet;
+  /* whether the current insn should be printed */
+  bool print_insn;
+  /* whether the current insn is an endloop0 */
+  bool print_endloop0;
+  /* whether the current insn is an endloop1 */
+  bool print_endloop1;
+  /* whether the current packet ends an inner hardware loop */
+  bool endloop0;
+  /* the label at the start of a hardware loop */
+  rtx endloop_label;
   bool dot_new_predicate_p;
   bool dot_new_gpr_p;
 };
