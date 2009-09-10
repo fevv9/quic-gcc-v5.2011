@@ -217,7 +217,9 @@ static void qdsp6_print_rtx(FILE *file, rtx x);
 static void qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x);
 
 static void qdsp6_compute_dwarf_frame_information(void);
-static void qdsp6_allocate_stack(unsigned HOST_WIDE_INT size);
+static void qdsp6_allocate_stack(
+              unsigned HOST_WIDE_INT size,
+              int allocate_stack_insn);
 static void qdsp6_deallocate_stack(unsigned HOST_WIDE_INT size);
 
 static void qdsp6_packet_optimizations(void);
@@ -1131,66 +1133,81 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
     enum insn_code sibcall_epilogue_function;
     unsigned int num_sibcall_function_restored_pairs;
   }
-  prologue_epilogue_functions_abi1[] =
-    {
+    prologue_epilogue_functions_abi1[] =
       {
-        CODE_FOR_nothing, 0,
-        CODE_FOR_deallocframe_function, 0,
-        CODE_FOR_nothing, 0
+        {
+          CODE_FOR_nothing, 0,
+          CODE_FOR_deallocframe_function, 0,
+          CODE_FOR_nothing, 0
+        },
+        {
+          CODE_FOR_nothing, 0,
+          CODE_FOR_restore_r24_through_r25_and_deallocframe, 1,
+          CODE_FOR_restore_r24_through_r25_and_deallocframe_before_sibcall, 1
+        },
+        {
+          CODE_FOR_save_r24_through_r27, 2,
+          CODE_FOR_restore_r24_through_r27_and_deallocframe, 2,
+          CODE_FOR_restore_r24_through_r27_and_deallocframe_before_sibcall, 2
+        }
       },
+    prologue_epilogue_functions_abi2[] =
       {
-        CODE_FOR_nothing, 0,
-        CODE_FOR_restore_r24_through_r25_and_deallocframe, 1,
-        CODE_FOR_restore_r24_through_r25_and_deallocframe_before_sibcall, 1
+        {
+          CODE_FOR_nothing, 0,
+          CODE_FOR_deallocframe_function, 0,
+          CODE_FOR_nothing, 0
+        },
+        {
+          CODE_FOR_nothing, 0,
+          CODE_FOR_restore_r16_through_r17_and_deallocframe, 1,
+          CODE_FOR_restore_r16_through_r17_and_deallocframe_before_sibcall, 1
+        },
+        {
+          CODE_FOR_save_r16_through_r19, 2,
+          CODE_FOR_restore_r16_through_r19_and_deallocframe, 2,
+          CODE_FOR_restore_r16_through_r19_and_deallocframe_before_sibcall, 2
+        },
+        {
+          CODE_FOR_save_r16_through_r21, 3,
+          CODE_FOR_restore_r16_through_r21_and_deallocframe, 3,
+          CODE_FOR_restore_r16_through_r21_and_deallocframe_before_sibcall, 3
+        },
+        {
+          CODE_FOR_save_r16_through_r23, 4,
+          CODE_FOR_restore_r16_through_r23_and_deallocframe, 4,
+          CODE_FOR_restore_r16_through_r23_and_deallocframe_before_sibcall, 4
+        },
+        {
+          CODE_FOR_save_r16_through_r25, 5,
+          CODE_FOR_restore_r16_through_r25_and_deallocframe, 5,
+          CODE_FOR_restore_r16_through_r25_and_deallocframe_before_sibcall, 5
+        },
+        {
+          CODE_FOR_save_r16_through_r27, 6,
+          CODE_FOR_restore_r16_through_r27_and_deallocframe, 6,
+          CODE_FOR_restore_r16_through_r27_and_deallocframe_before_sibcall, 6
+        }
       },
-      {
-        CODE_FOR_save_r24_through_r27, 2,
-        CODE_FOR_restore_r24_through_r27_and_deallocframe, 2,
-        CODE_FOR_restore_r24_through_r27_and_deallocframe_before_sibcall, 2
-      }
+    *prologue_epilogue_functions;
+
+  static const enum insn_code
+    allocframe_insn[] = {
+      CODE_FOR_allocframe,
+      CODE_FOR_allocframe_and_save_r16,
+      CODE_FOR_allocframe_and_save_r16_and_r17
     },
-  prologue_epilogue_functions_abi2[] =
-    {
-      {
-        CODE_FOR_nothing, 0,
-        CODE_FOR_deallocframe_function, 0,
-        CODE_FOR_nothing, 0
-      },
-      {
-        CODE_FOR_nothing, 0,
-        CODE_FOR_restore_r16_through_r17_and_deallocframe, 1,
-        CODE_FOR_restore_r16_through_r17_and_deallocframe_before_sibcall, 1
-      },
-      {
-        CODE_FOR_save_r16_through_r19, 2,
-        CODE_FOR_restore_r16_through_r19_and_deallocframe, 2,
-        CODE_FOR_restore_r16_through_r19_and_deallocframe_before_sibcall, 2
-      },
-      {
-        CODE_FOR_save_r16_through_r21, 3,
-        CODE_FOR_restore_r16_through_r21_and_deallocframe, 3,
-        CODE_FOR_restore_r16_through_r21_and_deallocframe_before_sibcall, 3
-      },
-      {
-        CODE_FOR_save_r16_through_r23, 4,
-        CODE_FOR_restore_r16_through_r23_and_deallocframe, 4,
-        CODE_FOR_restore_r16_through_r23_and_deallocframe_before_sibcall, 4
-      },
-      {
-        CODE_FOR_save_r16_through_r25, 5,
-        CODE_FOR_restore_r16_through_r25_and_deallocframe, 5,
-        CODE_FOR_restore_r16_through_r25_and_deallocframe_before_sibcall, 5
-      },
-      {
-        CODE_FOR_save_r16_through_r27, 6,
-        CODE_FOR_restore_r16_through_r27_and_deallocframe, 6,
-        CODE_FOR_restore_r16_through_r27_and_deallocframe_before_sibcall, 6
-      }
-    },
-  *prologue_epilogue_functions;
+    allocate_stack_insn[] = {
+      CODE_FOR_increment_stack_pointer,
+      CODE_FOR_allocate_stack_and_save_r16,
+      CODE_FOR_allocate_stack_and_save_r16_and_r17,
+      CODE_FOR_allocate_stack_and_save_r16_through_r18,
+      CODE_FOR_allocate_stack_and_save_r16_through_r19
+    };
 
   unsigned int max_function_saved_pairs = 0;
   unsigned int first_function_saved_regno = 0;
+  unsigned int num_regs_to_save_while_allocating = 0;
   unsigned int regno;
   unsigned int i = 0;
   unsigned int j;
@@ -1221,14 +1238,14 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
   }
 
   /* Can we omit the allocframe and deallocframe instructions? */
-  if(info->lrfp_size == 0){
+  if(!info->use_allocframe){
     info->allocframe_size = 0;
     info->sp_adjustment = info->frame_size;
     info->base_reg = stack_pointer_rtx;
     info->offset = info->frame_size;
   }
   else {
-    /* Can we allocate the entire stack frame with one allocfame
+    /* Can we allocate the entire stack frame with one allocframe
        instruction? */
     if(info->frame_size <= MAX_ALLOCFRAME_IMMED){
       info->allocframe_size = info->frame_size;
@@ -1257,7 +1274,7 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
   /* Determine whether we can save code size by using functions to implement
      common prologue or epilogue sequences. */
   if((optimize_size || optimize == 2)
-     && !crtl->calls_eh_return && info->lrfp_size != 0){
+     && info->use_allocframe && !crtl->calls_eh_return){
 
     /* If saving and restoring one of the single callee-save registers as a pair
        allows it to be saved and/or restored via a function call, then do so. */
@@ -1318,6 +1335,67 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
       SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (sibcall_epilogue_function);
       SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_sibcall_function_restored_pairs);
     }
+    info->num_specially_saved_pairs = info->num_function_saved_pairs;
+  }
+
+  info->allocframe_insn = CODE_FOR_allocframe;
+  info->allocate_stack_insn = CODE_FOR_increment_stack_pointer;
+
+  /* If possible, save one or more callee-save registers while allocating
+     stack. */
+  if(optimize && TARGET_PACKETS
+     && (info->use_allocframe || info->sp_adjustment != 0)
+     && info->num_function_saved_pairs == 0){
+    if(TARGET_V4_FEATURES && !info->use_allocframe){
+      switch(info->num_saved_pairs){
+        case 0:
+          if(info->num_saved_singles == 1 && info->saved_singles[0] == 16){
+            num_regs_to_save_while_allocating = 1;
+          }
+          break;
+        case 1:
+          if(info->saved_pairs[0] == 16){
+            if(info->num_saved_singles == 1 && info->saved_singles[0] == 18){
+              num_regs_to_save_while_allocating = 3;
+            }
+            else {
+              num_regs_to_save_while_allocating = 2;
+            }
+          }
+          break;
+        default:
+          if(info->saved_pairs[0] == 16){
+            if(info->saved_pairs[1] == 18){
+              num_regs_to_save_while_allocating = 4;
+            }
+            else {
+              num_regs_to_save_while_allocating = 2;
+            }
+          }
+          break;
+      }
+    }
+    else if(TARGET_V4_FEATURES || !info->use_allocframe){
+      if(info->num_saved_pairs == 0){
+        if(info->num_saved_singles == 1 && info->saved_singles[0] == 16){
+          num_regs_to_save_while_allocating = 1;
+        }
+      }
+      else if(info->saved_pairs[0] == 16){
+        num_regs_to_save_while_allocating = 2;
+      }
+    }
+
+    if(info->use_allocframe){
+      info->allocframe_insn
+        = allocframe_insn[num_regs_to_save_while_allocating];
+    }
+    else {
+      info->allocate_stack_insn
+        = allocate_stack_insn[num_regs_to_save_while_allocating];
+    }
+    info->num_specially_saved_pairs = num_regs_to_save_while_allocating / 2;
+    info->num_specially_saved_singles = num_regs_to_save_while_allocating % 2;
   }
 }
 
@@ -1398,6 +1476,7 @@ qdsp6_frame_info(void)
   else {
     info->lrfp_size = 2 * UNITS_PER_WORD;
   }
+  info->use_allocframe = info->lrfp_size != 0;
 
   info->total_size = info->frame_size + info->lrfp_size;
 
@@ -6190,15 +6269,15 @@ qdsp6_compute_dwarf_frame_information(void)
 
   frame = qdsp6_frame_info();
 
-  /* Did we omit the allocframe instruction? */
-  if(frame->lrfp_size != 0){
-    /* No. */
+  /* Did we use the allocframe instruction? */
+  if(frame->use_allocframe){
+    /* Yes. */
     dwarf2out_def_cfa(label, HARD_FRAME_POINTER_REGNUM, frame->lrfp_size);
     dwarf2out_reg_save(label, LINK_REGNUM, -UNITS_PER_WORD);
     dwarf2out_reg_save(label, HARD_FRAME_POINTER_REGNUM, -(2 * UNITS_PER_WORD));
   }
   else {
-    /* Yes. */
+    /* No. */
     dwarf2out_def_cfa(label, STACK_POINTER_REGNUM, frame->total_size);
   }
 
@@ -6228,27 +6307,34 @@ qdsp6_compute_dwarf_frame_information(void)
    Allocate stack space by decrementing SP. */
 
 static void
-qdsp6_allocate_stack(unsigned HOST_WIDE_INT size){
-  rtx r28;
+qdsp6_allocate_stack(unsigned HOST_WIDE_INT size, int allocate_stack_insn){
+  rtx offset;
 
-  /* If more than two add instructions would be required, then reload the offset
+  if(size == 0){
+    return;
+  }
+
+  /* If more than two add instructions would be required, then load the offset
      into r28. */
   if(size > 2 * -MIN_ADD_IMMED){
-    r28 = gen_rtx_REG (SImode, 28);
-    emit_move_insn(r28, gen_int_mode(-size, Pmode));
-    emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx, r28));
+    offset = gen_rtx_REG (SImode, 28);
+    emit_move_insn(offset, gen_int_mode(-size, Pmode));
+    size = 0;
+  }
+  else if(size > -MIN_ADD_IMMED){
+    offset = gen_int_mode(MIN_ADD_IMMED, Pmode);
+    size -= -MIN_ADD_IMMED;
   }
   else {
-    while(size > -MIN_ADD_IMMED){
-      emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx,
-                                              gen_int_mode(MIN_ADD_IMMED,
-                                                           Pmode)));
-      size -= -MIN_ADD_IMMED;
-    }
-    if(size > 0){
-      emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx,
-                                              gen_int_mode(-size, Pmode)));
-    }
+    offset = gen_int_mode(-size, Pmode);
+    size = 0;
+  }
+
+  emit_insn(GEN_FCN (allocate_stack_insn)(offset));
+
+  if(size > 0){
+    offset = gen_int_mode(-size, Pmode);
+    emit_insn(gen_increment_stack_pointer(offset));
   }
 }
 
@@ -6268,29 +6354,34 @@ qdsp6_expand_prologue(void)
 
   frame = qdsp6_frame_info();
 
-  /* Can we omit the allocframe instruction? */
-  if(frame->lrfp_size != 0){
-    emit_insn(gen_allocframe(gen_int_mode(frame->allocframe_size, SImode)));
+  /* Do we need to use the allocframe instruction? */
+  if(frame->use_allocframe){
+    rtx allocframe_size = gen_int_mode(frame->allocframe_size, SImode);
+    emit_insn(GEN_FCN (frame->allocframe_insn)(allocframe_size));
   }
 
   /* Allocate any remaning stack space. */
-  qdsp6_allocate_stack(frame->sp_adjustment);
+  qdsp6_allocate_stack(frame->sp_adjustment, frame->allocate_stack_insn);
 
   /* Save callee-save registers. */
   if(frame->prologue_function != CODE_FOR_nothing){
     emit_insn(GEN_FCN (frame->prologue_function)(NULL_RTX));
   }
   base_reg = frame->base_reg;
-  offset = frame->offset - 2 * UNITS_PER_WORD * frame->num_function_saved_pairs;
+  offset = frame->offset;
+  /* Account for any pairs that have already been saved. */
+  offset -= 2 * UNITS_PER_WORD * frame->num_specially_saved_pairs;
   /* Save any callee-save registers that can be stored as pairs and have not
-     been saved by a common prologue function. */
-  for(i = frame->num_function_saved_pairs; i < frame->num_saved_pairs; i++){
+     already been saved in some other manner. */
+  for(i = frame->num_specially_saved_pairs; i < frame->num_saved_pairs; i++){
     offset -= 2 * UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (DImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (DImode, frame->saved_pairs[i]));
   }
+  /* Account for any singles that have already been saved. */
+  offset -= UNITS_PER_WORD * frame->num_specially_saved_singles;
   /* Save any remaining callee-save registers. */
-  for(i = 0; i < frame->num_saved_singles; i++){
+  for(i = frame->num_specially_saved_singles; i < frame->num_saved_singles; i++){
     offset -= UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (SImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (SImode, frame->saved_singles[i]));
@@ -6310,7 +6401,7 @@ qdsp6_direct_return(void)
   struct qdsp6_frame_info *frame = qdsp6_frame_info();
 
   return reload_completed && (frame->total_size == 0
-                              || (TARGET_V4_FEATURES && frame->lrfp_size != 0
+                              || (TARGET_V4_FEATURES && frame->use_allocframe
                                                      && frame->reg_size == 0));
 }
 
@@ -6388,10 +6479,14 @@ qdsp6_expand_epilogue(bool sibcall)
     offset += 2 * UNITS_PER_WORD;
   }
 
-  /* Can we omit the deallocframe instruction? */
-  if(frame->lrfp_size == 0){
+  /* Determine how best to deallocate the stack frame and restore LR and FP if
+     necessary. */
+  /* If LR and FP do not need to be restored, then simply deallocate the
+     stack. */
+  if(!frame->use_allocframe){
     qdsp6_deallocate_stack(frame->sp_adjustment);
   }
+  /* Otherwise, call a function if doing so will save code size. */
   else if(!sibcall && frame->epilogue_function != CODE_FOR_nothing){
     emit_jump_insn(GEN_FCN (frame->epilogue_function)(NULL_RTX));
     emit_return = false;
@@ -6399,20 +6494,24 @@ qdsp6_expand_epilogue(bool sibcall)
   else if(sibcall && frame->sibcall_epilogue_function != CODE_FOR_nothing){
     emit_insn(GEN_FCN (frame->sibcall_epilogue_function)(NULL_RTX));
   }
+  /* Otherwise, on V4 and up, use the dealloc_return instruction if possible. */
   else if(TARGET_V4_FEATURES && emit_return
           && !crtl->calls_eh_return){
     emit_jump_insn(gen_deallocframe_return());
     emit_return = false;
   }
+  /* Otherwise, use separate deallocframe and return instructions. */
   else {
     emit_insn(gen_deallocframe());
   }
 
+  /* If returning to an exception handler, adjust the stack as necessary. */
   if(crtl->calls_eh_return){
     emit_insn(gen_addsi3(stack_pointer_rtx,
                          stack_pointer_rtx, EH_RETURN_STACKADJ_RTX));
   }
 
+  /* Emit a return jump if we still need to. */
   if(emit_return){
     emit_jump_insn(gen_return_jump());
   }

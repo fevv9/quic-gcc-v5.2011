@@ -82,7 +82,7 @@
 ;; Used to determine which slots an insn can use when scheduling insns
 
 (define_attr "type"
-             "A,X,Load,Store,Memop,LoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,EM,ES,EJ,EJR,ECR,multiple,J_dotnew"
+             "A,X,Load,Store,Memop,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,EM,ES,EJ,EJR,ECR,multiple,J_dotnew"
              (const_string "multiple"))
 
 
@@ -138,12 +138,12 @@
 ;; V1 ;;
 ;;----;;
 
-(define_insn_reservation "v1_A"         1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "A"))
+(define_insn_reservation "v1_A"          1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "A"))
  "Slot0 | Slot1 | Slot2 | Slot3")
 
-(define_insn_reservation "v1_X"         1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "X"))
+(define_insn_reservation "v1_X"          1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "X"))
                  "Slot2 | Slot3")
 
 (define_insn_reservation "v1_Load"
@@ -160,44 +160,52 @@
                                      (eq_attr "type" "Load")))
  "Slot0")
 
-(define_insn_reservation "v1_Store"     1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "Store"))
+(define_insn_reservation "v1_Store"      1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "Store"))
  "Slot0")
 
-(define_insn_reservation "v1_LoadStore" 1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "LoadStore"))
+(define_insn_reservation "v1_LoadStore"  1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "LoadStore"))
  "Slot0 + Slot1")
 
-(define_insn_reservation "v1_M"         1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "M"))
+(define_insn_reservation "v1_AStore"     1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "AStore"))
+ "Slot0 + (Slot1 | Slot2 | Slot3)")
+
+(define_insn_reservation "v1_ALoadStore" 1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "ALoadStore"))
+ "Slot0 + Slot1 + (Slot2 | Slot3)")
+
+(define_insn_reservation "v1_M"          1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "M"))
                  "Slot2")
 
-(define_insn_reservation "v1_S"         1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "S"))
+(define_insn_reservation "v1_S"          1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "S"))
                          "Slot3")
 
-(define_insn_reservation "v1_CR"        1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "CR"))
+(define_insn_reservation "v1_CR"         1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "CR"))
                          "Slot3")
 
-(define_insn_reservation "v1_loop"      1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "loop"))
+(define_insn_reservation "v1_loop"       1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "loop"))
                          "Slot3  + PCadder")
 
-(define_insn_reservation "v1_J"         1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "J"))
+(define_insn_reservation "v1_J"          1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "J"))
                 "(Slot2 | Slot3) + PCadder + control")
 
-(define_insn_reservation "v1_JR"        1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "JR"))
+(define_insn_reservation "v1_JR"         1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "JR"))
                  "Slot2                    + control")
 
-(define_insn_reservation "v1_endloop0"  1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "endloop0"))
+(define_insn_reservation "v1_endloop0"   1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "endloop0"))
                                             "endloop0")
 
-(define_insn_reservation "v1_endloop1"  1 (and (eq_attr "arch" "v1")
-                                               (eq_attr "type" "endloop1"))
+(define_insn_reservation "v1_endloop1"   1 (and (eq_attr "arch" "v1")
+                                                (eq_attr "type" "endloop1"))
                                             "endloop1")
 
 
@@ -205,12 +213,12 @@
 ;; V2 ;;
 ;;----;;
 
-(define_insn_reservation "v2_A"         1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "A"))
+(define_insn_reservation "v2_A"          1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "A"))
  "Slot0 | Slot1 | Slot2 | Slot3")
 
-(define_insn_reservation "v2_X"         1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "X"))
+(define_insn_reservation "v2_X"          1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "X"))
                  "Slot2 | Slot3")
 
 (define_insn_reservation "v2_Load"
@@ -227,44 +235,52 @@
                                      (eq_attr "type" "Load")))
  "Slot0")
 
-(define_insn_reservation "v2_Store"     1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "Store"))
+(define_insn_reservation "v2_Store"      1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "Store"))
  "Slot0")
 
-(define_insn_reservation "v2_LoadStore" 1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "LoadStore"))
+(define_insn_reservation "v2_LoadStore"  1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "LoadStore"))
  "Slot0 + Slot1")
 
-(define_insn_reservation "v2_M"         1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "M"))
+(define_insn_reservation "v2_AStore"     1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "AStore"))
+ "Slot0 + (Slot1 | Slot2 | Slot3)")
+
+(define_insn_reservation "v2_ALoadStore" 1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "ALoadStore"))
+ "Slot0 + Slot1 + (Slot2 | Slot3)")
+
+(define_insn_reservation "v2_M"          1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "M"))
                  "Slot2 | Slot3")
 
-(define_insn_reservation "v2_S"         1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "S"))
+(define_insn_reservation "v2_S"          1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "S"))
                  "Slot2 | Slot3")
 
-(define_insn_reservation "v2_CR"        1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "CR"))
+(define_insn_reservation "v2_CR"         1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "CR"))
                          "Slot3")
 
-(define_insn_reservation "v2_loop"      1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "loop"))
+(define_insn_reservation "v2_loop"       1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "loop"))
                          "Slot3  + PCadder")
 
-(define_insn_reservation "v2_J"         1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "J"))
+(define_insn_reservation "v2_J"          1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "J"))
                 "(Slot2 | Slot3) + PCadder + control")
 
-(define_insn_reservation "v2_JR"        1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "JR"))
+(define_insn_reservation "v2_JR"         1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "JR"))
                  "Slot2                    + control")
 
-(define_insn_reservation "v2_endloop0"  1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "endloop0"))
+(define_insn_reservation "v2_endloop0"   1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "endloop0"))
                                             "endloop0")
 
-(define_insn_reservation "v2_endloop1"  1 (and (eq_attr "arch" "v2,v3")
-                                               (eq_attr "type" "endloop1"))
+(define_insn_reservation "v2_endloop1"   1 (and (eq_attr "arch" "v2")
+                                                (eq_attr "type" "endloop1"))
                                             "endloop1")
 
 
@@ -272,60 +288,68 @@
 ;; V3 ;;
 ;;----;;
 
-(define_insn_reservation "v3_A"         1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "A"))
+(define_insn_reservation "v3_A"          1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "A"))
  "Slot0 | Slot1 | Slot2 | Slot3")
 
-(define_insn_reservation "v3_X"         1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "X"))
+(define_insn_reservation "v3_X"          1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "X"))
                  "Slot2 | Slot3")
 
-(define_insn_reservation "v3_Load"      1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "Load"))
+(define_insn_reservation "v3_Load"       1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "Load"))
  "Slot0 | Slot1")
 
-(define_insn_reservation "v3_Store"     1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "Store"))
+(define_insn_reservation "v3_Store"      1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "Store"))
  "Slot0")
 
-(define_insn_reservation "v3_LoadStore" 1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "LoadStore"))
+(define_insn_reservation "v3_LoadStore"  1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "LoadStore"))
  "Slot0 + Slot1")
 
-(define_insn_reservation "v3_M"         1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "M"))
+(define_insn_reservation "v3_AStore"     1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "AStore"))
+ "Slot0 + (Slot1 | Slot2 | Slot3)")
+
+(define_insn_reservation "v3_ALoadStore" 1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "ALoadStore"))
+ "Slot0 + Slot1 + (Slot2 | Slot3)")
+
+(define_insn_reservation "v3_M"          1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "M"))
                  "Slot2 | Slot3")
 
-(define_insn_reservation "v3_S"         1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "S"))
+(define_insn_reservation "v3_S"          1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "S"))
                  "Slot2 | Slot3")
 
-(define_insn_reservation "v3_CR"        1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "CR"))
+(define_insn_reservation "v3_CR"         1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "CR"))
                          "Slot3")
 
-(define_insn_reservation "v3_loop"      1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "loop"))
+(define_insn_reservation "v3_loop"       1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "loop"))
                          "Slot3  + PCadder + PCadder_dualjumps")
 
-(define_insn_reservation "v3_J"         1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "J"))
+(define_insn_reservation "v3_J"          1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "J"))
                 "(Slot2 | Slot3) + (PCadder | PCadder_dualjumps) + (control | control_dualjumps)")
 
-(define_insn_reservation "v3_J_dotnew"  1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "J_dotnew"))
+(define_insn_reservation "v3_J_dotnew"   1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "J_dotnew"))
                 "(Slot2 | Slot3) + PCadder + control")
 
-(define_insn_reservation "v3_JR"        1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "JR"))
+(define_insn_reservation "v3_JR"         1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "JR"))
                  "Slot2 + control")
 
-(define_insn_reservation "v3_endloop0"  1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "endloop0"))
+(define_insn_reservation "v3_endloop0"   1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "endloop0"))
                                             "endloop0 + endloop0_dualjumps")
 
-(define_insn_reservation "v3_endloop1"  1 (and (eq_attr "arch" "v3")
-                                               (eq_attr "type" "endloop1"))
+(define_insn_reservation "v3_endloop1"   1 (and (eq_attr "arch" "v3")
+                                                (eq_attr "type" "endloop1"))
                                             "endloop1 + endloop1_dualjumps")
 
 
@@ -333,100 +357,108 @@
 ;; V4 ;;
 ;;----;;
 
-(define_insn_reservation "v4_A"        1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "A"))
+(define_insn_reservation "v4_A"          1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "A"))
  "Slot0 | Slot1 | Slot2 | Slot3")
 
-(define_insn_reservation "v4_X"        1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "X"))
+(define_insn_reservation "v4_X"          1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "X"))
                  "Slot2 | Slot3")
 
-(define_insn_reservation "v4_Load"     1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "Load"))
+(define_insn_reservation "v4_Load"       1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "Load"))
  "Slot0 | Slot1")
 
-(define_insn_reservation "v4_Store"    1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "Store"))
+(define_insn_reservation "v4_Store"      1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "Store"))
  "Slot0 | Slot1")
 
-(define_insn_reservation "v4_LoadStore" 1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "LoadStore"))
+(define_insn_reservation "v4_LoadStore"  1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "LoadStore"))
  "Slot0 + Slot1")
 
-(define_insn_reservation "v4_Memop"    1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "Memop"))
+(define_insn_reservation "v4_AStore"     1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "AStore"))
+ "(Slot0 + (Slot1 | Slot2 | Slot3)) | (Slot1 + (Slot2 | Slot3))")
+
+(define_insn_reservation "v4_ALoadStore" 1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "ALoadStore"))
+ "Slot0 + Slot1 + (Slot2 | Slot3)")
+
+(define_insn_reservation "v4_Memop"      1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "Memop"))
  "Slot0")
 
-(define_insn_reservation "v4_M"        1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "M"))
+(define_insn_reservation "v4_M"          1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "M"))
                  "Slot2 | Slot3")
 
-(define_insn_reservation "v4_S"        1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "S"))
+(define_insn_reservation "v4_S"          1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "S"))
                  "Slot2 | Slot3")
 
-(define_insn_reservation "v4_CR"       1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "CR"))
+(define_insn_reservation "v4_CR"         1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "CR"))
                          "Slot3")
 
-(define_insn_reservation "v4_loop"     1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "loop"))
+(define_insn_reservation "v4_loop"       1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "loop"))
                          "Slot3  + PCadder")
 
-(define_insn_reservation "v4_J"        1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "J"))
+(define_insn_reservation "v4_J"          1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "J"))
                 "(Slot2 | Slot3) + PCadder + control")
 
-(define_insn_reservation "v4_JR"       1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "JR"))
+(define_insn_reservation "v4_JR"         1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "JR"))
                  "Slot2                    + control")
 
-(define_insn_reservation "v4_endloop0" 1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "endloop0"))
+(define_insn_reservation "v4_endloop0"   1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "endloop0"))
                                             "endloop0")
 
-(define_insn_reservation "v4_endloop1" 1 (and (eq_attr "arch" "v4")
-                                              (eq_attr "type" "endloop1"))
+(define_insn_reservation "v4_endloop1"   1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "endloop1"))
                                             "endloop1")
 
-(define_insn_reservation "v4_EA"        1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "EA"))
+(define_insn_reservation "v4_EA"         1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EA"))
  "ESlot0 | ESlot1 | ESlot2 | ESlot3")
 
-(define_insn_reservation "v4_EX"        1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "EX"))
+(define_insn_reservation "v4_EX"         1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EX"))
                    "ESlot2 | ESlot3")
 
-(define_insn_reservation "v4_ELoad"     1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "ELoad"))
+(define_insn_reservation "v4_ELoad"      1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "ELoad"))
  "ESlot0 | ESlot1")
 
-(define_insn_reservation "v4_EStore"    1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "EStore"))
+(define_insn_reservation "v4_EStore"     1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EStore"))
  "ESlot0 | ESlot1")
 
-(define_insn_reservation "v4_EMemop"    1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "EMemop"))
+(define_insn_reservation "v4_EMemop"     1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EMemop"))
  "ESlot0")
 
-(define_insn_reservation "v4_EM"        1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "EM"))
+(define_insn_reservation "v4_EM"         1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EM"))
                    "ESlot2 | ESlot3")
 
-(define_insn_reservation "v4_ES"        1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "ES"))
+(define_insn_reservation "v4_ES"         1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "ES"))
                    "ESlot2 | ESlot3")
 
-(define_insn_reservation "v4_ECR"       1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "ECR"))
+(define_insn_reservation "v4_ECR"        1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "ECR"))
                             "ESlot3")
 
-(define_insn_reservation "v4_EJ"        1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "EJ"))
+(define_insn_reservation "v4_EJ"         1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EJ"))
                   "(ESlot2 | ESlot3) + PCadder + control")
 
-(define_insn_reservation "v4_EJR"       1 (and (eq_attr "arch" "v4")
-                                               (eq_attr "type" "EJR"))
+(define_insn_reservation "v4_EJR"        1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EJR"))
                    "ESlot2                     + control")
 
 
@@ -8125,7 +8157,7 @@
                    (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
               (set (reg:SI SP_REGNUM)
                    (minus:SI (reg:SI SP_REGNUM)
-                             (match_operand 0 "const_int_operand" "i")))])]
+                             (match_operand 0 "const_int_operand" "")))])]
   ""
   {
     operands[0] = gen_int_mode(INTVAL (operands[0]) + 8, SImode);
@@ -8148,6 +8180,148 @@
     return "allocframe(#%0)";
   }
   [(set_attr "type" "Store")]
+)
+
+(define_expand "allocframe_and_save_r16"
+  [(parallel [(set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -4)))
+                   (reg:SI LINK_REGNUM))
+              (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
+                   (reg:SI FP_REGNUM))
+              (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -12)))
+                   (reg:SI 16))
+              (set (reg:SI FP_REGNUM)
+                   (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
+              (set (reg:SI SP_REGNUM)
+                   (minus:SI (reg:SI SP_REGNUM)
+                             (match_operand 0 "const_int_operand" "")))])]
+  "TARGET_V4_FEATURES"
+  {
+    operands[0] = gen_int_mode(INTVAL (operands[0]) + 8, SImode);
+  }
+)
+
+(define_insn "allocframe_and_save_r16_real"
+  [(set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -4)))
+        (reg:SI LINK_REGNUM))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
+        (reg:SI FP_REGNUM))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -12)))
+        (reg:SI 16))
+   (set (reg:SI FP_REGNUM)
+        (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
+   (set (reg:SI SP_REGNUM)
+        (minus:SI (reg:SI SP_REGNUM)
+                  (match_operand 0 "const_int_operand" "i")))]
+  "TARGET_V4_FEATURES"
+  {
+    operands[0] = gen_int_mode(INTVAL (operands[0]) - 8, SImode);
+    return "memw(r29+#-12) = r16\;allocframe(#%0)";
+  }
+  [(set_attr "type" "LoadStore")]
+)
+
+(define_expand "allocframe_and_save_r16_and_r17"
+  [(parallel [(set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -4)))
+                   (reg:SI LINK_REGNUM))
+              (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
+                   (reg:SI FP_REGNUM))
+              (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -12)))
+                   (reg:SI 17))
+              (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -16)))
+                   (reg:SI 16))
+              (set (reg:SI FP_REGNUM)
+                   (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
+              (set (reg:SI SP_REGNUM)
+                   (minus:SI (reg:SI SP_REGNUM)
+                             (match_operand 0 "const_int_operand" "")))])]
+  "TARGET_V4_FEATURES"
+  {
+    operands[0] = gen_int_mode(INTVAL (operands[0]) + 8, SImode);
+  }
+)
+
+(define_insn "allocframe_and_save_r16_and_r17_real"
+  [(set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -4)))
+        (reg:SI LINK_REGNUM))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
+        (reg:SI FP_REGNUM))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -12)))
+        (reg:SI 17))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -16)))
+        (reg:SI 16))
+   (set (reg:SI FP_REGNUM)
+        (plus:SI (reg:SI SP_REGNUM) (const_int -8)))
+   (set (reg:SI SP_REGNUM)
+        (minus:SI (reg:SI SP_REGNUM)
+                  (match_operand 0 "const_int_operand" "i")))]
+  "TARGET_V4_FEATURES"
+  {
+    operands[0] = gen_int_mode(INTVAL (operands[0]) - 8, SImode);
+    return "memd(r29+#-16) = r17:16\;allocframe(#%0)";
+  }
+  [(set_attr "type" "LoadStore")]
+)
+
+(define_expand "increment_stack_pointer"
+  [(set (reg:SI SP_REGNUM)
+        (plus:SI (reg:SI SP_REGNUM)
+                 (match_operand 0 "nonmemory_operand" "")))]
+  ""
+  ""
+)
+
+(define_insn "allocate_stack_and_save_r16"
+  [(set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -4))) (reg:SI 16))
+   (set (reg:SI SP_REGNUM)
+        (plus:SI (reg:SI SP_REGNUM)
+                 (match_operand 0 "const_int_operand" "i,Rg")))]
+  ""
+  "@
+   memw(r29+#-4) = r16\;r29 = add(r29,#%0)
+   memw(r29+#-4) = r16\;r29 = add(r29,%0)"
+  [(set_attr "type" "AStore,AStore")]
+)
+
+(define_insn "allocate_stack_and_save_r16_and_r17"
+  [(set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -4))) (reg:SI 17))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -8))) (reg:SI 16))
+   (set (reg:SI SP_REGNUM)
+        (plus:SI (reg:SI SP_REGNUM)
+                 (match_operand 0 "const_int_operand" "i,Rg")))]
+  ""
+  "@
+   memd(r29+#-8) = r17:16\;r29 = add(r29,#%0)
+   memd(r29+#-8) = r17:16\;r29 = add(r29,%0)"
+  [(set_attr "type" "AStore,AStore")]
+)
+
+(define_insn "allocate_stack_and_save_r16_through_r18"
+  [(set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -4))) (reg:SI 17))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -8))) (reg:SI 16))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -12))) (reg:SI 18))
+   (set (reg:SI SP_REGNUM)
+        (plus:SI (reg:SI SP_REGNUM)
+                 (match_operand 0 "const_int_operand" "i,Rg")))]
+  "TARGET_V4_FEATURES"
+  "@
+   memd(r29+#-8) = r17:16\;memw(r29+#-12) = r18\;r29 = add(r29,#%0)
+   memd(r29+#-8) = r17:16\;memw(r29+#-12) = r18\;r29 = add(r29,%0)"
+  [(set_attr "type" "ALoadStore,ALoadStore")]
+)
+
+(define_insn "allocate_stack_and_save_r16_through_r19"
+  [(set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -4))) (reg:SI 17))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -8))) (reg:SI 16))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -12))) (reg:SI 19))
+   (set (mem:SI (plus:SI (reg:SI SP_REGNUM) (const_int -16))) (reg:SI 18))
+   (set (reg:SI SP_REGNUM)
+        (plus:SI (reg:SI SP_REGNUM)
+                 (match_operand 0 "const_int_operand" "i,Rg")))]
+  "TARGET_V4_FEATURES"
+  "@
+   memd(r29+#-8) = r17:16\;memd(r29+#-16) = r19:18\;r29 = add(r29,#%0)
+   memd(r29+#-8) = r17:16\;memd(r29+#-16) = r19:18\;r29 = add(r29,%0)"
+  [(set_attr "type" "ALoadStore,ALoadStore")]
 )
 
 (define_insn "deallocframe"

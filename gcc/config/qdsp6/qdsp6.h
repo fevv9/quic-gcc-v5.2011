@@ -1345,10 +1345,17 @@ struct qdsp6_frame_info GTY(()) {
   unsigned int num_saved_pairs;
   unsigned int saved_singles[FIRST_PSEUDO_REGISTER];
   unsigned int num_saved_singles;
+  /* whether to use the allocframe instruction */
+  bool use_allocframe;
   /* argument to allocframe */
   unsigned HOST_WIDE_INT allocframe_size;
   /* # bytes to decrement SP after or instead of using allocframe */
   unsigned HOST_WIDE_INT sp_adjustment;
+  /* insn to emit for allocframe that possibly saves registers in parallel */
+  int allocframe_insn;
+  /* insn to emit for allocating stack that possibly saves registers in
+     parallel */
+  int allocate_stack_insn;
   /* register used to address the callee-save register save of the frame */
   rtx base_reg;
   /* offset from base_reg to the callee-save register area of the frame */
@@ -1365,6 +1372,10 @@ struct qdsp6_frame_info GTY(()) {
   int sibcall_epilogue_function;
   /* number of callee-save register pairs restored by that function */
   unsigned int num_sibcall_function_restored_pairs;
+  /* number of callee-save register pairs saved in some special manner */
+  unsigned int num_specially_saved_pairs;
+  /* number of unpaired callee-save registers saved in some special manner */
+  unsigned int num_specially_saved_singles;
   bool computed;  /* true if frame info has already been computed */
 };
 
