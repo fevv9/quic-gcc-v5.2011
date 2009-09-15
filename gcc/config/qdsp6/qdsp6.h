@@ -286,12 +286,8 @@ Storage Layout
    aligned. */
 #define PARM_BOUNDARY 32
 
-/* The manual describes this macro poorly, but says that for most machines it
-   should be the same as PARM_BOUNDARY.  OK.  I hope that is right for QDSP6. */
-#define STACK_BOUNDARY PARM_BOUNDARY
-
 /* As specified by the ABI, SP should be 8-byte aligned upon function entry. */
-#define PREFERRED_STACK_BOUNDARY 64
+#define STACK_BOUNDARY 64
 
 /* Code must be 32-bit aligned. */
 #define FUNCTION_BOUNDARY 32
