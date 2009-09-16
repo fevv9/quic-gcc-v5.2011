@@ -8397,7 +8397,8 @@
    (return)]
   ""
   "jump __restore_r24_through_r27_and_deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "restore_r24_through_r25_and_deallocframe"
@@ -8412,7 +8413,8 @@
    (return)]
   ""
   "jump __restore_r24_through_r25_and_deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "save_r16_through_r19"
@@ -8648,7 +8650,8 @@
    (return)]
   ""
   "jump __restore_r16_through_r27_and_deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "restore_r16_through_r25_and_deallocframe"
@@ -8671,7 +8674,8 @@
    (return)]
   ""
   "jump __restore_r16_through_r25_and_deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "restore_r16_through_r23_and_deallocframe"
@@ -8692,7 +8696,8 @@
    (return)]
   ""
   "jump __restore_r16_through_r23_and_deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "restore_r16_through_r21_and_deallocframe"
@@ -8711,7 +8716,8 @@
    (return)]
   ""
   "jump __restore_r16_through_r21_and_deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "restore_r16_through_r19_and_deallocframe"
@@ -8728,7 +8734,8 @@
    (return)]
   ""
   "jump __restore_r16_through_r19_and_deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "restore_r16_through_r17_and_deallocframe"
@@ -8743,7 +8750,8 @@
    (return)]
   ""
   "jump __restore_r16_through_r17_and_deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "deallocframe_return"
@@ -8769,7 +8777,8 @@
    (return)]
   "!TARGET_V4_FEATURES"
   "jump __deallocframe"
-  [(set_attr "type" "J")]
+  [(set_attr "type" "J")
+   (set_attr "emulation_call" "yes")]
 )
 
 (define_insn "falign"

@@ -7389,9 +7389,6 @@ qdsp6_print_insn_info(FILE *file, struct qdsp6_insn_info *insn_info)
     if(QDSP6_CALL_P (insn_info)){
       fputs("call", file);
     }
-    if(QDSP6_EMULATION_CALL_P (insn_info)){
-      fputs("emulation_call", file);
-    }
     if(QDSP6_ENDLOOP_P (insn_info)){
       fputs("endloop", file);
     }
@@ -7403,20 +7400,27 @@ qdsp6_print_insn_info(FILE *file, struct qdsp6_insn_info *insn_info)
 
   fputs(";; flags: (", file);
   first = true;
+  if(QDSP6_EMULATION_CALL_P (insn_info)){
+    fputs("emulation_call", file);
+    first = false;
+  }
   if(QDSP6_VOLATILE_P (insn_info)){
+    if(!first){
+      fputs(", ", file);
+    }
     fputs("volatile", file);
     first = false;
   }
   if(QDSP6_MEM_P (insn_info)){
     if(!first){
-      fputc(',', file);
+      fputs(", ", file);
     }
     fputs("mem", file);
     first = false;
   }
   if(QDSP6_WANDERED_P (insn_info)){
     if(!first){
-      fputc(',', file);
+      fputs(", ", file);
     }
     fputs("wandered", file);
   }
@@ -7696,7 +7700,8 @@ qdsp6_get_flags(rtx insn)
   else if(CALL_P (insn)){
     flags |= QDSP6_CALL;
   }
-  else if(get_attr_emulation_call(insn) == EMULATION_CALL_YES){
+
+  if(get_attr_emulation_call(insn) == EMULATION_CALL_YES){
     flags |= QDSP6_EMULATION_CALL;
   }
 
