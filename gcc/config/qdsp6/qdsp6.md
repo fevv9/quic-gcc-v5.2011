@@ -953,17 +953,6 @@
         (match_operand:DI 1 "general_operand" ""))]
   ""
   {
-    if(TARGET_V4_FEATURES && memory_operand(operands[0], DImode)
-                          && const_int_operand(operands[1], DImode)){
-      emit_move_insn(change_address(operands[0], SImode,
-                                    plus_constant(XEXP (operands[0], 0),
-                                                  GET_MODE_SIZE (SImode))),
-                     gen_int_mode(INTVAL (operands[1]) >> 32ULL, SImode));
-      emit_move_insn(change_address(operands[0], SImode, XEXP (operands[0], 0)),
-                     gen_int_mode(INTVAL (operands[1]) & 0xFFFFFFFFULL,
-                                  SImode));
-      DONE;
-    }
     if(GET_CODE (operands[0]) != REG){
       operands[1] = force_reg(DImode, operands[1]);
     }
