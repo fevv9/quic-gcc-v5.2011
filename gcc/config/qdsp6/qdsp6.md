@@ -118,8 +118,11 @@
 
 (automata_option "ndfa")
 
-(define_cpu_unit "Slot0,Slot1,Slot2,Slot3,PCadder,PCadder_dualjumps,endloop0,endloop1,
-        endloop0_dualjumps,endloop1_dualjumps" "qdsp6")
+(define_cpu_unit "Slot0,Slot1,Slot2,Slot3,
+                  Store0,Store1,
+                  PCadder,PCadder_dualjumps,
+                  endloop0,endloop1,endloop0_dualjumps,endloop1_dualjumps"
+                 "qdsp6")
 
 
 (define_reservation "control" "(endloop0 + endloop1)")
@@ -371,7 +374,7 @@
 
 (define_insn_reservation "v4_Store"      1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "Store"))
- "Slot0 | Slot1")
+ "(Slot0 | Slot1) + (Store0 | Store1)")
 
 (define_insn_reservation "v4_LoadStore"  1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "LoadStore"))
@@ -379,7 +382,7 @@
 
 (define_insn_reservation "v4_AStore"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "AStore"))
- "(Slot0 + (Slot1 | Slot2 | Slot3)) | (Slot1 + (Slot2 | Slot3))")
+ "((Slot0 + (Slot1 | Slot2 | Slot3)) | (Slot1 + (Slot2 | Slot3))) + (Store0 | Store1)")
 
 (define_insn_reservation "v4_ALoadStore" 1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "ALoadStore"))
@@ -387,7 +390,7 @@
 
 (define_insn_reservation "v4_Memop"      1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "Memop"))
- "Slot0")
+ "Slot0 + Store0 + Store1")
 
 (define_insn_reservation "v4_M"          1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "M"))
@@ -435,11 +438,11 @@
 
 (define_insn_reservation "v4_EStore"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EStore"))
- "ESlot0 | ESlot1")
+ "(ESlot0 | ESlot1) + (Store0 | Store1)")
 
 (define_insn_reservation "v4_EMemop"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EMemop"))
- "ESlot0")
+ "ESlot0 + Store0 + Store1")
 
 (define_insn_reservation "v4_EM"         1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EM"))
