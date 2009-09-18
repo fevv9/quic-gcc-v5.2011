@@ -1205,8 +1205,9 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
       CODE_FOR_allocate_stack_and_save_r16_through_r19
     };
 
+  bool use_common_functions;
   unsigned int max_function_saved_pairs = 0;
-  unsigned int first_function_saved_regno = 0;
+  unsigned int first_callee_save_regno = 0;
   unsigned int num_regs_to_save_while_allocating = 0;
   unsigned int regno;
   unsigned int i = 0;
@@ -1217,13 +1218,13 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
     prologue_epilogue_functions = prologue_epilogue_functions_abi2;
     max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi2)
                                - 1;
-    first_function_saved_regno = 16;
+    first_callee_save_regno = 16;
   }
   else {
     prologue_epilogue_functions = prologue_epilogue_functions_abi1;
     max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi1)
                                - 1;
-    first_function_saved_regno = 24;
+    first_callee_save_regno = 24;
   }
 
   /* For V4, don't call the __deallocframe function, since we have the
@@ -1267,56 +1268,61 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
     }
   }
 
+  use_common_functions = (optimize_size || optimize == 2)
+                         && info->use_allocframe && !crtl->calls_eh_return;
+
+  /* If we are using a function to save or restore callee-save registers or we
+     are forming packets, then maximize the number of registers saved as pairs,
+     since the common prologue and epilogue functions only save registers as
+     pairs and doubleword store subinstructions have larger offsets than word
+     store subinstructions. */
+  if((use_common_functions || (optimize && TARGET_PACKETS))
+     && info->num_saved_singles % 2 == 1){
+
+    /* Count the number of contiguous callee-save register pairs being saved. */
+    for(i = 0, regno = first_callee_save_regno;
+        i < info->num_saved_pairs && info->saved_pairs[i] == regno;
+        i++, regno += 2);
+
+    /* If the first single callee-save register is part of the next pair that
+       could be saved, then remove it from the list of single callee-save
+       registers and insert it into the list of paired callee-save
+       registers. */
+    if((   info->saved_singles[0] == regno
+        || info->saved_singles[0] == regno + 1)
+       && !call_used_regs[regno]
+       && !call_used_regs[regno + 1]){
+
+      for(j = 0; j < info->num_saved_singles - 1; j++){
+        info->saved_singles[j] = info->saved_singles[j + 1];
+      }
+      for(j = info->num_saved_pairs; j > i; j--){
+        info->saved_pairs[j] = info->saved_pairs[j - 1];
+      }
+      info->saved_pairs[i] = regno;
+      info->num_saved_pairs++;
+      info->num_saved_singles--;
+
+      /* The callee-save registers being saved must still fit in the space
+         allocated. */
+      gcc_assert(info->reg_size >= 2 * UNITS_PER_WORD
+                                     * info->num_saved_pairs
+                                   + UNITS_PER_WORD
+                                     * info->num_saved_singles);
+    }
+  }
+
   info->prologue_function = CODE_FOR_nothing;
   info->epilogue_function = CODE_FOR_nothing;
   info->sibcall_epilogue_function = CODE_FOR_nothing;
 
   /* Determine whether we can save code size by using functions to implement
      common prologue or epilogue sequences. */
-  if((optimize_size || optimize == 2)
-     && info->use_allocframe && !crtl->calls_eh_return){
-
-    /* If saving and restoring one of the single callee-save registers as a pair
-       allows it to be saved and/or restored via a function call, then do so. */
-    if(info->num_saved_singles % 2 == 1){
-
-      /* Count the number of callee-save register pairs that can be saved or
-         restored by function calls in the prologue and epilogue so far. */
-      for(i = 0, regno = first_function_saved_regno;
-          i < info->num_saved_pairs && info->saved_pairs[i] == regno;
-          i++, regno += 2);
-
-      /* If the first single callee-save register is part of the next pair that
-         could be saved, then remove it from the list of single callee-save
-         registers and insert it into the list of paired callee-save
-         registers. */
-      if((optimize_size || i >= 2)
-         && i < max_function_saved_pairs
-         && (info->saved_singles[0] == regno
-             || info->saved_singles[0] == regno + 1)){
-
-        for(j = 0; j < info->num_saved_singles - 1; j++){
-          info->saved_singles[j] = info->saved_singles[j + 1];
-        }
-        for(j = info->num_saved_pairs; j > i; j--){
-          info->saved_pairs[j] = info->saved_pairs[j - 1];
-        }
-        info->saved_pairs[i] = regno & -2;
-        info->num_saved_pairs++;
-        info->num_saved_singles--;
-
-        /* The callee-save registers being saved must still fit in the space
-           allocated. */
-        gcc_assert(info->reg_size >= 2 * UNITS_PER_WORD
-                                       * info->num_saved_pairs
-                                     + UNITS_PER_WORD
-                                       * info->num_saved_singles);
-      }
-    }
+  if(use_common_functions){
 
     /* Count the number of callee-save register pairs that can be saved or
        restored by function calls in the prologue and epilogue. */
-    for(i = 0, regno = first_function_saved_regno;
+    for(i = 0, regno = first_callee_save_regno;
         i < info->num_saved_pairs && info->saved_pairs[i] == regno;
         i++, regno += 2);
     if(i > max_function_saved_pairs){
@@ -1346,6 +1352,7 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
   if(optimize && TARGET_PACKETS
      && (info->use_allocframe || info->sp_adjustment != 0)
      && info->num_function_saved_pairs == 0){
+
     if(TARGET_V4_FEATURES && !info->use_allocframe){
       switch(info->num_saved_pairs){
         case 0:
