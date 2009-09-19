@@ -662,10 +662,10 @@
 (define_insn "cond_movqi"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,  Rp,  Rp,   Rp,    Rp,RpRnp")
+       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,RpRnp,RpRnp,RpRnp, RpRnp,RpRnp")
         (const_int 0)])
-     (set (match_operand:QI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg,Acsi,Acsi,Acond,Aecond,   Rg")
-          (match_operand:QI 1 "conditional_src_operand"   "Rg,Acond,Aecond, Is6,   i,   Rg,    Rg, Is12")))]
+     (set (match_operand:QI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg, Acsi, Acsi,Acond,Aecond,   Rg")
+          (match_operand:QI 1 "conditional_src_operand"   "Rg,Acond,Aecond,  Is6,    i,   Rg,    Rg, Is12")))]
   "!memory_operand(operands[0], QImode)
    || gr_register_operand(operands[1], QImode)
    || (TARGET_V4_FEATURES
@@ -762,10 +762,10 @@
 (define_insn "cond_movhi"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,  Rp,  Rp,   Rp,    Rp,RpRnp,RpRnp")
+       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,RpRnp,RpRnp,RpRnp, RpRnp,RpRnp,RpRnp")
         (const_int 0)])
-     (set (match_operand:HI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg,Acsi,Acsi,Acond,Aecond,   Rg,   Rg")
-          (match_operand:HI 1 "conditional_src_operand"   "Rg,Acond,Aecond, Is6,   i,   Rg,    Rg, Is12,    i")))]
+     (set (match_operand:HI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg, Acsi, Acsi,Acond,Aecond,   Rg,   Rg")
+          (match_operand:HI 1 "conditional_src_operand"   "Rg,Acond,Aecond,  Is6,    i,   Rg,    Rg, Is12,    i")))]
   "!memory_operand(operands[0], HImode)
    || gr_register_operand(operands[1], HImode)
    || (TARGET_V4_FEATURES
@@ -921,10 +921,10 @@
 (define_insn "cond_movsi"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,  Rp,  Rp,   Rp,    Rp,RpRnp,RpRnp")
+       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,RpRnp,RpRnp,RpRnp, RpRnp,RpRnp,RpRnp")
         (const_int 0)])
-     (set (match_operand:SI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg,Acsi,Acsi,Acond,Aecond,   Rg,   Rg")
-          (match_operand:SI 1 "conditional_src_operand"   "Rg,Acond,Aecond, Is6,   i,   Rg,    Rg, Is12,    i")))]
+     (set (match_operand:SI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg, Acsi, Acsi,Acond,Aecond,   Rg,   Rg")
+          (match_operand:SI 1 "conditional_src_operand"   "Rg,Acond,Aecond,  Is6,    i,   Rg,    Rg, Is12,    i")))]
   "!memory_operand(operands[0], SImode)
    || gr_register_operand(operands[1], SImode)
    || (TARGET_V4_FEATURES
@@ -1042,7 +1042,7 @@
 (define_insn "cond_movdi"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,   Rp,    Rp")
+       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,RpRnp, RpRnp")
         (const_int 0)])
      (set (match_operand:DI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg,Acond,Aecond")
           (match_operand:DI 1 "conditional_src_operand"   "Rg,Acond,Aecond,   Rg,    Rg")))]
@@ -1171,10 +1171,10 @@
 (define_insn "cond_movsf"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,  Rp,  Rp,   Rp,    Rp,RpRnp,RpRnp")
+       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,RpRnp,RpRnp,RpRnp, RpRnp,RpRnp,RpRnp")
         (const_int 0)])
-     (set (match_operand:SF 0 "conditional_dest_operand" "=Rg,   Rg,    Rg,Acsi,Acsi,Acond,Aecond,   Rg,   Rg")
-          (match_operand:SF 1 "conditional_src_operand"   "Rg,Acond,Aecond,   G,   i,   Rg,    Rg,    G,    i")))]
+     (set (match_operand:SF 0 "conditional_dest_operand" "=Rg,   Rg,    Rg, Acsi, Acsi,Acond,Aecond,   Rg,   Rg")
+          (match_operand:SF 1 "conditional_src_operand"   "Rg,Acond,Aecond,    G,    i,   Rg,    Rg,    G,    i")))]
   "!memory_operand(operands[0], SFmode)
    || gr_register_operand(operands[1], SFmode)
    || (TARGET_V4_FEATURES
@@ -1215,18 +1215,13 @@
 (define_insn "cond_movdf_real"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"          "RpRnp")
+       [(match_operand:BI 3 "pr_register_operand" "RpRnp")
         (const_int 0)])
-   (set (match_operand:DF 0 "nonimmediate_operand" "=Rg")
-        (match_operand:DF 1 "general_operand"       "Rg")))]
+   (set (match_operand:DF 0 "nonimmediate_operand"  "=Rg")
+        (match_operand:DF 1 "general_operand"        "Rg")))]
   ""
   {
- 	if(TARGET_V2_FEATURES){
-          return "if (%C2) %P0 = combine(%H1,%L1) // %P0 = %P1"; /*%P0 = %P1*/
-        }
-        else {
-          return "if (%C2) %P0 = combine(%H1,%L1) // %P0 = %P1";
-        }
+    return "if (%C2) %P0 = %P1";
   }
   [(set_attr "type" "A")]
 )
@@ -3474,75 +3469,75 @@
   }
 )
 
+
 ;; Now, the actual branch instruction
+
+
 ;; GPR conditional jump introduced in v3
-;; PDB - Speculative Register Jump
- (define_insn "gpr_cond_jump"
-   [(set (pc)
-         (if_then_else (match_operator:BI 0 "gpr_cond_jump_operator"
-                         [(match_operand:SI 1 "gr_register_operand" "*Rg")
-                          (const_int 0)])
-                       (label_ref (match_operand 2 "" ""))
-                       (pc)))]
-   "TARGET_V3_FEATURES && !TARGET_V4_FEATURES"
-   {
+
+(define_insn "gpr_cond_jump"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "gpr_cond_jump_operator"
+                        [(match_operand:SI 1 "gr_register_operand" "*Rg")
+                         (const_int 0)])
+                      (label_ref (match_operand 2 "" ""))
+                      (pc)))]
+  "TARGET_V3_FEATURES && !TARGET_V4_FEATURES"
+  {
     rtx prediction;
     int predict_taken = 0;
     prediction = find_reg_note(insn, REG_BR_PROB, 0);
     predict_taken = (prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2);
 
-#define QDSP6_FIXUP_GPR_JUMP(string) ((get_attr_length(insn) == 4) ? string : \
-                                       "jump %l4\n%l2:\;jump %l3\n%l4:\;" string)
+#define QDSP6_FIXUP_GPR_JUMP(string) ((get_attr_length(insn) == 4) \
+                                      ? string \
+                                      : "jump %l4\n%l2:\;jump %l3\n%l4:\;" string)
 
-
-    if (get_attr_length(insn) == 8) {
-	/* create a new label and swap that with the real target */
-	operands[3] = operands[2];
-	operands[2] = gen_label_rtx();
-	operands[4] = gen_label_rtx();
+    if(get_attr_length(insn) != 4){
+      /* Create a new label and swap that with the real target. */
+      operands[3] = operands[2];
+      operands[2] = gen_label_rtx();
+      operands[4] = gen_label_rtx();
     }
-	
-     if (GET_CODE(operands[0]) == EQ)  {
-       if(predict_taken) {
-         return QDSP6_FIXUP_GPR_JUMP("if (%1==#0) jump:t %l2");
-       }
-       else {
-          return QDSP6_FIXUP_GPR_JUMP("if (%1==#0) jump:nt %l2");
-       }
-      }
-      else if (GET_CODE(operands[0]) == NE) {
-       if(predict_taken) {
-         return QDSP6_FIXUP_GPR_JUMP("if (%1!=#0) jump:t %l2");
-       }
-       else {
-         return QDSP6_FIXUP_GPR_JUMP("if (%1!=#0) jump:nt %l2");
-       }
-      }
-      else if (GET_CODE(operands[0]) == GE) {
-       if(predict_taken) {
-         return QDSP6_FIXUP_GPR_JUMP("if (%1>=#0) jump:t %l2");
-       }
-       else {
-         return QDSP6_FIXUP_GPR_JUMP("if (%1>=#0) jump:nt %l2");
-       }
-      }
-      else if (GET_CODE(operands[0]) == LE) {
-       if(predict_taken) {
-         return QDSP6_FIXUP_GPR_JUMP("if (%1<=#0) jump:t %l2");
-       }
-       else {
-         return QDSP6_FIXUP_GPR_JUMP("if (%1<=#0) jump:nt %l2");
-       }
-      }
 
+    if(GET_CODE(operands[0]) == EQ){
+      if(predict_taken){
+        return QDSP6_FIXUP_GPR_JUMP("if (%1==#0) jump:t %l2");
+      }
       else {
-        gcc_unreachable();
+        return QDSP6_FIXUP_GPR_JUMP("if (%1==#0) jump:nt %l2");
       }
-
-
-
     }
-    [(set (attr "type")
+    else if(GET_CODE(operands[0]) == NE){
+      if(predict_taken){
+        return QDSP6_FIXUP_GPR_JUMP("if (%1!=#0) jump:t %l2");
+      }
+      else {
+        return QDSP6_FIXUP_GPR_JUMP("if (%1!=#0) jump:nt %l2");
+      }
+    }
+    else if(GET_CODE(operands[0]) == GE){
+      if(predict_taken){
+        return QDSP6_FIXUP_GPR_JUMP("if (%1>=#0) jump:t %l2");
+      }
+      else {
+        return QDSP6_FIXUP_GPR_JUMP("if (%1>=#0) jump:nt %l2");
+      }
+    }
+    else if(GET_CODE(operands[0]) == LE){
+      if(predict_taken){
+        return QDSP6_FIXUP_GPR_JUMP("if (%1<=#0) jump:t %l2");
+      }
+      else {
+        return QDSP6_FIXUP_GPR_JUMP("if (%1<=#0) jump:nt %l2");
+      }
+    }
+    else {
+      gcc_unreachable();
+    }
+
+  }
+  [(set (attr "type")
         (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 15000))
                       (const_string "CR")
                       (const_string "multiple")))
@@ -3550,8 +3545,7 @@
         (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 15000))
                       (const_int 4)
                       (const_int 8)))]
- )
-
+)
 
 (define_insn "cond_jump"
   [(set (pc)
@@ -3624,7 +3618,7 @@
     bool swap = false;
 
     if(REG_P (op1) || GET_CODE (op1) == SUBREG){
-      switch(code) {
+      switch(code){
         case EQ:
           compare_code = EQ; jump_code = NE; break;
         case NE:
@@ -3660,7 +3654,7 @@
       }
     }
     else {
-      switch(code) {
+      switch(code){
         case EQ:
           compare_code = EQ; jump_code = NE; break;
         case NE:
@@ -3919,7 +3913,7 @@
 (define_insn "cond_return"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
-                        [(match_operand:BI 1 "pr_register_operand" "Rp")
+                        [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
                          (const_int 0)])
                       (return)
                       (pc)))
@@ -3927,18 +3921,18 @@
   ""
   {
     rtx prediction;
-    int predict_taken = 0;
-    prediction = find_reg_note (insn, REG_BR_PROB, 0);
-    predict_taken = (prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2);
-    if (TARGET_V3_FEATURES)
-    {
-	if (predict_taken)
-		return "if (%C0) jumpr:t r31";
-	else
-		return "if (%C0) jumpr:nt r31";
+    if(which_alternative == 0){
+      return "if (%C0) jumpr r31";
     }
-    else
-	return "if %C0 jumpr r31";
+    else {
+      prediction = find_reg_note (insn, REG_BR_PROB, 0);
+      if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
+        return "if (%C0) jumpr:t r31";
+      }
+      else {
+        return "if (%C0) jumpr:nt r31";
+      }
+    }
   }
   [(set_attr "type" "JR")]
 )
@@ -3946,13 +3940,27 @@
 (define_insn "cond_return_rev"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
-                        [(match_operand:BI 1 "pr_register_operand" "Rp")
+                        [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
                          (const_int 0)])
                       (pc)
                       (return)))
    (use (reg:SI LINK_REGNUM))]
   ""
-  "if %I0 jumpr r31"
+  {
+    rtx prediction;
+    if(which_alternative == 0){
+      return "if (%I0) jumpr r31";
+    }
+    else {
+      prediction = find_reg_note (insn, REG_BR_PROB, 0);
+      if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
+        return "if (%I0) jumpr:t r31";
+      }
+      else {
+        return "if (%I0) jumpr:nt r31";
+      }
+    }
+  }
   [(set_attr "type" "JR")]
 )
 
@@ -3978,48 +3986,38 @@
 ;;---------------;;
 ;; indirect_jump ;;
 ;;---------------;;
-;PDB - Speculative Jump - Register Indirect
+
+(define_insn "indirect_jump"
+  [(set (pc) (match_operand:SI 0 "nonimmediate_operand" "Rg"))]
+  ""
+  "jumpr %0"
+  [(set_attr "type" "JR")]
+)
 
 (define_insn "cond_jump_reg_indirect"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
                         [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
                          (const_int 0)])
-                        (match_operand 2 "gr_register_operand" "Rg,Rg")
+                      (match_operand 2 "gr_register_operand" "Rg,Rg")
                       (pc)))]
-  "TARGET_V3_FEATURES"
+  ""
   {
     rtx prediction;
-    prediction = find_reg_note(insn, REG_BR_PROB, 0);
 
     if(which_alternative == 0){
-       if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
-          return "if (%C0) jumpr:t %2";
-       }
-       else {
-          return "if (%C0) jumpr:nt %2";
-       }
-
+      return "if (%C0) jumpr %2";
+    }
+    else {
+      prediction = find_reg_note(insn, REG_BR_PROB, 0);
+      if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
+        return "if (%C0) jumpr:t %2";
       }
       else {
-
-       if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
-          return "if (%I0) jumpr:t %2";
-       }
-       else {
-          return "if (%I0) jumpr:nt %2";
-       }
-
-
+        return "if (%C0) jumpr:nt %2";
       }
+    }
   }
-  [(set_attr "type" "JR")]
-)
-
-(define_insn "indirect_jump"
-  [(set (pc) (match_operand:SI 0 "nonimmediate_operand" "Rg"))]
-  ""
-  "jumpr %0"
   [(set_attr "type" "JR")]
 )
 

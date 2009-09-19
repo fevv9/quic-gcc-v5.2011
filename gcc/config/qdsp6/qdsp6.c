@@ -8074,9 +8074,19 @@ qdsp6_dot_newable(struct qdsp6_insn_info *insn_info)
     return false;
   }
 
-  /* The only control insns that can be .new predicated are direct jumps. */
-  if(QDSP6_CONTROL_P (insn_info) && !QDSP6_DIRECT_JUMP_P (insn_info)){
+  /* Before V4, the only control insns that could be .new predicated were direct
+     jumps. In V4, all control instructions can be .new predicated except calls
+     and register-condition jumps. */
+  if(QDSP6_CONTROL_P (insn_info)
+     && (QDSP6_REGCOND_JUMP_P (insn_info)
+         || QDSP6_CALL_P (insn_info)
+         || (!TARGET_V4_FEATURES && !QDSP6_DIRECT_JUMP_P (insn_info)))){
     return false;
+  }
+
+  /* In V4, all non-control predicable instructions are .new predicable. */
+  if(TARGET_V4_FEATURES){
+    return true;
   }
 
   x = PATTERN (insn_info->insn);
