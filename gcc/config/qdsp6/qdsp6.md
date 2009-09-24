@@ -7595,6 +7595,39 @@
   [(set_attr "type" "ELoad")]
 )
 
+(define_insn "absloadsetqi"
+  [(parallel [(set (match_operand:QI 0 "gr_register_operand"            "=Rg")
+                   (mem:QI (match_operand:SI 1 "absolute_address_operand" "Q")))
+              (set (match_operand:SI 2 "gr_register_operand"            "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"         "1"))])]
+  "TARGET_V4_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memb(%2=##%1)"
+  [(set_attr "type" "ELoad")]
+)
+
+(define_insn "absloadsxtsetqi"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                            "=Rg")
+                   (sign_extend:SI (mem:QI (match_operand:SI 1 "absolute_address_operand" "Q"))))
+              (set (match_operand:SI 2 "gr_register_operand"                            "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                         "1"))])]
+  "TARGET_V4_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memb(%2=##%1)"
+  [(set_attr "type" "ELoad")]
+)
+
+(define_insn "absloadzxtsetqi"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                            "=Rg")
+                   (zero_extend:SI (mem:QI (match_operand:SI 1 "absolute_address_operand" "Q"))))
+              (set (match_operand:SI 2 "gr_register_operand"                            "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                         "1"))])]
+  "TARGET_V4_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memub(%2=##%1)"
+  [(set_attr "type" "ELoad")]
+)
+
 (define_insn "absloadsethi"
   [(parallel [(set (match_operand:HI 0 "gr_register_operand"            "=Rg")
                    (mem:HI (match_operand:SI 1 "absolute_address_operand" "Q")))
@@ -7653,6 +7686,17 @@
 (define_insn "absstoresetbi"
   [(parallel [(set (mem:BI (match_operand:SI 0 "absolute_address_operand" "Q"))
                    (match_operand:BI 1 "gr_register_operand"             "Rg"))
+              (set (match_operand:SI 2 "gr_register_operand"            "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"         "0"))])]
+  "TARGET_V4_FEATURES
+   && rtx_equal_p(operands[0], operands[3])"
+  "memb(%2=##%0) = %1"
+  [(set_attr "type" "EStore")]
+)
+
+(define_insn "absstoresetqi"
+  [(parallel [(set (mem:QI (match_operand:SI 0 "absolute_address_operand" "Q"))
+                   (match_operand:QI 1 "gr_register_operand"             "Rg"))
               (set (match_operand:SI 2 "gr_register_operand"            "=Rg")
                    (match_operand:SI 3 "absolute_address_operand"         "0"))])]
   "TARGET_V4_FEATURES
