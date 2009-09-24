@@ -2744,8 +2744,11 @@
   [(use (match_operand:BLK 0 "memory_operand" ""))
    (use (match_operand:BLK 1 "memory_operand" ""))
    (use (match_operand:SI 2 "nonmemory_operand" ""))
-   (use (match_operand:SI 3 "const_int_operand" ""))]
-  "optimize && !optimize_size"
+   (use (match_operand:SI 3 "const_int_operand" ""))
+   (use (match_operand:SI 4 "const_int_operand" ""))
+   (use (match_operand:SI 5 "const_int_operand" ""))
+   (use (match_operand:SI 6 "const_int_operand" ""))]
+  ""
   {
     if(qdsp6_expand_movmem(operands)){
       DONE;

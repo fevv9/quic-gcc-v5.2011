@@ -221,6 +221,15 @@ static void qdsp6_allocate_stack(
               unsigned HOST_WIDE_INT size,
               int allocate_stack_insn);
 static void qdsp6_deallocate_stack(unsigned HOST_WIDE_INT size);
+static tree qdsp6_special_case_memcpy_fn(const char *name);
+static void qdsp6_emit_special_case_memcpy_fn(
+              tree *fn,
+              const char *name,
+              rtx dst,
+              rtx src,
+              rtx size,
+              bool tailcall);
+static void qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p);
 
 static void qdsp6_packet_optimizations(void);
 static void qdsp6_final_pack_insns(void);
@@ -6643,28 +6652,92 @@ qdsp6_expand_compare(enum rtx_code code)
 
 
 
-bool
-qdsp6_expand_movmem(rtx operands[])
+static tree
+qdsp6_special_case_memcpy_fn(const char *name)
+{
+  tree args, fn;
+
+  fn = get_identifier(name);
+  args = build_function_type_list(ptr_type_node, ptr_type_node,
+                                  const_ptr_type_node, sizetype,
+                                  NULL_TREE);
+
+  fn = build_decl(FUNCTION_DECL, fn, args);
+  DECL_EXTERNAL (fn) = 1;
+  TREE_PUBLIC (fn) = 1;
+  DECL_ARTIFICIAL (fn) = 1;
+  TREE_NOTHROW (fn) = 1;
+  DECL_VISIBILITY (fn) = VISIBILITY_DEFAULT;
+  DECL_VISIBILITY_SPECIFIED (fn) = 1;
+  make_decl_rtl(fn);
+  assemble_external(fn);
+
+  return fn;
+}
+
+
+
+
+static void
+qdsp6_emit_special_case_memcpy_fn(
+  tree *fn,
+  const char *name,
+  rtx dst,
+  rtx src,
+  rtx size,
+  bool tailcall
+)
+{
+  rtx dst_addr, src_addr;
+  tree call_expr, src_tree, dst_tree, size_tree;
+  enum machine_mode size_mode;
+
+  /* Emit code to copy the addresses of DST and SRC and SIZE into new
+     pseudos.  We can then place those new pseudos into a VAR_DECL and
+     use them later.  */
+
+  dst_addr = copy_to_mode_reg(Pmode, XEXP (dst, 0));
+  src_addr = copy_to_mode_reg(Pmode, XEXP (src, 0));
+
+  dst_addr = convert_memory_address(ptr_mode, dst_addr);
+  src_addr = convert_memory_address(ptr_mode, src_addr);
+
+  dst_tree = make_tree(ptr_type_node, dst_addr);
+  src_tree = make_tree(ptr_type_node, src_addr);
+
+  size_mode = TYPE_MODE (sizetype);
+
+  size = convert_to_mode(size_mode, size, 1);
+  size = copy_to_mode_reg(size_mode, size);
+
+  size_tree = make_tree(sizetype, size);
+
+  if(!*fn){
+    *fn = qdsp6_special_case_memcpy_fn(name);
+  }
+  call_expr = build_call_expr (*fn, 3, dst_tree, src_tree, size_tree);
+  CALL_EXPR_TAILCALL (call_expr) = tailcall;
+
+  expand_normal (call_expr);
+}
+
+
+
+
+static void
+qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p)
 {
   rtx src_0, dst_0, src_reg, dst_reg, src_mem, dst_mem, value_reg, count_reg;
   rtx label, loopcount_rtx, doloop_fixup_code;
   int count, loopcount, align;
-  bool volatile_p;
 
+  count = INTVAL (operands[2]);
   align = INTVAL (operands[3]);
-
-  if((align & 3) != 0  || GET_CODE (operands[2]) != CONST_INT){
-    return false;
-  }
-
-  volatile_p = MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
-               || !qdsp6_dual_memory_accesses;
 
   src_0 = operands[1];
   dst_0 = operands[0];
   src_reg = copy_to_mode_reg(Pmode, XEXP (src_0, 0));
   dst_reg = copy_to_mode_reg(Pmode, XEXP (dst_0, 0));
-  count = INTVAL (operands[2]);
 
   if((align & 7) == 0){
 
@@ -6842,8 +6915,72 @@ qdsp6_expand_movmem(rtx operands[])
     emit_move_insn(dst_mem, value_reg);
 
   }
+}
 
-  return true;
+
+
+
+static GTY(()) tree qdsp6_memcpy_volatile;
+static GTY(()) tree qdsp6_memcpy_likely_aligned8_min32_mult8;
+
+bool
+qdsp6_expand_movmem(rtx operands[])
+{
+  HOST_WIDE_INT length, align;
+  int cycles, leftovers;
+  bool volatile_p, simple_copy_p;
+
+  volatile_p = !TARGET_V4_FEATURES
+               && (MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
+                   || !qdsp6_dual_memory_accesses);
+
+  if(GET_CODE (operands[2]) == CONST_INT){
+    length = INTVAL (operands[2]);
+    simple_copy_p = length == align;
+  }
+  else {
+    length = 0;
+    simple_copy_p = false;
+  }
+  gcc_assert(length >= 0);
+
+  align = INTVAL (operands[3]);
+  if(align <= 0){
+    align = 1;
+  }
+  gcc_assert((align & (align - 1)) == 0);
+
+  cycles = length / align + 1;
+  for(leftovers = length % align; leftovers; leftovers >>= 1){
+    cycles += leftovers & 1;
+  }
+
+  if(optimize
+     && (simple_copy_p
+         || (!optimize_size
+             && (align & 3) == 0
+             && length != 0
+             && cycles <= (optimize >= 3 ? 10 : 5)))){
+    qdsp6_expand_movmem_inline(operands, volatile_p);
+    return true;
+  }
+
+  if(optimize && !volatile_p
+     && (align & 3) == 0 && length >= 32 && length % 8 == 0 && cycles < 100){
+    qdsp6_emit_special_case_memcpy_fn(&qdsp6_memcpy_likely_aligned8_min32_mult8,
+                                      "__qdsp_memcpy_likely_aligned_min32bytes_mult8bytes",
+                                      operands[0], operands[1], operands[2],
+                                      INTVAL (operands[4]));
+    return true;
+  }
+
+  if(volatile_p){
+    qdsp6_emit_special_case_memcpy_fn(&qdsp6_memcpy_volatile, "memcpy_v",
+                                      operands[0], operands[1], operands[2],
+                                      INTVAL (operands[4]));
+    return true;
+  }
+  return false;
 }
 
 
