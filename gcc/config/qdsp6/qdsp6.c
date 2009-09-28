@@ -7964,6 +7964,15 @@ qdsp6_record_reads(rtx *y, void *info)
         insn_info->reg_reads = reg_access;
       }
       return 0;
+    case RETURN:
+      if(!QDSP6_CALL_P (insn_info)){
+        reg_access = ggc_alloc_cleared(sizeof(struct qdsp6_reg_access));
+        reg_access->regno = LINK_REGNUM;
+        reg_access->flags = insn_info->flags;
+        reg_access->next = insn_info->reg_reads;
+        insn_info->reg_reads = reg_access;
+      }
+      return 0;
     default:
       return 0;
   }

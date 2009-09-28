@@ -3896,38 +3896,34 @@
 ;;--------;;
 
 (define_expand "return"
-  [(return)
-   (use (reg:SI LINK_REGNUM))]
+  [(return)]
   "qdsp6_direct_return()"
   {
-    if(cfun->machine->frame_info.total_size == 0){
-      emit_jump_insn(gen_return_jump());
-    }
-    else {
+    if(cfun->machine->frame_info.use_allocframe){
       gcc_assert(TARGET_V4_FEATURES);
       emit_jump_insn(gen_deallocframe_return());
+      DONE;
     }
-    DONE;
   }
 )
 
 ;; Conditional returns when we don't need an epilogue
 
-(define_insn "cond_return"
+(define_insn_and_split "cond_return"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
                         [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
                          (const_int 0)])
                       (return)
-                      (pc)))
-   (use (reg:SI LINK_REGNUM))]
-  ""
+                      (pc)))]
+  "qdsp6_direct_return()"
   {
     rtx prediction;
     if(which_alternative == 0){
       return "if (%C0) jumpr r31";
     }
     else {
+      gcc_assert(TARGET_V3_FEATURES);
       prediction = find_reg_note (insn, REG_BR_PROB, 0);
       if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
         return "if (%C0) jumpr:t r31";
@@ -3937,24 +3933,41 @@
       }
     }
   }
+  "cfun->machine->frame_info.use_allocframe"
+  [(parallel [(set (pc)
+                   (if_then_else (match_dup 0)
+                                 (return)
+                                 (pc)))
+              (cond_exec
+                (match_dup 0)
+                (parallel
+                  [(set (reg:SI SP_REGNUM)
+                        (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
+                   (set (reg:SI LINK_REGNUM)
+                        (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
+                   (set (reg:SI FP_REGNUM)
+                        (mem:SI (reg:SI FP_REGNUM)))]))])]
+  {
+    gcc_assert(TARGET_V4_FEATURES);
+  }
   [(set_attr "type" "JR")]
 )
 
-(define_insn "cond_return_rev"
+(define_insn_and_split "cond_return_inverse"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
                         [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
                          (const_int 0)])
                       (pc)
-                      (return)))
-   (use (reg:SI LINK_REGNUM))]
-  ""
+                      (return)))]
+  "qdsp6_direct_return()"
   {
     rtx prediction;
     if(which_alternative == 0){
       return "if (%I0) jumpr r31";
     }
     else {
+      gcc_assert(TARGET_V3_FEATURES);
       prediction = find_reg_note (insn, REG_BR_PROB, 0);
       if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
         return "if (%I0) jumpr:t r31";
@@ -3964,7 +3977,94 @@
       }
     }
   }
+  "cfun->machine->frame_info.use_allocframe"
+  [(parallel [(set (pc)
+                   (if_then_else (match_dup 0)
+                                 (pc)
+                                 (return)))
+              (cond_exec
+                (match_dup 0)
+                (parallel
+                  [(set (reg:SI SP_REGNUM)
+                        (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
+                   (set (reg:SI LINK_REGNUM)
+                        (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
+                   (set (reg:SI FP_REGNUM)
+                        (mem:SI (reg:SI FP_REGNUM)))]))])]
+  {
+    gcc_assert(TARGET_V4_FEATURES);
+  }
   [(set_attr "type" "JR")]
+)
+
+(define_insn "cond_dealloc_return"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "predicate_operator"
+                        [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
+                         (const_int 0)])
+                      (return)
+                      (pc)))
+   (cond_exec
+     (match_dup 0)
+     (parallel
+       [(set (reg:SI SP_REGNUM)
+             (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
+        (set (reg:SI LINK_REGNUM)
+             (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
+        (set (reg:SI FP_REGNUM)
+             (mem:SI (reg:SI FP_REGNUM)))]))]
+  "qdsp6_direct_return()"
+  {
+    rtx prediction;
+    if(which_alternative == 0){
+      return "if (%C0) dealloc_return";
+    }
+    else {
+      prediction = find_reg_note (insn, REG_BR_PROB, 0);
+      if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
+        return "if (%C0) dealloc_return:t";
+      }
+      else {
+        return "if (%C0) dealloc_return:nt";
+      }
+    }
+  }
+  [(set_attr "type" "Load")]
+)
+
+(define_insn "cond_dealloc_inverse"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "predicate_operator"
+                        [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
+                         (const_int 0)])
+                      (pc)
+                      (return)))
+   (cond_exec
+     (match_dup 0)
+     (parallel
+       [(set (reg:SI SP_REGNUM)
+             (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
+        (set (reg:SI LINK_REGNUM)
+             (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
+        (set (reg:SI FP_REGNUM)
+             (mem:SI (reg:SI FP_REGNUM)))]))]
+  "qdsp6_direct_return()"
+  {
+    rtx prediction;
+    if(which_alternative == 0){
+      return "if (%I0) dealloc_return";
+    }
+    else {
+      prediction = find_reg_note (insn, REG_BR_PROB, 0);
+      if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
+        return "if (%I0) dealloc_return:t";
+      }
+      else {
+        return "if (%I0) dealloc_return:nt";
+      }
+    }
+  }
+  [(set_attr "type" "Load")]
 )
 
 
@@ -4012,6 +4112,7 @@
       return "if (%C0) jumpr %2";
     }
     else {
+      gcc_assert(TARGET_V3_FEATURES);
       prediction = find_reg_note(insn, REG_BR_PROB, 0);
       if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
         return "if (%C0) jumpr:t %2";
@@ -8178,8 +8279,7 @@
 
 
 (define_insn "return_jump"
-  [(return)
-   (use (reg:SI LINK_REGNUM))]
+  [(return)]
   ""
   "jumpr r31"
   [(set_attr "type" "JR")]
@@ -8421,7 +8521,8 @@
 )
 
 (define_insn "restore_r24_through_r27_and_deallocframe"
-  [(set (reg:SI 26) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -16))))
+  [(return)
+   (set (reg:SI 26) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -16))))
    (set (reg:SI 27) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -12))))
    (set (reg:SI 24) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -8))))
    (set (reg:SI 25) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -4))))
@@ -8430,8 +8531,7 @@
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   ""
   "jump __restore_r24_through_r27_and_deallocframe"
   [(set_attr "type" "J")
@@ -8439,15 +8539,15 @@
 )
 
 (define_insn "restore_r24_through_r25_and_deallocframe"
-  [(set (reg:SI 24) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -8))))
+  [(return)
+   (set (reg:SI 24) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -8))))
    (set (reg:SI 25) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -4))))
    (set (reg:SI SP_REGNUM)
         (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   ""
   "jump __restore_r24_through_r25_and_deallocframe"
   [(set_attr "type" "J")
@@ -8666,7 +8766,8 @@
 )
 
 (define_insn "restore_r16_through_r27_and_deallocframe"
-  [(set (reg:SI 26) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -48))))
+  [(return)
+   (set (reg:SI 26) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -48))))
    (set (reg:SI 27) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -44))))
    (set (reg:SI 24) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -40))))
    (set (reg:SI 25) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -36))))
@@ -8683,8 +8784,7 @@
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   ""
   "jump __restore_r16_through_r27_and_deallocframe"
   [(set_attr "type" "J")
@@ -8692,7 +8792,8 @@
 )
 
 (define_insn "restore_r16_through_r25_and_deallocframe"
-  [(set (reg:SI 24) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -40))))
+  [(return)
+   (set (reg:SI 24) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -40))))
    (set (reg:SI 25) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -36))))
    (set (reg:SI 22) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -32))))
    (set (reg:SI 23) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -28))))
@@ -8707,8 +8808,7 @@
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   ""
   "jump __restore_r16_through_r25_and_deallocframe"
   [(set_attr "type" "J")
@@ -8716,7 +8816,8 @@
 )
 
 (define_insn "restore_r16_through_r23_and_deallocframe"
-  [(set (reg:SI 22) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -32))))
+  [(return)
+   (set (reg:SI 22) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -32))))
    (set (reg:SI 23) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -28))))
    (set (reg:SI 20) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -24))))
    (set (reg:SI 21) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -20))))
@@ -8729,8 +8830,7 @@
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   ""
   "jump __restore_r16_through_r23_and_deallocframe"
   [(set_attr "type" "J")
@@ -8738,7 +8838,8 @@
 )
 
 (define_insn "restore_r16_through_r21_and_deallocframe"
-  [(set (reg:SI 20) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -24))))
+  [(return)
+   (set (reg:SI 20) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -24))))
    (set (reg:SI 21) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -20))))
    (set (reg:SI 18) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -16))))
    (set (reg:SI 19) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -12))))
@@ -8749,8 +8850,7 @@
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   ""
   "jump __restore_r16_through_r21_and_deallocframe"
   [(set_attr "type" "J")
@@ -8758,7 +8858,8 @@
 )
 
 (define_insn "restore_r16_through_r19_and_deallocframe"
-  [(set (reg:SI 18) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -16))))
+  [(return)
+   (set (reg:SI 18) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -16))))
    (set (reg:SI 19) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -12))))
    (set (reg:SI 16) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -8))))
    (set (reg:SI 17) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -4))))
@@ -8767,8 +8868,7 @@
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   ""
   "jump __restore_r16_through_r19_and_deallocframe"
   [(set_attr "type" "J")
@@ -8776,15 +8876,15 @@
 )
 
 (define_insn "restore_r16_through_r17_and_deallocframe"
-  [(set (reg:SI 16) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -8))))
+  [(return)
+   (set (reg:SI 16) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -8))))
    (set (reg:SI 17) (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int -4))))
    (set (reg:SI SP_REGNUM)
         (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   ""
   "jump __restore_r16_through_r17_and_deallocframe"
   [(set_attr "type" "J")
@@ -8792,26 +8892,26 @@
 )
 
 (define_insn "deallocframe_return"
-  [(set (reg:SI SP_REGNUM)
+  [(return)
+   (set (reg:SI SP_REGNUM)
         (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   "TARGET_V4_FEATURES"
   "dealloc_return"
   [(set_attr "type" "Load")]
 )
 
 (define_insn "deallocframe_function"
-  [(set (reg:SI SP_REGNUM)
+  [(return)
+   (set (reg:SI SP_REGNUM)
         (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))
-   (return)]
+        (mem:SI (reg:SI FP_REGNUM)))]
   "!TARGET_V4_FEATURES"
   "jump __deallocframe"
   [(set_attr "type" "J")
