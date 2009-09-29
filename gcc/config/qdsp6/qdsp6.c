@@ -7370,6 +7370,7 @@ static struct qdsp6_insn_info *qdsp6_predicate_insn(
                                  struct qdsp6_insn_info *insn_info,
                                  struct qdsp6_insn_info *jump_insn_info,
                                  bool invert_condition);
+static int qdsp6_dot_newify_reg(rtx *x, void *y);
 static struct qdsp6_insn_info *qdsp6_dot_newify_insn(
                                  struct qdsp6_insn_info *insn_info);
 static rtx  qdsp6_bb_real_head_insn(basic_block bb);
@@ -7774,16 +7775,28 @@ static int
 qdsp6_get_flags(rtx insn)
 {
   int flags;
+  rtx pattern;
   rtx test;
 
   flags = 0;
 
-  if(GET_CODE (PATTERN (insn)) == COND_EXEC){
-    test = COND_EXEC_TEST (PATTERN (insn));
+  pattern = PATTERN (insn);
+  if(GET_CODE (pattern) == PARALLEL){
+    pattern = XVECEXP (pattern, 0, 0);
   }
-  else if(JUMP_P (insn) && GET_CODE (PATTERN (insn)) == SET
-          && GET_CODE (SET_SRC (PATTERN (insn))) == IF_THEN_ELSE){
-    test = XEXP (SET_SRC (PATTERN (insn)), 0);
+
+  if(GET_CODE (pattern) == COND_EXEC){
+    test = COND_EXEC_TEST (pattern);
+  }
+  else if(JUMP_P (insn) && GET_CODE (pattern) == SET
+          && GET_CODE (SET_SRC (pattern)) == IF_THEN_ELSE){
+
+    test = XEXP (SET_SRC (pattern), 0);
+
+    if(C_REG_P (XEXP (test, 0))){
+      flags |= QDSP6_ENDLOOP;
+      test = NULL_RTX;
+    }
   }
   else {
     test = NULL_RTX;
@@ -7818,10 +7831,10 @@ qdsp6_get_flags(rtx insn)
     flags |= QDSP6_UNCONDITIONAL;
   }
 
-  if(JUMP_P (insn)){
-    if(GET_CODE (PATTERN (insn)) == SET){
-      if(GET_CODE (SET_SRC (PATTERN (insn))) == IF_THEN_ELSE){
-        if(GET_CODE (XEXP (SET_SRC (PATTERN (insn)), 1)) == LABEL_REF){
+  if(JUMP_P (insn) && !(flags & QDSP6_ENDLOOP)){
+    if(GET_CODE (pattern) == SET){
+      if(GET_CODE (SET_SRC (pattern)) == IF_THEN_ELSE){
+        if(GET_CODE (XEXP (SET_SRC (pattern), 1)) == LABEL_REF){
           flags |= QDSP6_DIRECT_JUMP;
         }
         else {
@@ -7829,16 +7842,13 @@ qdsp6_get_flags(rtx insn)
         }
       }
       else {
-        if(GET_CODE (SET_SRC (PATTERN (insn))) == LABEL_REF){
+        if(GET_CODE (SET_SRC (pattern)) == LABEL_REF){
           flags |= QDSP6_DIRECT_JUMP;
         }
         else {
           flags |= QDSP6_INDIRECT_JUMP;
         }
       }
-    }
-    else {
-      flags |= QDSP6_ENDLOOP;
     }
   }
   else if(CALL_P (insn)){
@@ -8695,34 +8705,48 @@ qdsp6_predicate_insn(
 
 
 
+static int
+qdsp6_dot_newify_reg(rtx *x, void *y)
+{
+  rtx old_reg = (rtx) y;
+
+  if(REG_P (*x) && REGNO (*x) == REGNO (old_reg)){
+    *x = gen_rtx_REG (GET_MODE (old_reg), REGNO (old_reg) + DOT_NEW_OFFSET);
+  }
+  return 0;
+}
+
+
+
+
 static struct qdsp6_insn_info *
 qdsp6_dot_newify_insn(struct qdsp6_insn_info *insn_info)
 {
   rtx pattern;
-  rtx test;
   rtx old_reg;
 
   gcc_assert(QDSP6_CONDITIONAL_P (insn_info));
 
   pattern = PATTERN (insn_info->insn);
+  if(GET_CODE (pattern) == PARALLEL){
+    pattern = XVECEXP (pattern, 0, 0);
+  }
+
   if(GET_CODE (pattern) == COND_EXEC){
-    test = COND_EXEC_TEST (pattern);
+    old_reg = XEXP (COND_EXEC_TEST (pattern), 0);
   }
   else {
     gcc_assert(JUMP_P (insn_info->insn));
-    test = XEXP (SET_SRC (pattern), 0);
+    old_reg = XEXP (XEXP (SET_SRC (pattern), 0), 0);
   }
 
-  old_reg = XEXP (test, 0);
   gcc_assert(PO_REG_P (old_reg));
-  XEXP (test, 0) = gen_rtx_REG (GET_MODE (old_reg),
-                                REGNO (old_reg) + DOT_NEW_OFFSET);
 
-  insn_info = qdsp6_get_insn_info(insn_info->insn);
-
-  if(!final_packing){
-    XEXP (test, 0) = old_reg;
+  if(final_packing){
+    for_each_rtx(&pattern, qdsp6_dot_newify_reg, old_reg);
   }
+
+  insn_info->flags |= QDSP6_DOT_NEW;
 
   return insn_info;
 }
