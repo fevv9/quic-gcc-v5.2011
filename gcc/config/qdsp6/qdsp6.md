@@ -9031,7 +9031,7 @@
   "(TARGET_CONST64
     || (   s8_const_int_operand(operands[1], SImode)
         && s8_const_int_operand(operands[3], SImode))
-    || (TARGET_V4_FEATURES && 0
+    || (TARGET_V4_FEATURES
         && (   s8_const_int_operand(operands[1], SImode)
             || s8_const_int_operand(operands[3], SImode))))
    && (!optimize_size
@@ -9163,14 +9163,15 @@
 
 
 
-(define_insn_and_split "combinesi"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg, Rg,Rg, Rg,Rg,Rg")
-        (match_operand:SI 1 "nonmemory_operand"    "Rg,Is8, Rg,Rg,Is8, i, i"))
-   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg, Rg,Rg, Rg,Rg,Rg")
-        (match_operand:SI 3 "nonmemory_operand"    "Rg,Is8,Is8, i, Rg,Rg, i"))]
-  "reload_completed"
+(define_insn_and_split "combinesi_v4"
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg, Rg, Rg, Rg,Rg, Rg,Rg,Rg")
+        (match_operand:SI 1 "nonmemory_operand"    "Rg,Is8,Is8,  i, Rg,Rg,Is8, i, i"))
+   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg, Rg, Rg, Rg,Rg, Rg,Rg,Rg")
+        (match_operand:SI 3 "nonmemory_operand"    "Rg,Is8,  i,Is8,Is8, i, Rg,Rg, i"))]
+  "reload_completed && TARGET_V4_FEATURES"
   {
     HOST_WIDE_INT high, low;
+
     if(REGNO (operands[0]) % 2 == 0){
       switch(which_alternative){
         case 0:
@@ -9178,14 +9179,18 @@
         case 1:
           return "%P0 = combine(#%3,#%1)";
         case 2:
-          return "%P0 = combine(#%3,%1)";
+          return "%P0 = combine(##%3,#%1)";
         case 3:
-          return "%P0 = combine(##%3,%1)";
+          return "%P0 = combine(#%3,##%1)";
         case 4:
-          return "%P0 = combine(%3,#%1)";
+          return "%P0 = combine(#%3,%1)";
         case 5:
-          return "%P0 = combine(%3,##%1)";
+          return "%P0 = combine(##%3,%1)";
         case 6:
+          return "%P0 = combine(%3,#%1)";
+        case 7:
+          return "%P0 = combine(%3,##%1)";
+        case 8:
           gcc_assert(TARGET_CONST64);
           gcc_assert(const_int_operand(operands[1], SImode));
           gcc_assert(const_int_operand(operands[3], SImode));
@@ -9205,14 +9210,18 @@
         case 1:
           return "%P2 = combine(#%1,#%3)";
         case 2:
-          return "%P2 = combine(%1,#%3)";
+          return "%P2 = combine(#%1,##%3)";
         case 3:
-          return "%P2 = combine(%1,##%3)";
+          return "%P2 = combine(##%1,#%3)";
         case 4:
-          return "%P2 = combine(#%1,%3)";
+          return "%P2 = combine(%1,#%3)";
         case 5:
-          return "%P2 = combine(##%1,%3)";
+          return "%P2 = combine(%1,##%3)";
         case 6:
+          return "%P2 = combine(#%1,%3)";
+        case 7:
+          return "%P2 = combine(##%1,%3)";
+        case 8:
           gcc_assert(TARGET_CONST64);
           gcc_assert(const_int_operand(operands[1], SImode));
           gcc_assert(const_int_operand(operands[3], SImode));
@@ -9236,7 +9245,68 @@
     gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[3])
                  && REGNO (operands[0]) == REGNO (operands[3])));
   }
-  [(set_attr "type" "A,A,A,EA,A,EA,Load")]
+  [(set_attr "type" "A,A,EA,EA,A,EA,A,EA,Load")]
+)
+
+(define_insn_and_split "combinesi"
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg,Rg")
+        (match_operand:SI 1 "nonmemory_operand"    "Rg,Is8, i"))
+   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg,Rg")
+        (match_operand:SI 3 "nonmemory_operand"    "Rg,Is8, i"))]
+  "reload_completed"
+  {
+    HOST_WIDE_INT high, low;
+
+    if(REGNO (operands[0]) % 2 == 0){
+      switch(which_alternative){
+        case 0:
+          return "%P0 = combine(%3,%1)";
+        case 1:
+          return "%P0 = combine(#%3,#%1)";
+        case 2:
+          gcc_assert(TARGET_CONST64);
+          gcc_assert(const_int_operand(operands[1], SImode));
+          gcc_assert(const_int_operand(operands[3], SImode));
+          low = INTVAL (operands[1]);
+          high = INTVAL (operands[3]);
+          operands[1] = gen_int_mode((high << 32ULL) | (low & 0x0FFFFFFFFULL),
+                                     DImode);
+          return "%P0 = CONST64(#%1)";
+        default:
+          gcc_unreachable();
+      }
+    }
+    else {
+      switch(which_alternative){
+        case 0:
+          return "%P2 = combine(%1,%3)";
+        case 1:
+          return "%P2 = combine(#%1,#%3)";
+        case 2:
+          gcc_assert(TARGET_CONST64);
+          gcc_assert(const_int_operand(operands[1], SImode));
+          gcc_assert(const_int_operand(operands[3], SImode));
+          low = INTVAL (operands[3]);
+          high = INTVAL (operands[1]);
+          operands[1] = gen_int_mode((high << 32ULL) | (low & 0x0FFFFFFFFULL),
+                                     DImode);
+          return "%P2 = CONST64(#%1)";
+        default:
+          gcc_unreachable();
+      }
+    }
+  }
+  "&& !(   (   REGNO (operands[0]) % 2 == 0
+            && REGNO (operands[0]) + 1 == REGNO (operands[2]))
+        || (   REGNO (operands[2]) % 2 == 0
+            && REGNO (operands[2]) + 1 == REGNO (operands[0])))"
+  [(set (match_dup 0) (match_dup 1))
+   (set (match_dup 2) (match_dup 3))]
+  {
+    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[3])
+                 && REGNO (operands[0]) == REGNO (operands[3])));
+  }
+  [(set_attr "type" "A,A,Load")]
 )
 
 (define_insn_and_split "cond_combinesi"
