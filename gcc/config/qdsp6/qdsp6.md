@@ -1094,8 +1094,8 @@
 )
 
 (define_insn "movsf_real_v4"
-  [(set (match_operand:SF 0 "nonimmediate_operand_with_GP" "=Rg,    Rg,Rg,Asi,Anoext, m,Rg,Rg")
-        (match_operand:SF 1 "GP_or_reg_operand"             "Rg,Anoext, m,  i,    Rg,Rg, G, i"))]
+  [(set (match_operand:SF 0 "nonimmediate_operand_with_GP" "=Rg,    Rg,Rg,Asi,Asi,Anoext, m,Rg,Rg")
+        (match_operand:SF 1 "GP_or_reg_operand"             "Rg,Anoext, m,  G,  i,    Rg,Rg, G, i"))]
   "TARGET_V4_FEATURES
    && (!memory_operand(operands[0], SFmode)
        || gr_register_operand(operands[1], SFmode)
@@ -1109,12 +1109,13 @@
    %0 = %1
    %0 = memw(%1)
    %0 = memw(%E1)
+   memw(%0) = #%1
    memw(%0) = ##%1
    memw(%0) = %1
    memw(%E0) = %1
    %0 = #%1
    %0 = ##%1"
-  [(set_attr "type" "A,Load,ELoad,EStore,Store,EStore,A,EA")]
+  [(set_attr "type" "A,Load,ELoad,Store,EStore,Store,EStore,A,EA")]
 )
 
 (define_insn "movsf_real"
