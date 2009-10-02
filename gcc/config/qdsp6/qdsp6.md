@@ -9025,15 +9025,17 @@
 
 (define_peephole2
   [(set (match_operand:SI 0 "gr_register_operand" "")
-        (match_operand:SI 1 "const_int_operand" ""))
+        (match_operand:SI 1 "immediate_operand" ""))
    (set (match_operand:SI 2 "gr_register_operand" "")
-        (match_operand:SI 3 "const_int_operand" ""))]
-  "(TARGET_CONST64
-    || (   s8_const_int_operand(operands[1], SImode)
-        && s8_const_int_operand(operands[3], SImode))
+        (match_operand:SI 3 "immediate_operand" ""))]
+  "((TARGET_CONST64
+     && const_int_operand(operands[1], SImode)
+     && const_int_operand(operands[3], SImode))
     || (TARGET_V4_FEATURES
         && (   s8_const_int_operand(operands[1], SImode)
-            || s8_const_int_operand(operands[3], SImode))))
+            || s8_const_int_operand(operands[3], SImode)))
+    || (   s8_const_int_operand(operands[1], SImode)
+        && s8_const_int_operand(operands[3], SImode)))
    && (!optimize_size
        || s8_const_int_operand(operands[1], SImode)
        || s8_const_int_operand(operands[3], SImode)
