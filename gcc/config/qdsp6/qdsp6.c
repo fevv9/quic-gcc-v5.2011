@@ -766,6 +766,25 @@ qdsp6_data_alignment(tree type, int align)
 
 
 
+/* Implements macro CONSTANT_ALIGNMENT
+
+   Doubleword align constant strings. */
+
+int
+qdsp6_constant_alignment(tree constant, int align)
+{
+  if(!optimize_size && TREE_CODE (constant) == STRING_CST
+     && TREE_STRING_LENGTH (constant) >= BIGGEST_ALIGNMENT
+     && (align) < BIGGEST_ALIGNMENT){
+    return BIGGEST_ALIGNMENT;
+  }
+
+  return align;
+}
+
+
+
+
 /* Implements macro LOCAL_ALIGNMENT
 
    Align a local variable on the stack
