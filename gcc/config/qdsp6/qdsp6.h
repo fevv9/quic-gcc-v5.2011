@@ -300,10 +300,8 @@ Storage Layout
 #define DATA_ALIGNMENT(TYPE, ALIGN) \
   qdsp6_data_alignment(TYPE, ALIGN)
 
-/* Doubleword align constant strings. */
 #define CONSTANT_ALIGNMENT(CONSTANT, ALIGN) \
-  (TREE_CODE (CONSTANT) == STRING_CST \
-   && (ALIGN) < BIGGEST_ALIGNMENT ? BIGGEST_ALIGNMENT : (ALIGN))
+  qdsp6_constant_alignment(CONSTANT, ALIGN)
 
 #define LOCAL_ALIGNMENT(TYPE, ALIGN) \
   qdsp6_local_alignment(TYPE, ALIGN)
