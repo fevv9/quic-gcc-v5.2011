@@ -2564,6 +2564,24 @@
   [(set_attr "type" "A,EA,A")]
 )
 
+(define_insn "cmpsi_ge_v4"
+  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp,Rp")
+        (ge:BI (match_operand:SI 1 "gr_register_operand"   "Rg,Rg")
+               (match_operand:SI 2 "immediate_operand" "Ks10p1, i")))]
+  "TARGET_V4_FEATURES
+   && (crtl->combine_in_progress || crtl->combine_completed)"
+  {
+    operands[2] = plus_constant(operands[2], -1);
+    if(which_alternative == 0){
+      return "%0 = cmp.gt(%1,#%2)";
+    }
+    else {
+      return "%0 = cmp.gt(%1,##%2)";
+    }
+  }
+  [(set_attr "type" "A,EA")]
+)
+
 (define_insn "cmpsi_gtu_v4"
   [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp,Rp")
         (gtu:BI (match_operand:SI 1 "gr_register_operand" "Rg,Rg,Rg")
@@ -2577,6 +2595,24 @@
    %0 = cmp.gtu(%1,##%2)
    %0 = cmp.gtu(%1,%2)"
   [(set_attr "type" "A,EA,A")]
+)
+
+(define_insn "cmpsi_geu_v4"
+  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp,Rp")
+        (geu:BI (match_operand:SI 1 "gr_register_operand"  "Rg,Rg")
+                (match_operand:SI 2 "immediate_operand" "Ku9p1, i")))]
+  "TARGET_V4_FEATURES
+   && (crtl->combine_in_progress || crtl->combine_completed)"
+  {
+    operands[2] = plus_constant(operands[2], -1);
+    if(which_alternative == 0){
+      return "%0 = cmp.gtu(%1,#%2)";
+    }
+    else {
+      return "%0 = cmp.gtu(%1,##%2)";
+    }
+  }
+  [(set_attr "type" "A,EA")]
 )
 
 (define_insn "cmpsi_ne"
@@ -2609,6 +2645,24 @@
   [(set_attr "type" "A,EA,A")]
 )
 
+(define_insn "cmpsi_lt_v4"
+  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp,Rp")
+        (lt:BI (match_operand:SI 1 "gr_register_operand"   "Rg,Rg")
+               (match_operand:SI 2 "immediate_operand" "Ks10p1, i")))]
+  "TARGET_V4_FEATURES
+   && (crtl->combine_in_progress || crtl->combine_completed)"
+  {
+    operands[2] = plus_constant(operands[2], -1);
+    if(which_alternative == 0){
+      return "%0 = !cmp.gt(%1,#%2)";
+    }
+    else {
+      return "%0 = !cmp.gt(%1,##%2)";
+    }
+  }
+  [(set_attr "type" "A,EA")]
+)
+
 (define_insn "cmpsi_leu"
   [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp,Rp")
         (leu:BI (match_operand:SI 1 "gr_register_operand" "Rg,Rg,Rg")
@@ -2622,6 +2676,24 @@
    %0 = !cmp.gtu(%1,##%2)
    %0 = !cmp.gtu(%1,%2)"
   [(set_attr "type" "A,EA,A")]
+)
+
+(define_insn "cmpsi_ltu_v4"
+  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp,Rp")
+        (ltu:BI (match_operand:SI 1 "gr_register_operand"  "Rg,Rg")
+                (match_operand:SI 2 "immediate_operand" "Ku9p1, i")))]
+  "TARGET_V4_FEATURES
+   && (crtl->combine_in_progress || crtl->combine_completed)"
+  {
+    operands[2] = plus_constant(operands[2], -1);
+    if(which_alternative == 0){
+      return "%0 = !cmp.gtu(%1,#%2)";
+    }
+    else {
+      return "%0 = !cmp.gtu(%1,##%2)";
+    }
+  }
+  [(set_attr "type" "A,EA")]
 )
 
 (define_insn "cmpsi_eq_imm"
@@ -7580,6 +7652,18 @@
   [(set_attr "type" "X,X")]
 )
 
+(define_insn "cmpqi_ge"
+  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp")
+        (ge:BI (match_operand:QI 1 "gr_register_operand"  "Rg")
+               (match_operand:QI 2 "immediate_operand" "Ks8p1")))]
+  "TARGET_V4_FEATURES"
+  {
+    operands[2] = plus_constant(operands[2], -1);
+    return "%0 = cmpb.gt(%1,#%2)";
+  }
+  [(set_attr "type" "X")]
+)
+
 (define_insn "cmpqi_gtu"
   [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp")
         (gtu:BI (match_operand:QI 1 "gr_register_operand" "Rg,Rg")
@@ -7589,6 +7673,18 @@
    %0 = cmpb.gtu(%1,#%2)
    %0 = cmpb.gtu(%1,%2)"
   [(set_attr "type" "X,X")]
+)
+
+(define_insn "cmpqi_geu"
+  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp")
+        (geu:BI (match_operand:QI 1 "gr_register_operand"  "Rg")
+                (match_operand:QI 2 "immediate_operand" "Ku7p1")))]
+  "TARGET_V4_FEATURES"
+  {
+    operands[2] = plus_constant(operands[2], -1);
+    return "%0 = cmpb.gtu(%1,#%2)";
+  }
+  [(set_attr "type" "X")]
 )
 
 (define_insn "cmphi_eq"
@@ -7613,6 +7709,18 @@
   [(set_attr "type" "X,X")]
 )
 
+(define_insn "cmphi_ge"
+  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp")
+        (ge:BI (match_operand:HI 1 "gr_register_operand"  "Rg")
+               (match_operand:HI 2 "immediate_operand" "Ks8p1")))]
+  "TARGET_V4_FEATURES"
+  {
+    operands[2] = plus_constant(operands[2], -1);
+    return "%0 = cmph.gt(%1,#%2)";
+  }
+  [(set_attr "type" "X")]
+)
+
 (define_insn "cmphi_gtu"
   [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp")
         (gtu:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg")
@@ -7622,6 +7730,18 @@
    %0 = cmph.gtu(%1,#%2)
    %0 = cmph.gtu(%1,%2)"
   [(set_attr "type" "X,X")]
+)
+
+(define_insn "cmphi_geu"
+  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp")
+        (geu:BI (match_operand:HI 1 "gr_register_operand"  "Rg")
+                (match_operand:HI 2 "immediate_operand" "Ks8p1")))]
+  "TARGET_V4_FEATURES"
+  {
+    operands[2] = plus_constant(operands[2], -1);
+    return "%0 = cmph.gtu(%1,#%2)";
+  }
+  [(set_attr "type" "X")]
 )
 
 

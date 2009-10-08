@@ -878,6 +878,10 @@ Register Classes
 
    K16 means 16
    K32 means 32
+   Ku7p1 integers in [1, 128]
+   Ks8p1 integers in [-127, 128]
+   Ku9p1 integers in [1, 512]
+   Ks10p1 integers in [-511, 512]
    Ks8s8 means integers that can be formed using combine(#s8,#s8)
    Konehot32 means power of 2 integers that can be represented in 32 bits
    Konenot32 means one's complements of Konehot32 constants */
@@ -956,6 +960,18 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
       }
       else if(QDSP6_CONSTRAINT_P(str, 32)){
         return value == 32;
+      }
+      else if(QDSP6_CONSTRAINT_P(str, u7p1)){
+        return IN_RANGE (value, 1, 128);
+      }
+      else if(QDSP6_CONSTRAINT_P(str, s8p1)){
+        return IN_RANGE (value, -127, 128);
+      }
+      else if(QDSP6_CONSTRAINT_P(str, u9p1)){
+        return IN_RANGE (value, 1, 512);
+      }
+      else if(QDSP6_CONSTRAINT_P(str, s10p1)){
+        return IN_RANGE (value, -511, 512);
       }
       else if(QDSP6_CONSTRAINT_P(str, s8s8)){
         high = value >> 32ULL;
@@ -6575,6 +6591,7 @@ qdsp6_expand_compare(enum rtx_code code)
 
   if(REG_P (op1) || GET_CODE (op1) == SUBREG){
     switch(code) {
+      /* Equality compares */
       case EQ:
         SET_CODES (EQ, NE); break;
       case NE:
@@ -6608,6 +6625,7 @@ qdsp6_expand_compare(enum rtx_code code)
     gcc_assert(GET_MODE (op0) != DImode && GET_MODE (op1) != DImode);
 
     switch(code) {
+      /* Equality compares */
       case EQ:
         SET_CODES (EQ, NE); break;
       case NE:
@@ -6637,24 +6655,11 @@ qdsp6_expand_compare(enum rtx_code code)
         gcc_unreachable();
     }
 
-    if(GET_CODE (op1) == CONST_INT
-       && INTVAL (op1) >= (compare_code == GTU ? 0 - offset : -512 - offset)
-       && INTVAL (op1) <= 511 - offset){
-      if(offset != 0){
-        op1 = GEN_INT (INTVAL (op1) + offset);
-      }
-    }
-    else {
-      const_reg = gen_reg_rtx(SImode);
-      emit_move_insn(const_reg, op1);
-      if(offset != 0){
-        jump_code = jump_code == EQ ? NE : EQ;
-        op1 = op0;
-        op0 = const_reg;
-      }
-      else {
-        op1 = const_reg;
-      }
+    op1 = plus_constant(op1, offset);
+
+    if(GET_CODE (op1) != CONST_INT
+       || !IN_RANGE (INTVAL (op1), compare_code == GTU ? 0 : -512, 511)){
+      op1 = force_reg(SImode, op1);
     }
   }
 
