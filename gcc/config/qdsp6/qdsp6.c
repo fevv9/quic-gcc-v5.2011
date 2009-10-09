@@ -2107,6 +2107,9 @@ qdsp6_legitimate_address_p(
   else if(!strcmp(constraint, "csi")){
   }
   else if(!strcmp(constraint, "memop") || !strcmp(constraint, "ememop")){
+    if(!TARGET_MEMOPS){
+      return false;
+    }
   }
   else {
     gcc_unreachable();
