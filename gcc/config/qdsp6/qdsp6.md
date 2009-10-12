@@ -7644,7 +7644,7 @@
 (define_insn "cmpqi_gt"
   [(set (match_operand:BI 0 "pr_register_operand"       "=Rp,Rp")
         (gt:BI (match_operand:QI 1 "gr_register_operand" "Rg,Rg")
-               (match_operand:QI 2 "nonmemory_operand"  "Is8,Rg")))]
+               (match_operand:QI 2 "nonmemory_operand"    "i,Rg")))]
   "TARGET_V4_FEATURES"
   "@
    %0 = cmpb.gt(%1,#%2)
@@ -7653,11 +7653,13 @@
 )
 
 (define_insn "cmpqi_ge"
-  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp")
-        (ge:BI (match_operand:QI 1 "gr_register_operand"  "Rg")
-               (match_operand:QI 2 "immediate_operand" "Ks8p1")))]
+  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+        (ge:BI (match_operand:QI 1 "gr_register_operand" "Rg")
+               (match_operand:QI 2 "immediate_operand"    "i")))]
   "TARGET_V4_FEATURES"
   {
+    gcc_assert(GET_CODE (operands[2]) == CONST_INT
+               && INTVAL (operands[2]) > -512);
     operands[2] = plus_constant(operands[2], -1);
     return "%0 = cmpb.gt(%1,#%2)";
   }
@@ -7665,83 +7667,102 @@
 )
 
 (define_insn "cmpqi_gtu"
-  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp")
-        (gtu:BI (match_operand:QI 1 "gr_register_operand" "Rg,Rg")
-                (match_operand:QI 2 "nonmemory_operand"  "Iu7,Rg")))]
+  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp,Rp")
+        (gtu:BI (match_operand:QI 1 "gr_register_operand" "Rg,Rg,Rg")
+                (match_operand:QI 2 "nonmemory_operand"  "Iu7, i,Rg")))]
   "TARGET_V4_FEATURES"
   "@
    %0 = cmpb.gtu(%1,#%2)
+   %0 = cmpb.gtu(%1,##%2)
    %0 = cmpb.gtu(%1,%2)"
-  [(set_attr "type" "X,X")]
+  [(set_attr "type" "X,EX,X")]
 )
 
 (define_insn "cmpqi_geu"
-  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp")
-        (geu:BI (match_operand:QI 1 "gr_register_operand"  "Rg")
-                (match_operand:QI 2 "immediate_operand" "Ku7p1")))]
+  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp,Rp")
+        (geu:BI (match_operand:QI 1 "gr_register_operand"  "Rg,Rg")
+                (match_operand:QI 2 "immediate_operand" "Ku7p1, i")))]
   "TARGET_V4_FEATURES"
   {
     operands[2] = plus_constant(operands[2], -1);
-    return "%0 = cmpb.gtu(%1,#%2)";
+    if(which_alternative == 0){
+      return "%0 = cmpb.gtu(%1,#%2)";
+    }
+    else {
+      return "%0 = cmpb.gtu(%1,##%2)";
+    }
   }
-  [(set_attr "type" "X")]
+  [(set_attr "type" "X,EX")]
 )
 
 (define_insn "cmphi_eq"
-  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp,Rp")
-        (eq:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg")
-               (match_operand:HI 2 "nonmemory_operand"  "Is8,Rg")))]
+  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp,Rp,Rp")
+        (eq:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg,Rg")
+               (match_operand:HI 2 "nonmemory_operand"  "Is8, i,Rg")))]
   "TARGET_V4_FEATURES"
   "@
    %0 = cmph.eq(%1,#%2)
+   %0 = cmph.eq(%1,##%2)
    %0 = cmph.eq(%1,%2)"
-  [(set_attr "type" "X,X")]
+  [(set_attr "type" "X,EX,X")]
 )
 
 (define_insn "cmphi_gt"
-  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp,Rp")
-        (gt:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg")
-               (match_operand:HI 2 "nonmemory_operand"  "Is8,Rg")))]
+  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp,Rp,Rp")
+        (gt:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg,Rg")
+               (match_operand:HI 2 "nonmemory_operand"  "Is8, i,Rg")))]
   "TARGET_V4_FEATURES"
   "@
    %0 = cmph.gt(%1,#%2)
+   %0 = cmph.gt(%1,##%2)
    %0 = cmph.gt(%1,%2)"
-  [(set_attr "type" "X,X")]
+  [(set_attr "type" "X,EX,X")]
 )
 
 (define_insn "cmphi_ge"
-  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp")
-        (ge:BI (match_operand:HI 1 "gr_register_operand"  "Rg")
-               (match_operand:HI 2 "immediate_operand" "Ks8p1")))]
+  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp")
+        (ge:BI (match_operand:HI 1 "gr_register_operand"  "Rg,Rg")
+               (match_operand:HI 2 "immediate_operand" "Ks8p1, i")))]
   "TARGET_V4_FEATURES"
   {
     operands[2] = plus_constant(operands[2], -1);
-    return "%0 = cmph.gt(%1,#%2)";
+    if(which_alternative == 0){
+      return "%0 = cmph.gt(%1,#%2)";
+    }
+    else {
+      return "%0 = cmph.gt(%1,##%2)";
+    }
   }
-  [(set_attr "type" "X")]
+  [(set_attr "type" "X,EX")]
 )
 
 (define_insn "cmphi_gtu"
-  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp")
-        (gtu:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg")
-                (match_operand:HI 2 "nonmemory_operand"  "Iu7,Rg")))]
+  [(set (match_operand:BI 0 "pr_register_operand"        "=Rp,Rp,Rp")
+        (gtu:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg,Rg")
+                (match_operand:HI 2 "nonmemory_operand"  "Iu7, i,Rg")))]
   "TARGET_V4_FEATURES"
   "@
    %0 = cmph.gtu(%1,#%2)
+   %0 = cmph.gtu(%1,##%2)
    %0 = cmph.gtu(%1,%2)"
-  [(set_attr "type" "X,X")]
+  [(set_attr "type" "X,EX,X")]
 )
 
 (define_insn "cmphi_geu"
-  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp")
-        (geu:BI (match_operand:HI 1 "gr_register_operand"  "Rg")
-                (match_operand:HI 2 "immediate_operand" "Ks8p1")))]
+  [(set (match_operand:BI 0 "pr_register_operand"         "=Rp,Rp")
+        (geu:BI (match_operand:HI 1 "gr_register_operand"  "Rg,Rg")
+                (match_operand:HI 2 "immediate_operand" "Ks8p1, i")))]
   "TARGET_V4_FEATURES"
   {
     operands[2] = plus_constant(operands[2], -1);
-    return "%0 = cmph.gtu(%1,#%2)";
+    if(which_alternative == 0){
+      return "%0 = cmph.gtu(%1,#%2)";
+    }
+    else {
+      return "%0 = cmph.gtu(%1,##%2)";
+    }
   }
-  [(set_attr "type" "X")]
+  [(set_attr "type" "X,EX")]
 )
 
 
