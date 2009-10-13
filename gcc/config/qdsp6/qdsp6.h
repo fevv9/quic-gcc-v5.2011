@@ -860,8 +860,9 @@ Function Entry and Exit
 /* ??? maybe? */
 /*#define EXIT_IGNORE_STACK*/
 
-/* ??? maybe? */
-/*#define EH_USES(REGNO)*/
+/* The link regsiter is live across leaf functions that do not use
+   allocframe. */
+#define EH_USES(REGNO) ((REGNO) == LINK_REGNUM)
 
 
 /*---------------------------
