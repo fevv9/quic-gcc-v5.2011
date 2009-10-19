@@ -862,7 +862,10 @@ Function Entry and Exit
 
 /* The link regsiter is live across leaf functions that do not use
    allocframe. */
-#define EH_USES(REGNO) ((REGNO) == LINK_REGNUM)
+#define EPILOGUE_USES(REGNO) ((REGNO) == LINK_REGNUM)
+
+/* ??? maybe? */
+/*#define EH_USES(REGNO)*/
 
 
 /*---------------------------

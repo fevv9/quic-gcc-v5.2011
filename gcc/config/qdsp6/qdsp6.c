@@ -7964,21 +7964,23 @@ qdsp6_record_reads(rtx *y, void *info)
       for_each_rtx(&COND_EXEC_CODE (x), qdsp6_record_reads, insn_info);
       return -1;
     case SET:
-      if(GET_CODE (SET_SRC (x)) != CALL){
-        for_each_rtx(&SET_DEST (x), qdsp6_record_writes, insn_info);
+    case POST_MODIFY:
+      if(GET_CODE (XEXP (x, 1)) != CALL){
+        for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
       }
-      for_each_rtx(&SET_SRC (x), qdsp6_record_reads, insn_info);
+      for_each_rtx(&XEXP (x, 1), qdsp6_record_reads, insn_info);
       return -1;
     case CALL:
       gcc_assert(MEM_P (XEXP (x, 0)));
       for_each_rtx(&XEXP (XEXP (x, 0), 0), qdsp6_record_reads, insn_info);
       return -1;
     case CLOBBER:
-    case POST_DEC:
-    case POST_INC:
-    case POST_MODIFY:
       for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
       return -1;
+    case POST_DEC:
+    case POST_INC:
+      for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
+      return 0;
     case MEM:
       mem_access = ggc_alloc_cleared(sizeof(struct qdsp6_mem_access));
       mem_access->mem = x;

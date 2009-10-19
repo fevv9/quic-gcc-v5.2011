@@ -94,8 +94,8 @@
 (define_attr "length" ""
              (if_then_else (eq_attr "type"
                                     "EA,EX,ELoad,EStore,EMemop,EM,ES,EJ,EJR,ECR")
-                           (const_int 8)
-                           (const_int 4)))
+                           (const_string "8")
+                           (const_string "4")))
 
 
 ;; Predicable means that the insn can be conditionally executed based on
@@ -3614,13 +3614,13 @@
 
   }
   [(set (attr "type")
-        (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 15000))
+        (if_then_else (eq_attr "length" "4")
                       (const_string "CR")
                       (const_string "multiple")))
    (set (attr "length")
         (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 15000))
-                      (const_int 4)
-                      (const_int 8)))]
+                      (const_string "4")
+                      (const_string "8")))]
 )
 
 (define_insn "cond_jump"
@@ -3663,13 +3663,13 @@
     }
   }
   [(set (attr "type")
-        (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 50000))
+        (if_then_else (eq_attr "length" "4")
                       (const_string "J")
                       (const_string "multiple")))
    (set (attr "length")
         (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 50000))
-                      (const_int 4)
-                      (const_int 8)))]
+                      (const_string "4")
+                      (const_string "8")))]
 )
 
 
@@ -4287,7 +4287,8 @@
   {
     operands[3] = gen_rtx_REG (SImode, LC0_REGNUM);
   }
-  [(set_attr "type" "endloop0")]
+  [(set_attr "type" "endloop0")
+   (set_attr "length" "8")]
 )
 
 (define_insn "endloop0"
@@ -4303,7 +4304,8 @@
               UNSPEC_DOLOOP_END)]
   ""
   "{ nop }:endloop0 // start=%l0"
-  [(set_attr "type" "endloop0")]
+  [(set_attr "type" "endloop0")
+   (set_attr "length" "8")]
 )
 
 (define_insn_and_split "doloop_end1"
@@ -4336,7 +4338,8 @@
   {
     operands[3] = gen_rtx_REG (SImode, LC1_REGNUM);
   }
-  [(set_attr "type" "endloop1")]
+  [(set_attr "type" "endloop1")
+   (set_attr "length" "12")]
 )
 
 (define_insn "endloop1"
@@ -4352,7 +4355,8 @@
               UNSPEC_DOLOOP_END)]
   ""
   "{ nop }:endloop1 // start=%l0"
-  [(set_attr "type" "endloop1")]
+  [(set_attr "type" "endloop1")
+   (set_attr "length" "12")]
 )
 
 
@@ -4425,13 +4429,13 @@
     }
   }
   [(set (attr "type")
-        (if_then_else (le (abs (minus (match_dup 1) (pc))) (const_int 200))
+        (if_then_else (eq_attr "length" "4")
                       (const_string "loop")
                       (const_string "multiple")))
    (set (attr "length")
         (if_then_else (le (abs (minus (match_dup 1) (pc))) (const_int 200))
-                      (const_int 4)
-                      (const_int 20)))]
+                      (const_string "4")
+                      (const_string "20")))]
 )
 
 (define_insn "doloop_begin1"
@@ -4479,13 +4483,13 @@
     }
   }
   [(set (attr "type")
-        (if_then_else (le (abs (minus (match_dup 1) (pc))) (const_int 200))
+        (if_then_else (eq_attr "length" "4")
                       (const_string "loop")
                       (const_string "multiple")))
    (set (attr "length")
         (if_then_else (le (abs (minus (match_dup 1) (pc))) (const_int 200))
-                      (const_int 4)
-                      (const_int 20)))]
+                      (const_string "4")
+                      (const_string "20")))]
 )
 
 
