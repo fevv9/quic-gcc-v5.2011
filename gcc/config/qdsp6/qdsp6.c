@@ -9477,6 +9477,7 @@ qdsp6_packet_optimizations(void)
   unsigned int cost_with,cost_without; 
 
   let_cmp_jump_pack_together      = true;
+  shorten_branches(get_insns());
   qdsp6_init_packing_info();
   qdsp6_pack_insns();
   qdsp6_pull_up_insns();
