@@ -6591,7 +6591,7 @@ vectorizable_load (gimple stmt, gimple_stmt_iterator *gsi, gimple *vec_stmt,
       if (alignment_support_scheme == dr_explicit_realign_optimized)
 	{
 	  phi = SSA_NAME_DEF_STMT (msq);
-	  offset = size_int (TYPE_VECTOR_SUBPARTS (vectype) - 1);
+ 	  offset = size_int (TYPE_VECTOR_SUBPARTS (vectype)); /* Fix _LSY_ - 1); */ 
 	}
     }
   else
