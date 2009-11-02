@@ -283,6 +283,12 @@ Storage Layout
       (MODE) = SImode; \
   }
 
+/* Prevent certsin combinations of modes and reg
+   classes from being changed. Good example
+   changing QI to SI as a subreg in Predicate reg */
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS) \
+  qdsp6_cannot_change_mode_class (FROM, TO, CLASS)
+
 /* As specified by the ABI, all arguments passed on the stack are at least word
    aligned. */
 #define PARM_BOUNDARY 32
@@ -299,6 +305,11 @@ Storage Layout
 
 /* No native data types have more than 8-byte alignment by default. */
 #define BIGGEST_ALIGNMENT 64
+
+/* This is only used for internal sorting during packetization
+   and eventually need to be replaced with a linked list or any
+   other scalable method of bookkeeping */ 
+#define MAX_NUM_EDGES_IN_BB	1024
 
 /* QDSP6 has byte-sized stores. */
 
