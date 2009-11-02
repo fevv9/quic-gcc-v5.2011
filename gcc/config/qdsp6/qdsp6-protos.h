@@ -32,6 +32,7 @@ extern void qdsp6_hardware_loop (void);
 
 extern int  qdsp6_GP_or_reg_operand_c (rtx , enum machine_mode); 
 extern int  qdsp6_nonimmediate_operand_with_GP_c (rtx , enum machine_mode); 
+extern int  qdsp6_instructions_dependent (rtx ,rtx ); 
 #ifdef TREE_CODE
 extern int  qdsp6_data_alignment(tree, int);
 extern int  qdsp6_local_alignment(tree, int);
