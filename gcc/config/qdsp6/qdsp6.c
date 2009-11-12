@@ -962,11 +962,15 @@ Basic Stack Layout
    the address of the stack frame COUNT frames above the current one. */
 
 rtx
-qdsp6_return_addr_rtx(int count ATTRIBUTE_UNUSED, rtx frame)
+qdsp6_return_addr_rtx(int count, rtx frame)
 {
   rtx return_addr;
 
   cfun->machine->calls_builtin_return_address = true;
+
+  if(count == 0) {
+    frame = gen_rtx_REG(Pmode, HARD_FRAME_POINTER_REGNUM);
+  }
 
   return_addr = memory_address(Pmode,
                                plus_constant(frame, GET_MODE_SIZE (Pmode)));

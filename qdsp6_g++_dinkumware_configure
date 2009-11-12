@@ -17,6 +17,9 @@ else
   fi
 fi
 
+#export CFLAGS="-O0 -g"
+#export CXXFLAGS="-O0 -g"
+
 bash `dirname $0`/configure \
   --prefix=${PREFIX}/gnu \
   --target=qdsp6 \
