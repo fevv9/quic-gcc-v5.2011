@@ -1771,12 +1771,7 @@ qdsp6_return_in_memory(const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
     byte_size = int_size_in_bytes(type);
   }
 
-  if(byte_size < 0 || 2 * UNITS_PER_WORD < byte_size){
-    return true;
-  }
-  else {
-    return false;
-  }
+  return !IN_RANGE (byte_size, 0, 2 * UNITS_PER_WORD);
 }
 
 
