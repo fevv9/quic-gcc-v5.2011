@@ -7171,6 +7171,7 @@ qdsp6_wandered_too_far_p(rtx insn)
     case CODE_FOR_cond_jump:
     case CODE_FOR_loop0:
     case CODE_FOR_loop1:
+  case CODE_FOR_gpr_cond_jump:
       if(get_attr_length(insn) > 4){
         return true;
       }
