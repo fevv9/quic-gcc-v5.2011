@@ -1409,13 +1409,15 @@ static int second_gimple_array_elements;
 static int visited_gimple_array_elements;
 
 static inline t_bool
-have_this_node_been_visited(gimple root_phi){
+have_this_node_been_visited(gimple root_phi)
+{
    int j; 
 
-   for(j=0;j<visited_gimple_array_elements;j++){
+   for(j=0;j<visited_gimple_array_elements;j++)
+    {
         if(root_phi == visited_gimple_array[j])
             return t_true; 
-   }
+    }
    return t_false; 
 }
 
@@ -1432,21 +1434,23 @@ two_phi_arguments_are_identical(gimple first_phi, gimple second_phi)
 	return t_false; 
    for (i = 0; i < gimple_phi_num_args (first_phi); i++)
      {
-		if(gimple_phi_arg_def (first_phi, i) != 
+	if(gimple_phi_arg_def (first_phi, i) != 
            gimple_phi_arg_def (second_phi, i))   
-			return t_false; 
+	    return t_false; 
      }
    return t_true;
 }
 
 
-/* Will attempt to descend a chain of PHI nodes to the depth MAX_GIMPLE_LIST_DEPTH
-    and will return a list of nodes. This is a recursivelly called function
+/* Will attempt to descend a chain of PHI nodes to the 
+   depth MAX_GIMPLE_LIST_DEPTH
+   and will return a list of nodes. This is a recursivelly called function
    root-phi - the current phi, to which we traverse parameters
    gimple_array - useful entries
    count - total number of usefull entries
    level - controlls recursion and prevents run-aways.
-   The algorithmical purpose - convert tree form into list form for easier matching.
+   The algorithmical purpose - convert tree form into list form for 
+   easier matching.
    gimple_array will only hold relevant PHI nodes */ 
 static gimple
 descend_phi_chain (gimple root_phi, gimple gimple_array[], 
@@ -1465,41 +1469,45 @@ descend_phi_chain (gimple root_phi, gimple gimple_array[],
   /* Mark visited node to prevent duplication  */ 
   visited_gimple_array[visited_gimple_array_elements++] = root_phi; 
 
-  for (i = 0; i < gimple_phi_num_args (root_phi); i++){
+  for (i = 0; i < gimple_phi_num_args (root_phi); i++)
+   {
     if(gimple_phi_arg_def (root_phi, i) 
       && (TREE_CODE(gimple_phi_arg_def (root_phi, i)) == SSA_NAME)
       && !have_this_node_been_visited(
-            SSA_NAME_DEF_STMT(gimple_phi_arg_def (root_phi, i)))){
+            SSA_NAME_DEF_STMT(gimple_phi_arg_def (root_phi, i))))
+     {
         /* Recursive call that actually descends the chain */ 
         low_ssa =  descend_phi_chain(
                 SSA_NAME_DEF_STMT(gimple_phi_arg_def (root_phi, i)),
                 gimple_array,counter,level+1); 
         /* Record gimple node if it is
-                            an assign and we have not reached 
-                            max number of entries.
-                    */
+           an assign and we have not reached 
+           max number of entries.
+        */
         if( low_ssa && 
             is_gimple_assign(low_ssa) && 
-            *counter<MAX_GIMPLE_LIST_DEPTH){
+            *counter<MAX_GIMPLE_LIST_DEPTH)
+         {
             /* Make sure that this is a unique entry */
-            for(j=0;j<*counter;j++){
+            for(j=0;j<*counter;j++)
+              {
                 if(gimple_array[j] == low_ssa)  
                     continue; 
-            }
+              }
             gimple_array[*counter] = low_ssa; 
             *counter += 1; 
-        }
-    }	 
-  }
+         }
+      }	 
+   }
   return low_ssa; 
 }
 
 
-/* This function attempts to prove equivalency between two PHI nodes 
+/* This function attempts to prove equivalency between two PHI nodes
    It looks for a special case:
-        def             : i_14    = PHI <i_20(5), 0(3)>
+        def        : i_14  = PHI <i_20(5), 0(3)>
         halting_phi: i.0_9 = PHI <i.0_3(5), 0(3)>
-        i.0_3                      = (unsigned int) i_20
+        i.0_3              = (unsigned int) i_20
 */ 
 static t_bool
 analyze_possible_phi_aliasing (struct loop *loop,
@@ -1514,8 +1522,8 @@ analyze_possible_phi_aliasing (struct loop *loop,
         return t_false; 
 
     /* Flush out the simple case.
-                If all sources of the phi are the same... Order sensitive. 
-               All members are sorted, so this should cover all matches */ 
+       If all sources of the phi are the same... Order sensitive. 
+       All members are sorted, so this should cover all matches */ 
     if(two_phi_arguments_are_identical(first_phi,second_phi))	
         return t_true; 
     
@@ -1525,10 +1533,10 @@ analyze_possible_phi_aliasing (struct loop *loop,
     visited_gimple_array_elements = 0; 
   
     /* Now descend the chain of interdependent PHI nodes. 
-               Most of the time, the depth is only 2, 
-              but there are some rare cases when it is more. 
-             If we exceed MAX_GIMPLE_LIST_DEPTH  
-             simply stop searching */
+       Most of the time, the depth is only 2, 
+       but there are some rare cases when it is more. 
+       If we exceed MAX_GIMPLE_LIST_DEPTH  
+       simply stop searching */
     descend_phi_chain(first_phi,first_gimple_array,
                      &first_gimple_array_elements,0); 
     /* Have to reset the visited list */ 
@@ -1538,39 +1546,41 @@ analyze_possible_phi_aliasing (struct loop *loop,
                      &second_gimple_array_elements,0);
 
     /* Now, go through the obtained list, and see 
-            if all PHI nodes in it meet our "transparency"
-            condition. The condition is: intermediate PHI 
-            is simple assign or at the most sign cast.
-            If chains have different depth, 
-            do not even bother to look */
+       if all PHI nodes in it meet our "transparency"
+       condition. The condition is: intermediate PHI 
+       is simple assign or at the most sign cast.
+       If chains have different depth, 
+       do not even bother to look */
 	if(!first_gimple_array_elements || 
        (first_gimple_array_elements != 
         second_gimple_array_elements))
         return t_false;
 
     for(i=0;i<first_gimple_array_elements;i++)
-    {
-     /* For the definition of NOP_EXPR see comments in c-convert.c: 
-                  "Change of width--truncation and extension of integers or reals--
-                 is represented with NOP_EXPR.  Proper functioning of many things
-                 assumes that no other conversions can be NOP_EXPRs.
+     {
+/* For the definition of NOP_EXPR see comments in c-convert.c: 
+   "Change of width--truncation and extension of integers 
+   or reals--
+   is represented with NOP_EXPR.  Proper functioning of 
+   many things
+   assumes that no other conversions can be NOP_EXPRs.
 
-                Conversion between integer and pointer is represented with CONVERT_EXPR.
-                Converting integer to real uses FLOAT_EXPR
-                and real to integer uses FIX_TRUNC_EXPR.
+   Conversion between integer and pointer is represented with 
+   CONVERT_EXPR.
+   Converting integer to real uses FLOAT_EXPR
+   and real to integer uses FIX_TRUNC_EXPR.
 
-               Here is a list of all the functions that assume that widening and
-               narrowing is always done with a NOP_EXPR:
-                 In convert.c, convert_to_integer.
-                 In c-typeck.c, build_binary_op (boolean ops), and
-                    c_common_truthvalue_conversion.
-                 In expr.c: expand_expr, for operands of a MULT_EXPR.
-                 In fold-const.c: fold.
-                 In tree.c: get_narrower and get_unwidened."
-
-                    In our case this widening is the  false cause of failure 
-                    for induction variable detection, so we want to ignore it.
-              */ 
+   Here is a list of all the functions that assume that widening and
+   narrowing is always done with a NOP_EXPR:
+   In convert.c, convert_to_integer.
+   In c-typeck.c, build_binary_op (boolean ops), and
+   c_common_truthvalue_conversion.
+   In expr.c: expand_expr, for operands of a MULT_EXPR.
+   In fold-const.c: fold.
+   In tree.c: get_narrower and get_unwidened."
+   In our case this widening is the  false cause of failure 
+   for induction variable detection, so we want to ignore it.
+*/ 
      if(!((((gimple_assign_rhs_code (first_gimple_array[i])) 
                 == NOP_EXPR) &&
          (gimple_assign_lhs(second_gimple_array[i]) == 
@@ -1581,7 +1591,7 @@ analyze_possible_phi_aliasing (struct loop *loop,
           gimple_assign_rhs1(second_gimple_array[i])))))
         return t_false;
      
-    }
+     }
     return t_true; 
 }
 
@@ -1608,18 +1618,18 @@ follow_ssa_edge (struct loop *loop, gimple def, gimple halting_phi,
     {
     case GIMPLE_PHI:
     /* _LSY_ Currently during SSA edge analysis when we got here, 
-            a PHI node  will prevent further descend and ultimatly miss whole 
-            analysis. This happens often with sign cast scenario in the loop. 
-            For example when we have:
-            for( signed int i=0; i<(unsigned int) exit; i++){}
-           This loop will miss 'i' as induction variable. 
-           But, if we can establish here relationship between 
-	def and halting_phi to be (def = halting_phi;) this will work */ 
+    a PHI node  will prevent further descend and ultimatly miss whole 
+    analysis. This happens often with sign cast scenario in the loop. 
+    For example when we have:
+    for( signed int i=0; i<(unsigned int) exit; i++){}
+    This loop will miss 'i' as induction variable. 
+    But, if we can establish here relationship between 
+    def and halting_phi to be (def = halting_phi;) this will work */ 
       if (!loop_phi_node_p (def))
-	/* DEF is a condition-phi-node.  Follow the branches, and
-	   record their evolutions.  Finally, merge the collected
-	   information and set the approximation to the main
-	   variable.  */
+      /* DEF is a condition-phi-node.  Follow the branches, and
+	 record their evolutions.  Finally, merge the collected
+	 information and set the approximation to the main
+	 variable.  */
 	return follow_ssa_edge_in_condition_phi 
 	  (loop, def, halting_phi, evolution_of_loop, limit);
 
