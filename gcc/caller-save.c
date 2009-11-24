@@ -928,14 +928,11 @@ add_stored_regs (rtx reg, const_rtx setter, void *data)
       if (GET_CODE (mem_operand) == POST_INC || 
 	  GET_CODE (mem_operand) == PRE_INC ||
 	  GET_CODE (mem_operand) == POST_DEC ||
-	  GET_CODE (mem_operand) == PRE_DEC)
+	  GET_CODE (mem_operand) == PRE_DEC || 
+	  GET_CODE (mem_operand) == POST_MODIFY ||
+	  GET_CODE (mem_operand) == PRE_MODIFY)
 	{
-	  reg = XEXP (mem_operand, 0);
-	}
-      else if (GET_CODE (mem_operand) == POST_MODIFY ||
-	       GET_CODE (mem_operand) == PRE_MODIFY)
-	{
-	  reg = XEXP (mem_operand, 1);
+	  return add_stored_regs(XEXP (mem_operand, 0), setter, data);
 	}
     }
 #endif /* AUTO_INC_DEC */
