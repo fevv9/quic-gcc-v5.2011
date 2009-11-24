@@ -1760,16 +1760,17 @@
 )
 
 (define_insn "ashlsi3_real"
-  [(set (match_operand:SI 0 "gr_register_operand"           "=Rg,  Rg, Rg,Rg")
-        (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg,  Rg, Rg,Rg")
-                   (match_operand:SI 2 "nonmemory_operand"  "K16,Iu01,Iu5,Rg")))]
+  [(set (match_operand:SI 0 "gr_register_operand"           "=Rg,  Rg, Rg, Rg,Rg")
+        (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg,  Rg, Rg, Rg,Rg")
+                   (match_operand:SI 2 "nonmemory_operand"  "K16,Iu00,Iu01,Iu5,Rg")))]
   ""
   "@
    %0 = aslh(%1)
+   %0 = %1
    %0 = add(%1,%1)
    %0 = asl(%1,#%2)
    %0 = asl(%1,%2)"
-  [(set_attr "type" "A,A,S,S")]
+  [(set_attr "type" "A,A,A,S,S")]
 )
 
 
