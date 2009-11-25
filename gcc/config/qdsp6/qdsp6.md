@@ -441,12 +441,12 @@
     rtx reg; 
     if(TARGET_SECTION_SORTING_CODE_SUPPORT && TARGET_SECTION_SORTING && can_create_pseudo_p ()){ 
         if(GET_CODE (operands[0]) == MEM && sdata_symbolic_operand(XEXP (operands[0], 0), Pmode)){
-		   reg = gen_reg_rtx(SImode);
+		   reg = gen_reg_rtx(Pmode);
            emit_move_insn(reg, XEXP (operands[0], 0));
 	       operands[0] = change_address(operands[0],QImode,reg); 
        }
        else if(GET_CODE (operands[1]) == MEM && sdata_symbolic_operand(XEXP (operands[1], 0), Pmode)){
-            reg = gen_reg_rtx(SImode);
+            reg = gen_reg_rtx(Pmode);
             emit_move_insn(reg, XEXP (operands[1], 0));
             operands[1] = change_address(operands[1],QImode,reg);
        } 
@@ -476,8 +476,8 @@
 (define_insn "movqi_real"
   [(set (match_operand:QI 0 "qdsp6_nonimmediate_operand_with_GP" "=Rg,Rg, m,  Rg,?Rg,?*Rp")
         (match_operand:QI 1 "qdsp6_GP_or_reg_operand"             "Rg, m,Rg,Is16,*Rp,  Rg"))]
-  "!(memory_operand(operands[0], QImode)
-     && immediate_operand(operands[1], QImode))"
+  "(!memory_operand(operands[0], QImode)
+       || gr_register_operand(operands[1], QImode))"
   "@
    %0 = %1
    %0 = memb(%1) // movqi_real
@@ -516,12 +516,12 @@
     rtx reg;
     if(TARGET_SECTION_SORTING_CODE_SUPPORT && TARGET_SECTION_SORTING && can_create_pseudo_p ()){ 
        if(GET_CODE (operands[0]) == MEM && sdata_symbolic_operand(XEXP (operands[0], 0), Pmode)){
-                reg = gen_reg_rtx(SImode);
+                reg = gen_reg_rtx(Pmode);
                 emit_move_insn(reg, XEXP (operands[0], 0));
                 operands[0] = change_address(operands[0],HImode,reg);
        }
        else if(GET_CODE (operands[1]) == MEM && sdata_symbolic_operand(XEXP (operands[1], 0), Pmode)){
-                reg = gen_reg_rtx(SImode);
+                reg = gen_reg_rtx(Pmode);
                 emit_move_insn(reg, XEXP (operands[1], 0));
                 operands[1] = change_address(operands[1],HImode,reg);
        } 
@@ -535,8 +535,8 @@
 (define_insn "movhi_real"
   [(set (match_operand:HI 0 "qdsp6_nonimmediate_operand_with_GP" "=Rg,Rg, m,  Rg")
         (match_operand:HI 1 "qdsp6_GP_or_reg_operand"       "Rg, m,Rg,Is16"))]
-  "!(memory_operand(operands[0], HImode)
-     && immediate_operand(operands[1], HImode))"
+  "(!memory_operand(operands[0], HImode)
+       || gr_register_operand(operands[1], HImode))"
   "@
    %0 = %1
    %0 = memh(%1)
@@ -573,12 +573,12 @@
     rtx reg;
     if(TARGET_SECTION_SORTING_CODE_SUPPORT && TARGET_SECTION_SORTING && can_create_pseudo_p ()){ 
        if(GET_CODE (operands[0]) == MEM && sdata_symbolic_operand(XEXP (operands[0], 0), Pmode)){
-                reg = gen_reg_rtx(SImode);
+                reg = gen_reg_rtx(Pmode);
                 emit_move_insn(reg, XEXP (operands[0], 0));
                 operands[0] = change_address(operands[0],SImode,reg);
        }
        else if(GET_CODE (operands[1]) == MEM && sdata_symbolic_operand(XEXP (operands[1], 0), Pmode)){
-		reg = gen_reg_rtx(SImode);
+		reg = gen_reg_rtx(Pmode);
                 emit_move_insn(reg, XEXP (operands[1], 0));
                 operands[1] = change_address(operands[1],SImode,reg);
        }  
@@ -609,8 +609,8 @@
 (define_insn "movsi_real"
   [(set (match_operand:SI 0 "qdsp6_nonimmediate_operand_with_GP" "=Rg,Rg, m,  Rg,?Rg,Rg,Rc")
         (match_operand:SI 1 "qdsp6_GP_or_reg_operand"       "Rg, m,Rg,Is16,  i,Rc,Rg"))]
-  "!(memory_operand(operands[0], SImode)
-     && immediate_operand(operands[1], SImode))"
+  "(!memory_operand(operands[0], SImode)
+       || gr_register_operand(operands[1], SImode))"
   {
     switch(which_alternative){
       case 0:
@@ -822,6 +822,19 @@
   }
 )
 
+(define_insn "cond_movdi"
+  [(cond_exec
+     (match_operator:BI 2 "predicate_operator"
+       [(match_operand:BI 3 "pr_register_operand"        "RpRnp")
+        (const_int 0)])
+     (set (match_operand:DI 0 "conditional_dest_operand" "=Rg")
+          (match_operand:DI 1 "conditional_src_operand"   "Rg")))]
+  "!memory_operand(operands[0], DImode)
+   || gr_register_operand(operands[1], DImode)"
+  "if (%C2) %P0 = %P1"
+  [(set_attr "type" "A")]
+)
+
 ;;-------;;
 ;; movsf ;;
 ;;-------;;
@@ -834,12 +847,12 @@
     rtx reg;
     if(TARGET_SECTION_SORTING_CODE_SUPPORT && TARGET_SECTION_SORTING && can_create_pseudo_p ()){
        if(GET_CODE (operands[0]) == MEM && sdata_symbolic_operand(XEXP (operands[0], 0), Pmode)){
-                reg = gen_reg_rtx(SImode);
+                reg = gen_reg_rtx(Pmode);
                 emit_move_insn(reg, XEXP (operands[0], 0));
                 operands[0] = change_address(operands[0],SFmode,reg);
        }
        else if(GET_CODE (operands[1]) == MEM && sdata_symbolic_operand(XEXP (operands[1], 0), Pmode)){
-                reg = gen_reg_rtx(SImode);
+                reg = gen_reg_rtx(Pmode);
                 emit_move_insn(reg, XEXP (operands[1], 0));
                 operands[1] = change_address(operands[1],SFmode,reg);
        } 
@@ -851,9 +864,10 @@
 )
 
 (define_insn "movsf_real"
-  [(set (match_operand:SF 0 "qdsp6_nonimmediate_operand_with_GP" "=Rg,Rg, m,Rg,Rg")
+  [(set (match_operand:SF 0 "qdsp6_nonimmediate_operand_with_GP" "=Rg,Rg, m,Rg,?Rg")
         (match_operand:SF 1 "qdsp6_GP_or_reg_operand"       "Rg, m,Rg, G, i"))]
-  ""
+  "(!memory_operand(operands[0], SFmode)
+       || gr_register_operand(operands[1], SFmode))"
   {
     switch(which_alternative){
       case 0:
@@ -875,7 +889,7 @@
         gcc_unreachable();
     }
   }
-  [(set_attr "type" "A,Load,Store,A,multiple")]
+  [(set_attr "type" "A,Load,Store,A,Load")]
 )
 
 ;; After reload, replace floating immediate moves with integer immediate moves.
@@ -896,6 +910,19 @@
     ORIGINAL_REGNO (operands[2]) = ORIGINAL_REGNO (operands[0]);
     operands[3] = gen_int_mode(l, SImode);
   }
+)
+
+(define_insn "cond_movsf"
+  [(cond_exec
+     (match_operator:BI 2 "predicate_operator"
+       [(match_operand:BI 3 "pr_register_operand"        "RpRnp")
+        (const_int 0)])
+     (set (match_operand:SF 0 "conditional_dest_operand" "=Rg")
+          (match_operand:SF 1 "conditional_src_operand"   "Rg")))]
+  "!memory_operand(operands[0], SFmode)
+   || gr_register_operand(operands[1], SFmode)"
+  "if (%C2) %0 = %1"
+  [(set_attr "type" "A")]
 )
 
 ;;-------;;
@@ -1099,9 +1126,9 @@
 
 
 (define_insn "adddisi_v3"
-  [(set (match_operand:DI 0 "gr_register_operand"         "")
-        (plus:DI (match_operand:SI 1 "gr_register_operand" "")
-                  (match_operand:DI 2 "gr_register_operand" "")))]
+  [(set (match_operand:DI 0 "gr_register_operand"         "=Rg")
+        (plus:DI (match_operand:SI 1 "gr_register_operand" "Rg")
+                  (match_operand:DI 2 "gr_register_operand" "Rg")))]
   "TARGET_V3_FEATURES"
   "%0 = add(%1,%2)"
   [(set_attr "type" "X")]
@@ -1172,7 +1199,7 @@
 (define_insn "mulsi3_v2"
   [(set (match_operand:SI 0 "gr_register_operand"           "=Rg,Rg")
         (mult:SI (match_operand:SI 1 "gr_register_operand"   "Rg,Rg")
-                 (match_operand:SI 2 "m9_const_int_operand" "Im9,Rg")))]
+                 (match_operand:SI 2 "gr_or_m9_operand" "Im9,Rg")))]
   "TARGET_V2_FEATURES"
   "@
    %0 = mpyi(%1,#%2)
@@ -1719,17 +1746,34 @@
 ;; ashl{m}3 ;;
 ;;----------;;
 
-(define_insn "ashlsi3"
-  [(set (match_operand:SI 0 "gr_register_operand"           "=Rg, Rg, Rg")
-        (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg, Rg")
-                   (match_operand:SI 2 "nonmemory_operand"   "Rg,K16,Iu5")))]
+(define_expand "ashlsi3"
+  [(set (match_operand:SI 0 "gr_register_operand" "")
+        (ashift:SI (match_operand:SI 1 "nonmemory_operand" "")
+                   (match_operand:SI 2 "nonmemory_operand" "")))]
+  ""
+  {
+    if(!reload_completed
+       && !gr_register_operand(operands[1], SImode)){
+      operands[1] = force_reg(SImode, operands[1]);
+    }
+  }
+)
+
+(define_insn "ashlsi3_real"
+  [(set (match_operand:SI 0 "gr_register_operand"           "=Rg,  Rg, Rg, Rg,Rg")
+        (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg,  Rg, Rg, Rg,Rg")
+                   (match_operand:SI 2 "nonmemory_operand"  "K16,Iu00,Iu01,Iu5,Rg")))]
   ""
   "@
-   %0 = asl(%1,%2)
    %0 = aslh(%1)
-   %0 = asl(%1,#%2)"
-  [(set_attr "type" "S,A,S")]
+   %0 = %1
+   %0 = add(%1,%1)
+   %0 = asl(%1,#%2)
+   %0 = asl(%1,%2)"
+  [(set_attr "type" "A,A,A,S,S")]
 )
+
+
 
 (define_insn "ashldi3"
   [(set (match_operand:DI 0 "gr_register_operand"           "=Rg, Rg")
@@ -2418,7 +2462,7 @@
 ;; char -> int
 (define_insn "extendqisi2"
   [(set (match_operand:SI 0 "gr_register_operand"                 "=Rg,Rg")
-        (sign_extend:SI (match_operand:QI 1 "nonimmediate_operand" "Rg, m")))]
+        (sign_extend:SI (match_operand:QI 1 "qdsp6_nonimmediate_operand_with_GP" "Rg, m")))]
   ""
   "@
    %0 = sxtb(%1)
@@ -2443,7 +2487,7 @@
 ;; short -> int
 (define_insn "extendhisi2"
   [(set (match_operand:SI 0 "gr_register_operand"                 "=Rg,Rg")
-        (sign_extend:SI (match_operand:HI 1 "nonimmediate_operand" "Rg, m")))]
+        (sign_extend:SI (match_operand:HI 1 "qdsp6_nonimmediate_operand_with_GP" "Rg, m")))]
   ""
   "@
    %0 = sxth(%1)
@@ -2599,10 +2643,10 @@
 
 
 (define_expand "movsicc"
-  [(set (match_operand:SI 0 "gr_register_operand"                 "=Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"                 "")
         (if_then_else:SI (match_operand 1 "comparison_operator" "")
-                         (match_operand:SI 2 "nonmemory_operand" "Rg")
-                         (match_operand:SI 3 "nonmemory_operand" "Rg")))]
+                         (match_operand:SI 2 "nonmemory_operand" "")
+                         (match_operand:SI 3 "nonmemory_operand" "")))]
   ""
   {
     rtx reg;
@@ -2632,7 +2676,7 @@
    %0 = mux(%1,%2,#%3)
    %0 = mux(%1,#%2,%3)
    %0 = mux(%1,#%2,#%3)"
-  [(set_attr "type" "A")]
+  [(set_attr "type" "A,A,A,A")]
 )
 
 (define_insn "muxfimmsi"
@@ -2649,33 +2693,41 @@
    %0 = mux(%1,%3,#%2)
    %0 = mux(%1,#%3,%2)
    %0 = mux(%1,#%3,#%2)"
-  [(set_attr "type" "A")]
+  [(set_attr "type" "A,A,A,A")]
 )
 
 (define_insn "muxtsi"
-  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg, Rg, Rg, Rg")
         (if_then_else:SI
           (ne:BI
-            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (match_operand:BI 1 "pr_register_operand" "Rp, Rp, Rp, Rp")
             (const_int 0))
-          (match_operand:SI 2 "nonmemory_operand"     "Rg")
-          (match_operand:SI 3 "nonmemory_operand"     "Rg")))]
+          (match_operand:SI 2 "nonmemory_operand"     "Rg, Rg,Is8,Is8")
+          (match_operand:SI 3 "nonmemory_operand"     "Rg,Is8, Rg,Is8")))]
   ""
-  "%0 = mux(%1,%2,%3)"
-  [(set_attr "type" "A")]
+  "@
+  %0 = mux(%1,%2,%3)
+  %0 = mux(%1,%2,#%3)
+  %0 = mux(%1,#%2,%3)
+  %0 = mux(%1,#%2,#%3)"
+  [(set_attr "type" "A,A,A,A")]
 )
 
 (define_insn "muxfsi"
-  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg, Rg, Rg, Rg")
         (if_then_else:SI
           (eq:BI
-            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (match_operand:BI 1 "pr_register_operand" "Rp, Rp, Rp, Rp")
             (const_int 0))
-          (match_operand:SI 2 "nonmemory_operand"     "Rg")
-          (match_operand:SI 3 "nonmemory_operand"     "Rg")))]
+          (match_operand:SI 2 "nonmemory_operand"     "Rg,Is8, Rg,Is8")
+          (match_operand:SI 3 "nonmemory_operand"     "Rg, Rg,Is8,Is8")))]
   ""
-  "%0 = mux(%1,%3,%2)"
-  [(set_attr "type" "A")]
+  "@
+  %0 = mux(%1,%3,%2)
+  %0 = mux(%1,%3,#%2)
+  %0 = mux(%1,#%3,%2)
+  %0 = mux(%1,#%3,#%2)"
+  [(set_attr "type" "A,A,A,A")]
 )
 
 
@@ -4837,7 +4889,7 @@
    %0 += add(%2,%3)
    %0 += add(%1,#%3)
    %0 += add(%2,#%3)"
-  [(set_attr "type" "M")]
+  [(set_attr "type" "X,X,X,X,X")]
 )
 
 
@@ -4849,10 +4901,10 @@
         (plus:SI
           (minus:SI (match_operand:SI 1 "gr_register_operand" "Rg")
                     (match_operand:SI 2 "gr_register_operand" "Rg"))
-          (match_operand:SI 3 "gr_register_operand"            "0")))]
+          (match_operand:SI 3 "nonmemory_operand"            "0")))]
   "TARGET_V2_FEATURES"
   "%0 += sub(%1,%2)"
-  [(set_attr "type" "M")]
+  [(set_attr "type" "X")]
 )
 
 ;; A = (A+B)-C
@@ -4865,7 +4917,7 @@
           (match_operand:SI 3 "gr_register_operand"          "Rg")))]
   "TARGET_V2_FEATURES"
   "%0 += sub(%2,%3)"
-  [(set_attr "type" "M")]
+  [(set_attr "type" "X")]
 )
 
 ;; A = A-(B-C)
@@ -4878,7 +4930,7 @@
                     (match_operand:SI 3 "gr_register_operand" "Rg"))))]
   "TARGET_V2_FEATURES"
   "%0 += sub(%3,%2)"
-  [(set_attr "type" "M")]
+  [(set_attr "type" "X")]
 )
 
 
@@ -4894,7 +4946,7 @@
   "@
    %0 -= add(%2,%3)
    %0 -= add(%2,#%3)"
-  [(set_attr "type" "M")]
+  [(set_attr "type" "X")]
 )
 
 ;; A = (A-B)-C
@@ -4909,7 +4961,7 @@
   "@
    %0 -= add(%2,%3)
    %0 -= add(%2,#%3)"
-  [(set_attr "type" "M")]
+  [(set_attr "type" "X")]
 )
 
 
@@ -5116,7 +5168,7 @@
         (plus:SI
           (mult:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg, Rg")
                    (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu8,In8"))
-          (match_operand:SI 3 "gr_register_operand"           "0,  0,  0")))]
+          (match_operand:SI 3 "nonmemory_operand"           "0,  0,  0")))]
   "TARGET_V2_FEATURES"
   "@
    %0 += mpyi(%1,%2)
@@ -5628,12 +5680,12 @@
 (define_insn "ashlsi3_acc"
   [(set (match_operand:SI 0 "gr_register_operand"                    "=Rg, Rg")
         (plus:SI (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                            (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                            (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                  (match_operand:SI 3 "gr_register_operand"             "0,  0")))]
   ""
   "@
-   %0 += asl(%1,%2)
-   %0 += asl(%1,#%2)"
+   %0 += asl(%1,#%2)
+   %0 += asl(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
@@ -5641,35 +5693,35 @@
   [(set (match_operand:SI 0 "gr_register_operand"                     "=Rg, Rg")
         (minus:SI (match_operand:SI 1 "gr_register_operand"             "0,  0")
                   (ashift:SI (match_operand:SI 2 "gr_register_operand" "Rg, Rg")
-                             (match_operand:SI 3 "nonmemory_operand"   "Rg,Iu5"))))]
+                             (match_operand:SI 3 "nonmemory_operand"   "Iu5,Rg"))))]
   ""
   "@
-   %0 -= asl(%2,%3)
-   %0 -= asl(%2,#%3)"
+   %0 -= asl(%2,#%3)
+   %0 -= asl(%2,%3)"
   [(set_attr "type" "S,S")]
 )
 
 (define_insn "ashlsi3_and"
   [(set (match_operand:SI 0 "gr_register_operand"                   "=Rg, Rg")
         (and:SI (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                           (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                           (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                 (match_operand:SI 3 "gr_register_operand"             "0,  0")))]
   ""
   "@
-   %0 &= asl(%1,%2)
-   %0 &= asl(%1,#%2)"
+   %0 &= asl(%1,#%2)
+   %0 &= asl(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
 (define_insn "ashlsi3_or"
   [(set (match_operand:SI 0 "gr_register_operand"                   "=Rg, Rg")
         (ior:SI (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                           (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                           (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                 (match_operand:SI 3 "gr_register_operand"             "0,  0")))]
   ""
   "@
-   %0 |= asl(%1,%2)
-   %0 |= asl(%1,#%2)"
+   %0 |= asl(%1,#%2)
+   %0 |= asl(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
@@ -5688,12 +5740,12 @@
 (define_insn "ashrsi3_acc"
   [(set (match_operand:SI 0 "gr_register_operand"                      "=Rg, Rg")
         (plus:SI (ashiftrt:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                              (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                              (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                  (match_operand:SI 3 "gr_register_operand"               "0,  0")))]
   ""
   "@
-   %0 += asr(%1,%2)
-   %0 += asr(%1,#%2)"
+   %0 += asr(%1,#%2)
+   %0 += asr(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
@@ -5701,35 +5753,35 @@
   [(set (match_operand:SI 0 "gr_register_operand"                       "=Rg, Rg")
         (minus:SI (match_operand:SI 1 "gr_register_operand"               "0,  0")
                   (ashiftrt:SI (match_operand:SI 2 "gr_register_operand" "Rg, Rg")
-                               (match_operand:SI 3 "nonmemory_operand"   "Rg,Iu5"))))]
+                               (match_operand:SI 3 "nonmemory_operand"   "Iu5,Rg"))))]
   ""
   "@
-   %0 -= asr(%2,%3)
-   %0 -= asr(%2,#%3)"
+   %0 -= asr(%2,#%3)
+   %0 -= asr(%2,%3)"
   [(set_attr "type" "S,S")]
 )
 
 (define_insn "ashrsi3_and"
   [(set (match_operand:SI 0 "gr_register_operand"                     "=Rg, Rg")
         (and:SI (ashiftrt:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                             (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                             (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                 (match_operand:SI 3 "gr_register_operand"               "0,  0")))]
   ""
   "@
-   %0 &= asr(%1,%2)
-   %0 &= asr(%1,#%2)"
+   %0 &= asr(%1,#%2)
+   %0 &= asr(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
 (define_insn "ashrsi3_or"
   [(set (match_operand:SI 0 "gr_register_operand"                     "=Rg, Rg")
         (ior:SI (ashiftrt:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                             (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                             (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                 (match_operand:SI 3 "gr_register_operand"               "0,  0")))]
   ""
   "@
-   %0 |= asr(%1,%2)
-   %0 |= asr(%1,#%2)"
+   %0 |= asr(%1,#%2)
+   %0 |= asr(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
@@ -5738,12 +5790,12 @@
 (define_insn "lshrsi3_acc"
   [(set (match_operand:SI 0 "gr_register_operand"                      "=Rg, Rg")
         (plus:SI (lshiftrt:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                              (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                              (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                  (match_operand:SI 3 "gr_register_operand"               "0,  0")))]
   ""
   "@
-   %0 += lsr(%1,%2)
-   %0 += lsr(%1,#%2)"
+   %0 += lsr(%1,#%2)
+   %0 += lsr(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
@@ -5751,35 +5803,35 @@
   [(set (match_operand:SI 0 "gr_register_operand"                       "=Rg, Rg")
         (minus:SI (match_operand:SI 1 "gr_register_operand"               "0,  0")
                   (lshiftrt:SI (match_operand:SI 2 "gr_register_operand" "Rg, Rg")
-                               (match_operand:SI 3 "nonmemory_operand"   "Rg,Iu5"))))]
+                               (match_operand:SI 3 "nonmemory_operand"   "Iu5,Rg"))))]
   ""
   "@
-   %0 -= lsr(%2,%3)
-   %0 -= lsr(%2,#%3)"
+   %0 -= lsr(%2,#%3)
+   %0 -= lsr(%2,%3)"
   [(set_attr "type" "S,S")]
 )
 
 (define_insn "lshrsi3_and"
   [(set (match_operand:SI 0 "gr_register_operand"                     "=Rg, Rg")
         (and:SI (lshiftrt:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                             (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                             (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                 (match_operand:SI 3 "gr_register_operand"               "0,  0")))]
   ""
   "@
-   %0 &= lsr(%1,%2)
-   %0 &= lsr(%1,#%2)"
+   %0 &= lsr(%1,#%2)
+   %0 &= lsr(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
 (define_insn "lshrsi3_or"
   [(set (match_operand:SI 0 "gr_register_operand"                     "=Rg, Rg")
         (ior:SI (lshiftrt:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
-                             (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu5"))
+                             (match_operand:SI 2 "nonmemory_operand"   "Iu5,Rg"))
                 (match_operand:SI 3 "gr_register_operand"               "0,  0")))]
   ""
   "@
-   %0 |= lsr(%1,%2)
-   %0 |= lsr(%1,#%2)"
+   %0 |= lsr(%1,#%2)
+   %0 |= lsr(%1,%2)"
   [(set_attr "type" "S,S")]
 )
 
@@ -5969,34 +6021,41 @@
 ;;----------------;;
 
 (define_insn "setbitsi"
-  [(set (match_operand:SI 0 "gr_register_operand"                   "=Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"                  "=Rg,Rg")
         (ior:SI (ashift:SI (const_int 1)
-                           (match_operand:SI 1 "gr_register_operand" "Rg"))
-                (match_operand:SI 2 "gr_register_operand"            "Rg")))]
+                           (match_operand:SI 1 "nonmemory_operand" "Iu5,Rg"))
+                (match_operand:SI 2 "gr_register_operand"           "Rg,Rg")))]
   ""
-  "%0 = setbit(%2,%1)"
-  [(set_attr "type" "S")]
+  "@
+   %0 = setbit(%2,#%1)
+   %0 = setbit(%2,%1)"
+  [(set_attr "type" "S,S")]
 )
 
+
 (define_insn "clrbitsi"
-  [(set (match_operand:SI 0 "gr_register_operand"                     "=Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"                    "=Rg,Rg")
         (and:SI (not:SI
                   (ashift:SI (const_int 1)
-                             (match_operand:SI 1 "gr_register_operand" "Rg")))
-                (match_operand:SI 2 "gr_register_operand"              "Rg")))]
+                             (match_operand:SI 1 "nonmemory_operand" "Iu5,Rg")))
+                (match_operand:SI 2 "gr_register_operand"             "Rg,Rg")))]
   ""
-  "%0 = clrbit(%2,%1)"
-  [(set_attr "type" "S")]
+  "@
+   %0 = clrbit(%2,#%1)
+   %0 = clrbit(%2,%1)"
+  [(set_attr "type" "S,S")]
 )
 
 (define_insn "togglebitsi"
-  [(set (match_operand:SI 0 "gr_register_operand"                   "=Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"                  "=Rg,Rg")
         (xor:SI (ashift:SI (const_int 1)
-                           (match_operand:SI 1 "gr_register_operand" "Rg"))
-                (match_operand:SI 2 "gr_register_operand"            "Rg")))]
+                           (match_operand:SI 1 "nonmemory_operand" "Iu5,Rg"))
+                (match_operand:SI 2 "gr_register_operand"           "Rg,Rg")))]
   ""
-  "%0 = togglebit(%2,%1)"
-  [(set_attr "type" "S")]
+  "@
+   %0 = togglebit(%2,#%1)
+   %0 = togglebit(%2,%1)"
+  [(set_attr "type" "S,S")]
 )
 
 (define_insn "tstbitsi"
@@ -6074,31 +6133,38 @@
   }
   [(set_attr "type" "multiple")]
 )
-
 (define_insn "bitsclrsi"
-  [(set (match_operand:BI 0 "pr_register_operand"               "=Rp")
-        (eq:BI (and:SI (match_operand:SI 1 "gr_register_operand" "Rg")
-                       (match_operand:SI 2 "gr_register_operand" "Rg"))
+  [(set (match_operand:BI 0 "pr_register_operand"               "=Rp, Rp")
+        (eq:BI (and:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
+
+                       (match_operand:SI 2 "gr_or_u6_operand"    "Rg,Iu6"))
                (const_int 0)))]
   "TARGET_V2_FEATURES"
-  "%0 = bitsclr(%1,%2)"
-  [(set_attr "type" "S")]
+  "@
+   %0 = bitsclr(%1,%2)
+   %0 = bitsclr(%1,#%2)"
+  [(set_attr "type" "S,S")]
 )
 
 (define_insn "bitsclrsi_2"
-  [(set (match_operand:BI 0 "pr_register_operand"                       "=Rp")
-        (eq:BI (and:SI (not:SI (match_operand:SI 1 "gr_register_operand" "Rg"))
-                       (match_operand:SI 2 "gr_register_operand"         "Rg"))
+
+  [(set (match_operand:BI 0 "pr_register_operand"                       "=Rp, Rp")
+        (eq:BI (and:SI (not:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg"))
+
+                       (match_operand:SI 2 "gr_or_u6_operand"            "Rg,Iu6"))
                (match_dup 2)))]
+
   "TARGET_V2_FEATURES"
-  "%0 = bitsclr(%2,%1)"
-  [(set_attr "type" "S")]
+  "@
+   %0 = bitsclr(%1,%2)
+   %0 = bitsclr(%1,#%2)"
+  [(set_attr "type" "S,S")]
 )
 
 (define_insn_and_split "not_bitsclrsi"
-  [(set (match_operand:BI 0 "pr_register_operand"               "=Rp")
-        (ne:BI (and:SI (match_operand:SI 1 "gr_register_operand" "Rg")
-                       (match_operand:SI 2 "gr_register_operand" "Rg"))
+  [(set (match_operand:BI 0 "pr_register_operand"               "=Rp, Rp")
+        (ne:BI (and:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
+                       (match_operand:SI 2 "gr_or_u6_operand"    "Rg,Iu6"))
                (const_int 0)))]
   "TARGET_V2_FEATURES"
   "#"
@@ -6118,9 +6184,9 @@
 )
 
 (define_insn_and_split "not_bitsclrsi_2"
-  [(set (match_operand:BI 0 "pr_register_operand"                       "=Rp")
-        (ne:BI (and:SI (not:SI (match_operand:SI 1 "gr_register_operand" "Rg"))
-                       (match_operand:SI 2 "gr_register_operand"         "Rg"))
+  [(set (match_operand:BI 0 "pr_register_operand"                       "=Rp, Rp")
+        (ne:BI (and:SI (not:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg"))
+                       (match_operand:SI 2 "gr_or_u6_operand"            "Rg,Iu6"))
                (match_dup 2)))]
   "TARGET_V2_FEATURES"
   "#"
@@ -6806,45 +6872,78 @@
 
 
 (define_insn_and_split "combinesi"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg,Rg")
-        (match_operand:SI 1 "nonmemory_operand"    "Rg,Is8, i"))
-   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg,Rg")
-        (match_operand:SI 3 "nonmemory_operand"    "Rg,Is8, i"))]
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg, Rg, Rg,Rg")
+        (match_operand:SI 1 "nonmemory_operand"    "Rg,Is8, Rg,Is8, i"))
+   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg, Rg, Rg,Rg")
+        (match_operand:SI 3 "nonmemory_operand"    "Rg,Is8,Is8, Rg, i"))]
   "reload_completed"
   {
     HOST_WIDE_INT high, low;
-    if(REGNO (operands[2]) % 2 == 0){
-      operands[0] = operands[1];
-      operands[1] = operands[3];
-      operands[3] = operands[0];
-      operands[0] = operands[2];
+    if(REGNO (operands[0]) % 2 == 0){
+
+
+
+
+
+      switch(which_alternative){
+        case 0:
+          return "%P0 = combine(%3,%1)";
+        case 1:
+          return "%P0 = combine(#%3,#%1)";
+        case 2:
+          return "%P0 = combine(#%3,%1)";
+        case 3:         
+          return "%P0 = combine(%3,#%1)";
+        case 4:
+          gcc_assert(TARGET_CONST64);
+          gcc_assert(const_int_operand(operands[1], SImode));
+          gcc_assert(const_int_operand(operands[3], SImode));
+          low = INTVAL (operands[1]);
+          high = INTVAL (operands[3]);
+          operands[1] = gen_int_mode((high << 32ULL) | (low & 0x0FFFFFFFFULL),
+                                     DImode);
+          return "%P0 = CONST64(#%1)";
+        default:
+          gcc_unreachable();
+      }
     }
-    switch(which_alternative){
-      case 0:
-        return "%P0 = combine(%3,%1)";
-      case 1:
-        return "%P0 = combine(#%3,#%1)";
-      case 2:
-        gcc_assert(TARGET_CONST64);
-        gcc_assert(const_int_operand(operands[1], SImode));
-        gcc_assert(const_int_operand(operands[3], SImode));
-        low = INTVAL (operands[1]);
-        high = INTVAL (operands[3]);
-        operands[1] = gen_int_mode((high << 32ULL) | (low & 0x0FFFFFFFFULL),
-                                   DImode);
-        return "%P0 = CONST64(#%1)";
-      default:
-        gcc_unreachable();
+    else {
+      switch(which_alternative){
+        case 0:
+          return "%P2 = combine(%1,%3)";
+        case 1:
+          return "%P2 = combine(#%1,#%3)";
+        case 2:
+          return "%P2 = combine(%1,#%3)";
+        case 3:       
+          return "%P2 = combine(#%1,%3)";    
+        case 4:
+          gcc_assert(TARGET_CONST64);
+          gcc_assert(const_int_operand(operands[1], SImode));
+          gcc_assert(const_int_operand(operands[3], SImode));
+          low = INTVAL (operands[3]);
+          high = INTVAL (operands[1]);
+          operands[1] = gen_int_mode((high << 32ULL) | (low & 0x0FFFFFFFFULL),
+                                     DImode);
+          return "%P2 = CONST64(#%1)";
+        default:
+          gcc_unreachable();
+      }
     }
   }
-  "!(   (   REGNO (operands[0]) % 2 == 0
-         && REGNO (operands[0]) + 1 == REGNO (operands[2]))
-     || (   REGNO (operands[2]) % 2 == 0
-         && REGNO (operands[2]) + 1 == REGNO (operands[0])))"
+  "&& !(   (   REGNO (operands[0]) % 2 == 0
+            && REGNO (operands[0]) + 1 == REGNO (operands[2]))
+        || (   REGNO (operands[2]) % 2 == 0
+            && REGNO (operands[2]) + 1 == REGNO (operands[0])))"
   [(set (match_dup 0) (match_dup 1))
    (set (match_dup 2) (match_dup 3))]
-  ""
-  [(set_attr "type" "A,A,Load")]
+  {
+    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[3])
+                 && REGNO (operands[0]) == REGNO (operands[3])));
+  }
+
+
+  [(set_attr "type" "A,A,A,A,Load")]
 )
 
 (define_insn_and_split "cond_combinesi"

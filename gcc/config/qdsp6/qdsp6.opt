@@ -46,6 +46,14 @@ msort-sda-code-support
 Target Report Mask(SECTION_SORTING_CODE_SUPPORT)
 Disable small data sections sorting code support
 
+mextended-crossjumping
+Target Report Mask(EXTENDED_CROSSJUMPING)
+Allow Reordering instructions to facilitate crossjumping
+
+mdisable-deep-phi-match
+Target Report Mask(DISABLE_DEEP_PHI_MATCH)
+Disable advanced PHI chain matching
+
 mno-falign
 Target Report RejectNegative
 Do not use the falign directive (default with -O0 or -Os)

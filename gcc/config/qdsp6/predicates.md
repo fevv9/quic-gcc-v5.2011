@@ -278,6 +278,24 @@
 ;; Registers or Constants ;;
 ;;------------------------;;
 
+;; general purpose register or s16 constant
+(define_predicate "gr_or_s16_operand"
+  (ior (match_operand 0 "gr_register_operand")
+       (match_operand 0 "s16_const_int_operand"))
+)
+
+;; general purpose register or u6 constant
+(define_predicate "gr_or_u6_operand"
+  (ior (match_operand 0 "gr_register_operand")
+       (match_operand 0 "u6_const_int_operand"))
+)
+
+;; general purpose register or m9 constant
+(define_predicate "gr_or_m9_operand"
+  (ior (match_operand 0 "gr_register_operand")
+       (match_operand 0 "m9_const_int_operand"))
+)
+
 ;; conditional add operand
 (define_predicate "conditional_add_operand"
   (if_then_else (match_test "!reload_completed")

@@ -921,6 +921,22 @@ add_stored_regs (rtx reg, const_rtx setter, void *data)
   if (GET_CODE (setter) == CLOBBER)
     return;
 
+#ifdef AUTO_INC_DEC      
+  if (MEM_P(reg)) 
+    { 
+      rtx mem_operand = XEXP (reg, 0);
+      if (GET_CODE (mem_operand) == POST_INC || 
+	  GET_CODE (mem_operand) == PRE_INC ||
+	  GET_CODE (mem_operand) == POST_DEC ||
+	  GET_CODE (mem_operand) == PRE_DEC || 
+	  GET_CODE (mem_operand) == POST_MODIFY ||
+	  GET_CODE (mem_operand) == PRE_MODIFY)
+	{
+	  return add_stored_regs(XEXP (mem_operand, 0), setter, data);
+	}
+    }
+#endif /* AUTO_INC_DEC */
+
   if (GET_CODE (reg) == SUBREG
       && REG_P (SUBREG_REG (reg))
       && REGNO (SUBREG_REG (reg)) < FIRST_PSEUDO_REGISTER)
