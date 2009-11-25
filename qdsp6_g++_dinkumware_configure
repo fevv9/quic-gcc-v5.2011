@@ -21,7 +21,7 @@ fi
 #export CXXFLAGS="-O0 -g"
 
 bash `dirname $0`/configure \
-  --prefix=${PREFIX}/gnu \
+  --prefix=${PREFIX} \
   --target=qdsp6 \
   --program-prefix=qdsp6- \
   --enable-checking=assert,misc,tree,gc,rtlflag,runtime,df \

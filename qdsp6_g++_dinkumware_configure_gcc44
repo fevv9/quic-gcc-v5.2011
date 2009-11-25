@@ -22,7 +22,7 @@ else
 fi
 
 bash `dirname $0`/configure \
-  --prefix=${PREFIX}/gnu \
+  --prefix=${PREFIX} \
   --target=qdsp6 \
   --program-prefix=qdsp6- \
   --program-suffix=44 \
