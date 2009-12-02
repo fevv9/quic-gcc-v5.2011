@@ -593,6 +593,100 @@ static bool gate_dse1 (void);
 static bool gate_dse2 (void);
 
 
+
+/* Returns true if one of x or y is a mem based on a restrict qualified pointer. If both x and y are based on
+   restruct qualifed pointers, then true is returned only if both are based on different restrict qualifed pointers. */
+
+static bool
+either_is_restrict (rtx x, rtx y)
+{
+
+  tree  mem_expr, mem_expr_dep;
+  rtx mem_op;
+  tree base1, base2;
+  tree base1_dup, base2_dup;
+  HOST_WIDE_INT offset1 = 0, offset2 = 0;
+  HOST_WIDE_INT size1 = -1, size2 = -1;
+  HOST_WIDE_INT max_size1 = -1, max_size2 = -1;
+  HOST_WIDE_INT access_size1, access_size2;
+  HOST_WIDE_INT rtx_offset1, rtx_offset2;
+  bool x_restrict, y_restrict;
+
+  if (!flag_midi_optimizations)
+    return false;
+
+  x_restrict = false;
+  y_restrict = false;
+  
+  gcc_assert (GET_CODE (x) == MEM);
+  gcc_assert (GET_CODE (y) == MEM);
+  
+  /* First process x. Get its MEM_EXPR */
+  mem_expr = MEM_EXPR (x);
+  if (!mem_expr)
+    {
+      /* If the mem_expr is not available for the whole rtx x, then look inside it.
+       Here we only handle the case when x is of the form (mem:MODE (reg)) or 
+       (mem:MODE (plus (reg) (...)))*/
+      
+      rtx reg, addr;
+      reg = NULL_RTX;
+      addr = XEXP (x, 0);
+      
+      if (GET_CODE (addr) == PLUS)
+	reg = XEXP (addr, 0);
+      else if (GET_CODE (addr) == REG)
+	reg = addr;
+      if (reg)
+	mem_expr = REG_EXPR (reg);
+    }
+  /* If mem_expr is still NULL then give up. */
+  if (!mem_expr)
+    x_restrict = false;
+  else
+    {
+      /* else, analyze mem_expr */
+      base1 = mem_expr;
+      while (handled_component_p (base1))
+	base1 = TREE_OPERAND (base1, 0);
+      x_restrict = is_restrict_qualified (base1);
+    }
+  
+/* Finished Processing x, now y */
+  mem_expr_dep = MEM_EXPR (y);
+  if (!mem_expr_dep)
+    {
+      /* If the mem_expr is not available for the whole rtx y, then look inside it.
+	 Here we only handle the case when y is of the form (mem:MODE (reg)) or 
+	 (mem:MODE (plus (reg) (...)))*/
+      
+      rtx addr, reg;
+      reg = NULL_RTX;
+      addr = XEXP (y, 0);
+      if (GET_CODE (addr) == PLUS)
+	reg = XEXP (addr, 0);
+      else if (GET_CODE (addr) == REG)
+	reg = addr;
+      if (reg)
+	mem_expr_dep = REG_EXPR (reg);
+    }
+  if (!mem_expr_dep)
+    y_restrict = false;
+  else
+  {
+    base2 = mem_expr_dep;
+    while (handled_component_p (base2))
+      base2 = TREE_OPERAND (base2, 0);
+    
+    y_restrict = is_restrict_qualified (base2);
+  }
+  if (x_restrict && y_restrict)
+    if (operand_equal_p (base1, base2, 0))
+      return false;
+  
+  return (x_restrict || y_restrict);  
+}
+
 /*----------------------------------------------------------------------------
    Zeroth step.
 
@@ -3069,9 +3163,12 @@ scan_reads_nospill (insn_info_t insn_info, bitmap gen, bitmap kill)
 						group->canon_base_mem,
 						read_info->mem, rtx_varies_p))
 		    {
-		      if (kill)
-			bitmap_ior_into (kill, group->group_kill);
-		      bitmap_and_compl_into (gen, group->group_kill);
+		      if (!either_is_restrict (group->base_mem, read_info->mem))
+			{
+			  if (kill)
+			    bitmap_ior_into (kill, group->group_kill);
+			  bitmap_and_compl_into (gen, group->group_kill);
+			}
 		    }
 		}
 	    }

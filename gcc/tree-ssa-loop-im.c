@@ -1619,6 +1619,59 @@ cannot_overlap_p (aff_tree *diff, double_int size1, double_int size2)
     }
 }
 
+/* Return true if base1 is an indirect_ref and is also a __restrict qualified pointer */
+static bool
+indirect_ref_and_restrict_p (tree base1)
+{
+  if (INDIRECT_REF_P (base1))
+    {
+      tree decl, ttype;
+      if (TREE_CODE (TREE_OPERAND (base1, 0)) == SSA_NAME)
+	decl = SSA_NAME_VAR (TREE_OPERAND (base1, 0));
+      else
+	decl = find_base_decl (TREE_OPERAND (base1, 0));
+      if (decl)
+	{
+	  ttype = TREE_TYPE (decl);
+	  if (TYPE_RESTRICT (ttype))
+	    return true;
+	}
+    }
+  return false;
+}
+/* Returns true if either REF1 or REF2 is based on a restrict-qualified pointer */
+static bool
+check_either_restrict (tree ref1, tree ref2)
+{
+  tree base1, base2;
+  HOST_WIDE_INT offset1 = 0, offset2 = 0;
+  HOST_WIDE_INT size1 = -1, size2 = -1;
+  HOST_WIDE_INT max_size1 = -1, max_size2 = -1;
+
+  if (!flag_midi_optimizations)
+    return false;
+
+  base1 = ref1;
+  /* Decompose a structure reference to get to its base object. */
+  if (handled_component_p (ref1))
+    base1 = get_ref_base_and_extent (ref1, &offset1, &size1, &max_size1);
+  base2 = ref2;
+  if (handled_component_p (ref2))
+    base2 = get_ref_base_and_extent (ref2, &offset2, &size2, &max_size2);
+
+  /* Do not proceed if both base1 and base2 are the same */
+  if (operand_equal_p (base1, base2, 0))
+    return false;
+
+  if (indirect_ref_and_restrict_p (base1))
+    return true;
+  else if (indirect_ref_and_restrict_p (base2))
+    return true;
+
+  return false;
+}
+
+
 /* Returns true if MEM1 and MEM2 may alias.  TTAE_CACHE is used as a cache in
    tree_to_aff_combination_expand.  */
 
@@ -1630,6 +1683,10 @@ mem_refs_may_alias_p (tree mem1, tree mem2, struct pointer_map_t **ttae_cache)
      overlap, then they cannot alias.  */
   double_int size1, size2;
   aff_tree off1, off2;
+
+  /* check both mem1 and mem2 for restrict-qualified pointer based addresses. */
+   if (check_either_restrict (mem1, mem2))
+    return false;
 
   /* Perform basic offset and type-based disambiguation.  */
   if (!refs_may_alias_p (mem1, mem2))

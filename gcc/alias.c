@@ -156,7 +156,8 @@ static int base_alias_check (rtx, rtx, enum machine_mode,
 static rtx find_base_value (rtx);
 static int mems_in_disjoint_alias_sets_p (const_rtx, const_rtx);
 static int insert_subset_children (splay_tree_node, void*);
-static tree find_base_decl (tree);
+tree find_base_decl (tree);
+bool is_restrict_qualified (tree t);
 static alias_set_entry get_alias_set_entry (alias_set_type);
 static const_rtx fixed_scalar_and_varying_struct_p (const_rtx, const_rtx, rtx, rtx,
 						    bool (*) (const_rtx, bool));
@@ -428,7 +429,7 @@ objects_must_conflict_p (tree t1, tree t2)
    If there is no such DECL, or a unique decl cannot be determined,
    NULL_TREE is returned.  */
 
-static tree
+tree
 find_base_decl (tree t)
 {
   tree d0, d1;
@@ -464,7 +465,7 @@ find_base_decl (tree t)
       else if (d1 == 0)
 	return d0;
       else
-	return 0;
+      return 0;
 
     default:
       return 0;
@@ -703,6 +704,46 @@ get_alias_set (tree t)
     record_component_aliases (t);
 
   return set;
+}
+
+/* Return true if T is restrict qualified */
+bool
+is_restrict_qualified (tree t)
+{
+  tree decl1, ttype1;
+  
+  decl1 = NULL_TREE;
+  ttype1 = NULL_TREE;
+  if (INDIRECT_REF_P (t))
+    {
+      if (TREE_CODE (TREE_OPERAND (t, 0)) == SSA_NAME)
+	decl1 = SSA_NAME_VAR (TREE_OPERAND (t, 0));
+      else
+	decl1 = find_base_decl (TREE_OPERAND (t, 0));
+      if (decl1)
+	{
+	  ttype1 = TREE_TYPE (decl1);
+	  if (TYPE_RESTRICT (ttype1))
+	    return true;
+	}
+      else return false;
+      /* i.e. we couldnt say anything about the 't' so take a conservative ie. safe decision. */
+    }
+  else if (DECL_P (t))
+    {
+      if (TREE_CODE (t) == VAR_DECL && DECL_BASED_ON_RESTRICT_P (t))
+	t = DECL_GET_RESTRICT_BASE (t);
+      
+      if (t)
+	{
+	  if (TYPE_RESTRICT (TREE_TYPE (t)))
+	    return true;
+	}
+	else
+	  return false;
+    }
+  return false;
+  
 }
 
 /* Return a brand-new alias set.  */
