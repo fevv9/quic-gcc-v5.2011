@@ -97,3 +97,7 @@ Deprecated
 mv1-v2-uncached-data
 Target Report Undocumented Mask(UNCACHED_DATA)
 Limit the number of memory accesses in a packet to one
+
+mmidi-optimizations
+Common Target Var(flag_midi_optimizations) Optimization
+Perform MIDI specific optimizations.

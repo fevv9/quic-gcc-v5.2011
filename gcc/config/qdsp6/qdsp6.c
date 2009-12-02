@@ -59,7 +59,7 @@
 #include "debug.h"
 #include "langhooks.h"
 #include "df.h"
-
+#include "sched-int.h"
 enum qdsp6_architecture qdsp6_arch = QDSP6_ARCH_UNSPECIFIED;
 #if GCC_3_4_6
 const char * qdsp6_arch_string = QDSP6_ARCH_DEFAULT_STRING;
@@ -147,6 +147,7 @@ static bool qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total);
 static int qdsp6_address_cost(rtx address);
 
 static int qdsp6_sched_issue_rate(void);
+static void qdsp6_sched_dependencies_eval (rtx, rtx);
 #if GCC_3_4_6
 static int qdsp6_sched_use_dfa_pipeline_interface(void);
 #endif /* GCC_3_4_6 */
@@ -382,6 +383,9 @@ Adjusting the Instruction Scheduler
 #define TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD \
   qdsp6_sched_first_cycle_multipass_dfa_lookahead
 
+#undef TARGET_SCHED_DEPENDENCIES_EVALUATION_HOOK
+#define TARGET_SCHED_DEPENDENCIES_EVALUATION_HOOK \
+  qdsp6_sched_dependencies_eval
 
 /*--------------------------------------------------
 Dividing the Output into Sections (Texts, Data, ...)
@@ -2426,7 +2430,7 @@ qdsp6_address_cost(rtx address)
     case MINUS:
       if(GET_CODE (XEXP (address, 0)) == REG
          && GET_CODE (XEXP (address, 1)) == CONST_INT){
-        return COSTS_N_INSNS (1);
+        return COSTS_N_INSNS (2);
       }
       return COSTS_N_INSNS (2);
     default: /* ?? Label and such */
@@ -2449,6 +2453,125 @@ static int
 qdsp6_sched_issue_rate(void)
 {
   return 6; /* ??? 4 or 6? */
+}
+
+static tree
+get_mem_expr_from_mem_rtx (rtx mem)
+{
+  tree mem_expr;
+  mem_expr = MEM_EXPR (mem);
+  if (!mem_expr)
+    {
+      rtx addr, reg;
+      reg = NULL_RTX;
+      addr = XEXP (mem, 0);
+      if (GET_CODE (addr) == PLUS)
+	reg = XEXP (addr, 0);
+      else if (GET_CODE (addr) == REG)
+	reg = addr;
+      
+      if (reg)
+	mem_expr = REG_EXPR (reg);
+   }
+  return mem_expr;
+}
+/* The Instruction Scheduler calculates Instruction Dependencies. Evaluate the dependencies
+   calculated by the Scheduler. Specifically, remove dependencies between stores to addresses
+   based on __restrict qualified pointers and loads from addresses. */
+static void
+qdsp6_sched_dependencies_eval (rtx head, rtx tail)
+{
+
+  rtx insn, next_tail;
+  
+  if (!flag_midi_optimizations)
+    return;
+
+  next_tail = NEXT_INSN (tail);
+  for (insn = head; insn != next_tail; insn = NEXT_INSN (insn))
+    {
+      
+      if (!INSN_P (insn))
+	continue;
+      rtx x = PATTERN (insn);
+      
+      /* We are interested if the insn is a store insn. */
+      if (GET_CODE (x) == SET)
+	{
+	  if (MEM_P (SET_DEST (x)))
+	    {
+	      tree  mem_expr;
+	      rtx mem_op;
+	      tree base1, base2;
+	      HOST_WIDE_INT offset1 = 0, offset2 = 0;
+	      HOST_WIDE_INT size1 = -1, size2 = -1;
+	      HOST_WIDE_INT max_size1 = -1, max_size2 = -1;
+	      
+	      mem_op  = SET_DEST (x);
+	      mem_expr = get_mem_expr_from_mem_rtx (mem_op);
+	      /* If mem_expr is still NULL then give up. */
+	      if (!mem_expr)
+		continue;
+	      base1 = mem_expr;
+	      while (handled_component_p (base1))
+		base1 = TREE_OPERAND (base1, 0);
+	      
+	      /* Things become intesting only if this is an access via a restrict pointer. */
+	      if (is_restrict_qualified (base1))
+		{
+		  
+		  sd_iterator_def sd_it;
+		  sd_iterator_def temp_it;
+		  dep_t dep;
+		  for (sd_it = sd_iterator_start (insn, SD_LIST_FORW);
+		       sd_iterator_cond (&sd_it, &dep);)
+		    {
+		      rtx y;
+		      y = PATTERN (DEP_CON (dep));
+			
+		      if (GET_CODE (y) == SET)
+			{
+			  if (MEM_P (SET_DEST (y)) || MEM_P (SET_SRC (y)))
+			    {
+			      rtx dst, src;
+			      tree mem_expr_dep;
+			      dst = SET_DEST (y);
+			      src = SET_SRC (y);
+			      if (MEM_P (dst))
+				mem_expr_dep = get_mem_expr_from_mem_rtx (dst);
+			      else
+				mem_expr_dep = get_mem_expr_from_mem_rtx (src);
+			      
+			      if (!mem_expr_dep)
+				{
+				  sd_iterator_next (&sd_it);
+				  continue;
+				}
+			      base2 = mem_expr_dep;
+			      while (handled_component_p (base2))
+				base2 = TREE_OPERAND (base2, 0);
+			      if (operand_equal_p (base1, base2, 0))
+				sd_iterator_next (&sd_it);
+			      else
+				{
+				/* If base1 is restrict qualified and base1 != base2 then remove this dependency */
+				  sd_delete_dep (sd_it);
+				  continue;
+				}
+			    }
+			  else  /* !MEM_P (SET_DEST (y)) & !MEM_P (SET_SRC (y))  */
+			    sd_iterator_next (&sd_it);
+			}
+		      else	/* GET_CODE (y) != SET */
+			sd_iterator_next (&sd_it);
+		    } /* End FOR LOOP */
+		  
+		} /* is_restrict_qualified (base1) */
+	    } /* MEM_P (SET_DEST (x)) */
+	  
+	} /* GET_CODE (x) == SET */
+
+    } /* END MAIN FOR LOOP */
 }
 
 
@@ -3073,9 +3196,6 @@ qdsp6_output_operand(FILE *f, rtx x, int code ATTRIBUTE_UNUSED)
 
   PRINT_OPERAND (f, x, code);
 }
-
-
-
 
 /* Used by macro ASM_OUTPUT_OPCODE
 
