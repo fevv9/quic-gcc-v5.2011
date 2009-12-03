@@ -204,6 +204,15 @@ static void qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x);
 static void qdsp6_compute_dwarf_frame_information(void);
 static void qdsp6_allocate_stack(unsigned HOST_WIDE_INT size);
 static void qdsp6_deallocate_stack(unsigned HOST_WIDE_INT size);
+static tree qdsp6_special_case_memcpy_fn(const char *name);
+static void qdsp6_emit_special_case_memcpy_fn(
+              tree *fn,
+              const char *name,
+              rtx dst,
+              rtx src,
+              rtx size,
+              bool tailcall);
+static void qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p);
 
 static void qdsp6_packet_optimizations(void);
 static void qdsp6_final_pack_insns(void);
@@ -6330,181 +6339,222 @@ qdsp6_expand_compare(enum rtx_code code)
 
 
 
-bool
-qdsp6_expand_movmem(rtx operands[])
+/* Creates a tree node for a block-move function named NAME. */
+
+static tree
+qdsp6_special_case_memcpy_fn(const char *name)
+{
+  tree args, fn;
+
+  fn = get_identifier(name);
+  args = build_function_type_list(ptr_type_node, ptr_type_node,
+                                  const_ptr_type_node, sizetype,
+                                  NULL_TREE);
+
+  fn = build_decl(FUNCTION_DECL, fn, args);
+  DECL_EXTERNAL (fn) = 1;
+  TREE_PUBLIC (fn) = 1;
+  DECL_ARTIFICIAL (fn) = 1;
+  TREE_NOTHROW (fn) = 1;
+  DECL_VISIBILITY (fn) = VISIBILITY_DEFAULT;
+  DECL_VISIBILITY_SPECIFIED (fn) = 1;
+  make_decl_rtl(fn);
+  assemble_external(fn);
+
+  return fn;
+}
+
+
+
+
+/* Emits a call to block-move function *FN named NAME with parameters DST, SRC,
+   and SIZE.  TAILCALL is true only if the call may be implemented as a tail
+   call.  If *FN is NULL, then it is initialized to a tree node for a function
+   named NAME. */
+
+static void
+qdsp6_emit_special_case_memcpy_fn(
+  tree *fn,
+  const char *name,
+  rtx dst,
+  rtx src,
+  rtx size,
+  bool tailcall
+)
+{
+  rtx dst_addr, src_addr;
+  tree call_expr, src_tree, dst_tree, size_tree;
+  enum machine_mode size_mode;
+
+  /* Emit code to copy the addresses of DST and SRC and SIZE into new
+     pseudos.  We can then place those new pseudos into a VAR_DECL and
+     use them later.  */
+
+  dst_addr = copy_to_mode_reg(Pmode, XEXP (dst, 0));
+  src_addr = copy_to_mode_reg(Pmode, XEXP (src, 0));
+
+  dst_addr = convert_memory_address(ptr_mode, dst_addr);
+  src_addr = convert_memory_address(ptr_mode, src_addr);
+
+  dst_tree = make_tree(ptr_type_node, dst_addr);
+  src_tree = make_tree(ptr_type_node, src_addr);
+
+  size_mode = TYPE_MODE (sizetype);
+
+  size = convert_to_mode(size_mode, size, 1);
+  size = copy_to_mode_reg(size_mode, size);
+
+  size_tree = make_tree(sizetype, size);
+
+  if(!*fn){
+    *fn = qdsp6_special_case_memcpy_fn(name);
+  }
+  call_expr = build_call_expr (*fn, 3, dst_tree, src_tree, size_tree);
+  CALL_EXPR_TAILCALL (call_expr) = tailcall;
+
+  expand_normal (call_expr);
+}
+
+
+
+
+/* Emits an inline implementation of a block move.  OPERANDS[0] is a MEM
+   containing the destination address.  OPERANDS[1] is a MEM containing the
+   source address.  OPERANDS[2] is a CONST_INT containing the number of bytes to
+   be copied.  OPERANDS[3] is a CONST_INT containing the guaranteed minimum
+   alignment of both the source and destination addresses.  If VOLATILE_P is
+   true then the final assembly corresponding to the code being emitted must not
+   contain any packets containing more than one memory access. */
+
+static void
+qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p)
 {
   rtx src_0, dst_0, src_reg, dst_reg, src_mem, dst_mem, value_reg, count_reg;
   rtx label, loopcount_rtx, doloop_fixup_code;
-  int count, loopcount, align;
-  bool volatile_p;
+  int count, loopcount, align, size, log2size;
+  enum machine_mode mode;
+  rtx (*gen_memcpy_kernel)(rtx, rtx, rtx, rtx);
 
+  count = INTVAL (operands[2]);
   align = INTVAL (operands[3]);
 
-  if((align & 3) != 0  || GET_CODE (operands[2]) != CONST_INT){
-    return false;
-  }
-
-  volatile_p = MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
-               || !qdsp6_dual_memory_accesses;
+  gcc_assert(count >= 0);
 
   src_0 = operands[1];
   dst_0 = operands[0];
   src_reg = copy_to_mode_reg(Pmode, XEXP (src_0, 0));
   dst_reg = copy_to_mode_reg(Pmode, XEXP (dst_0, 0));
-  count = INTVAL (operands[2]);
 
+  /* Copy as many pieces as possible of size equal to the mutual alignment of
+     the source and destination. */
   if((align & 7) == 0){
+    mode = DImode;
+    size = 8;
+    log2size = 3;
+    gen_memcpy_kernel = gen_memcpy_kerneldi;
+  }
+  else if((align & 3) == 0){
+    mode = SImode;
+    size = 4;
+    log2size = 2;
+    gen_memcpy_kernel = gen_memcpy_kernelsi;
+  }
+  else if((align & 1) == 0){
+    mode = HImode;
+    size = 2;
+    log2size = 1;
+    gen_memcpy_kernel = gen_memcpy_kernelhi;
+  }
+  else {
+    mode = QImode;
+    size = 1;
+    log2size = 0;
+    gen_memcpy_kernel = gen_memcpy_kernelqi;
+  }
 
-    src_mem = change_address(src_0, DImode, src_reg);
-    dst_mem = change_address(dst_0, DImode, dst_reg);
+  src_mem = change_address(src_0, mode, src_reg);
+  dst_mem = change_address(dst_0, mode, dst_reg);
 
-    loopcount = count >> 3;
-    if(loopcount > 2){
+  /* Only form a loop if it would execute for at least two iterations. */
+  loopcount = count >> log2size;
+  if(loopcount > 2){
 
-      value_reg = gen_reg_rtx(DImode);
-      count_reg = gen_reg_rtx(SImode);
-      doloop_fixup_code = GEN_INT (REGNO (count_reg));
-      loopcount_rtx = gen_int_mode(volatile_p ? loopcount : loopcount - 1,
-                                   SImode);
-      label = gen_label_rtx();
+    /* If the source or destination might be volatile, then load and store
+       serially inside the loop.  Otherwise, software pipeline the loop. */
 
-      if(!volatile_p){
-        emit_move_insn(value_reg, src_mem);
-        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-      }
+    value_reg = gen_reg_rtx(mode);
+    count_reg = gen_reg_rtx(SImode);
+    doloop_fixup_code = GEN_INT (REGNO (count_reg));
+    loopcount_rtx = gen_int_mode(volatile_p ? loopcount : loopcount - 1,
+                                 SImode);
+    label = gen_label_rtx();
 
-      if(TARGET_HARDWARE_LOOPS){
-        emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
-      }
-      else {
-        emit_move_insn(count_reg, loopcount_rtx);
-      }
+    if(!volatile_p){
+      emit_move_insn(value_reg, src_mem);
+      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(size, Pmode)));
+    }
 
-      emit_label(label);
-
-      if(volatile_p){
-        emit_move_insn(value_reg, src_mem);
-        emit_move_insn(dst_mem, value_reg);
-      }
-      else {
-        emit_insn(gen_memcpy_kerneldi(dst_mem, value_reg, value_reg, src_mem));
-      }
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-
-      if(TARGET_HARDWARE_LOOPS){
-        emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
-        qdsp6_hardware_loop();
-      }
-      else {
-        rtx pred = gen_reg_rtx(BImode);
-        emit_insn(gen_addsi3(count_reg, count_reg, constm1_rtx));
-        emit_insn(gen_cmpsi_eq(pred, count_reg, const0_rtx));
-        emit_jump_insn(gen_cond_jump(gen_rtx_EQ (BImode, pred, const0_rtx),
-                                     pred, label));
-      }
-
-      if(!volatile_p){
-        emit_move_insn(dst_mem, value_reg);
-        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
-      }
-
+    if(TARGET_HARDWARE_LOOPS){
+      emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
     }
     else {
-      for(; loopcount; loopcount--){
-
-        value_reg = gen_reg_rtx(DImode);
-
-        emit_move_insn(value_reg, src_mem);
-        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-        emit_move_insn(dst_mem, value_reg);
-        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
-
-      }
+      emit_move_insn(count_reg, loopcount_rtx);
     }
-    if(count & 4){
 
-      value_reg = gen_reg_rtx(SImode);
-      src_mem = change_address(src_0, SImode, src_reg);
-      dst_mem = change_address(dst_0, SImode, dst_reg);
+    emit_label(label);
 
+    if(volatile_p){
       emit_move_insn(value_reg, src_mem);
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
       emit_move_insn(dst_mem, value_reg);
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
+    }
+    else {
+      emit_insn(gen_memcpy_kernel(dst_mem, value_reg, value_reg, src_mem));
+    }
+    emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(size, Pmode)));
+    emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(size, Pmode)));
 
+    if(TARGET_HARDWARE_LOOPS){
+      emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
+      qdsp6_hardware_loop();
+    }
+    else {
+      rtx pred = gen_reg_rtx(BImode);
+      emit_insn(gen_addsi3(count_reg, count_reg, constm1_rtx));
+      emit_insn(gen_cmpsi_eq(pred, count_reg, const0_rtx));
+      emit_jump_insn(gen_cond_jump(gen_rtx_EQ (BImode, pred, const0_rtx),
+                                   pred, label));
+    }
+
+    if(!volatile_p){
+      emit_move_insn(dst_mem, value_reg);
+      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(size, Pmode)));
     }
 
   }
   else {
+    for(; loopcount; loopcount--){
 
+      value_reg = gen_reg_rtx(mode);
+
+      emit_move_insn(value_reg, src_mem);
+      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(size, Pmode)));
+      emit_move_insn(dst_mem, value_reg);
+      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(size, Pmode)));
+
+    }
+  }
+
+  /* Copy any leftovers. */
+  if((align & 7) == 0 && count & 4){
+
+    value_reg = gen_reg_rtx(SImode);
     src_mem = change_address(src_0, SImode, src_reg);
     dst_mem = change_address(dst_0, SImode, dst_reg);
 
-    loopcount = count >> 2;
-    if(loopcount > 2){
-
-      value_reg = gen_reg_rtx(SImode);
-      count_reg = gen_reg_rtx(SImode);
-      doloop_fixup_code = GEN_INT (REGNO (count_reg));
-      loopcount_rtx = gen_int_mode(volatile_p ? loopcount : loopcount - 1,
-                                   SImode);
-      label = gen_label_rtx();
-
-      if(!volatile_p){
-        emit_move_insn(value_reg, src_mem);
-        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-      }
-
-      if(TARGET_HARDWARE_LOOPS){
-        emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
-      }
-      else {
-        emit_move_insn(count_reg, loopcount_rtx);
-      }
-
-      emit_label(label);
-
-      if(volatile_p){
-        emit_move_insn(value_reg, src_mem);
-        emit_move_insn(dst_mem, value_reg);
-      }
-      else {
-        emit_insn(gen_memcpy_kernelsi(dst_mem, value_reg, value_reg, src_mem));
-      }
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-
-      if(TARGET_HARDWARE_LOOPS){
-        emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
-        qdsp6_hardware_loop();
-      }
-      else {
-        rtx pred = gen_reg_rtx(BImode);
-        emit_insn(gen_addsi3(count_reg, count_reg, constm1_rtx));
-        emit_insn(gen_cmpsi_eq(pred, count_reg, const0_rtx));
-        emit_jump_insn(gen_cond_jump(gen_rtx_EQ (BImode, pred, const0_rtx),
-                                     pred, label));
-      }
-
-      if(!volatile_p){
-        emit_move_insn(dst_mem, value_reg);
-        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
-      }
-
-    }
-    else {
-      for(; loopcount; loopcount--){
-
-        value_reg = gen_reg_rtx(SImode);
-
-        emit_move_insn(value_reg, src_mem);
-        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-        emit_move_insn(dst_mem, value_reg);
-        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
-
-      }
-    }
+    emit_move_insn(value_reg, src_mem);
+    emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
+    emit_move_insn(dst_mem, value_reg);
+    emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
 
   }
   if(count & 2){
@@ -6529,8 +6579,83 @@ qdsp6_expand_movmem(rtx operands[])
     emit_move_insn(dst_mem, value_reg);
 
   }
+}
 
-  return true;
+
+
+
+/* Tree nodes for specialized block-move functions */
+
+static GTY(()) tree qdsp6_memcpy_volatile;
+static GTY(()) tree qdsp6_memcpy_likely_aligned8_min32_mult8;
+
+/* Emits RTL to perform a block move or returns false.  OPERANDS[0] is a MEM
+   containing the destination address.  OPERANDS[1] is a MEM containing the
+   source address.  OPERANDS[2] is a CONST_INT containing the number of bytes to
+   be copied.  OPERANDS[3] is a CONST_INT containing the guaranteed minimum
+   alignment of both the source and destination addresses.  OPERANDS[6] is a
+   CONST_INT with a non-zero value only if the block move may be performed via a
+   tail call. */
+
+bool
+qdsp6_expand_movmem(rtx operands[])
+{
+  HOST_WIDE_INT length, align;
+  int cycles, leftovers;
+  bool volatile_p, simple_copy_p;
+  const int O3_inline_cycle_threshold = 10;
+  const int O2_inline_cycle_threshold = 5;
+  const int likely_aligned_cycle_threshold = 100;
+
+  volatile_p = (MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
+                || !qdsp6_dual_memory_accesses);
+
+  align = MIN (INTVAL (operands[3]), BIGGEST_ALIGNMENT / BITS_PER_UNIT);
+  if(GET_CODE (operands[2]) == CONST_INT){
+    length = INTVAL (operands[2]);
+    simple_copy_p = length <= align && exact_log2(length) != -1;
+  }
+  else {
+    length = 0;
+    simple_copy_p = false;
+  }
+  gcc_assert(length >= 0);
+  gcc_assert((align & (align - 1)) == 0);
+
+  cycles = length / align + 1;
+  for(leftovers = length % align; leftovers; leftovers >>= 1){
+    cycles += leftovers & 1;
+  }
+
+  if(optimize
+     && (simple_copy_p
+         || (!optimize_size
+             && (align & 3) == 0
+             && length != 0
+             && cycles <= (optimize >= 3 ? O3_inline_cycle_threshold
+                                         : O2_inline_cycle_threshold)))){
+    qdsp6_expand_movmem_inline(operands, volatile_p);
+    return true;
+  }
+
+  if(optimize && !volatile_p
+     && (align & 3) == 0 && length >= 32 && length % 8 == 0
+     && cycles < likely_aligned_cycle_threshold){
+    qdsp6_emit_special_case_memcpy_fn(&qdsp6_memcpy_likely_aligned8_min32_mult8,
+                                      "__qdsp_memcpy_likely_aligned_min32bytes_mult8bytes",
+                                      operands[0], operands[1], operands[2],
+                                      INTVAL (operands[6]));
+    return true;
+  }
+
+  if(volatile_p){
+    qdsp6_emit_special_case_memcpy_fn(&qdsp6_memcpy_volatile, "memcpy_v",
+                                      operands[0], operands[1], operands[2],
+                                      INTVAL (operands[6]));
+    return true;
+  }
+
+  return false;
 }
 
 

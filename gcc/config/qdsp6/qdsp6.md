@@ -2247,8 +2247,11 @@
   [(use (match_operand:BLK 0 "memory_operand" ""))
    (use (match_operand:BLK 1 "memory_operand" ""))
    (use (match_operand:SI 2 "nonmemory_operand" ""))
-   (use (match_operand:SI 3 "const_int_operand" ""))]
-  "optimize && !optimize_size"
+   (use (match_operand:SI 3 "const_int_operand" ""))
+   (use (match_operand:SI 4 "const_int_operand" ""))
+   (use (match_operand:SI 5 "const_int_operand" ""))
+   (use (match_operand:SI 6 "const_int_operand" ""))]
+  ""
   {
     if(qdsp6_expand_movmem(operands)){
       DONE;
@@ -6665,6 +6668,26 @@
   ""
   ".falign"
   [(set_attr "length" "12")]
+)
+
+(define_insn "memcpy_kernelqi"
+  [(set (match_operand:QI 0 "memory_operand"       "=m")
+        (match_operand:QI 1 "gr_register_operand"  "Rg"))
+   (set (match_operand:QI 2 "gr_register_operand" "=Rg")
+        (match_operand:QI 3 "memory_operand"        "m"))]
+  ""
+  "memb(%0) = %1\;%2 = memb(%3)"
+  [(set_attr "type" "LoadStore")]
+)
+
+(define_insn "memcpy_kernelhi"
+  [(set (match_operand:HI 0 "memory_operand"       "=m")
+        (match_operand:HI 1 "gr_register_operand"  "Rg"))
+   (set (match_operand:HI 2 "gr_register_operand" "=Rg")
+        (match_operand:HI 3 "memory_operand"        "m"))]
+  ""
+  "memh(%0) = %1\;%2 = memh(%3)"
+  [(set_attr "type" "LoadStore")]
 )
 
 (define_insn "memcpy_kernelsi"
