@@ -928,12 +928,12 @@ find_bivs (struct ivopts_data *data)
       type = TREE_TYPE (PHI_RESULT (phi));
       base = fold_convert (type, base);
       if (step)
-      /* {
+      {
 	  if (POINTER_TYPE_P (type))
 	    step = fold_convert (sizetype, step);
-	  else*/ 
+	  else 
 	    step = fold_convert (type, step);
-      //}
+      }
 
       set_iv (data, PHI_RESULT (phi), base, step);
       found = true;

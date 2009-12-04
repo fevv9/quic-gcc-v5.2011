@@ -234,6 +234,8 @@ static void qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p);
 static void qdsp6_packet_optimizations(void);
 static void qdsp6_final_pack_insns(void);
 
+static int sdata_symbolic_operand_smallest_accessable_size(rtx);
+
 
 
 
@@ -474,7 +476,6 @@ struct gcc_target targetm = TARGET_INITIALIZER;
 static enum section_category	qdsp6_categorize_decl_for_section (const_tree decl, int reloc); 
 void				default_unique_section_2 (tree decl, int reloc); 
 unsigned int		smallest_accessable_entity_in_declaration(tree decl); 
-int					sdata_symbolic_operand_size(rtx op); 
 bool				has_this_tree_been_visited(tree node); 
 void				remember_this_tree(tree node); 
 unsigned int		descent_smallest(const char *prefix, tree node, unsigned int smallest); 
@@ -659,6 +660,10 @@ qdsp6_optimization_options(int level, int size)
 
   qdsp6_falign = QDSP6_NO_FALIGN;
 
+  if(size){
+    target_flags |= MASK_EXTENDED_CROSSJUMPING;
+  }
+
   if(level >= 3 && !size){
     qdsp6_falign = QDSP6_FALIGN_LABELS;
   }
@@ -722,6 +727,8 @@ get_inner_array_type (const_tree array)
 
   return type;
 }
+
+
 
 
 /* Helper function for the alignment routines
@@ -866,6 +873,35 @@ qdsp6_conditional_register_usage(void)
 /*--------------
 Register Classes
 --------------*/
+
+/* Implements macro CANNOT_CHANGE_MODE_CLASS
+
+   Prevent predicates from being represented as QImode SUBREGs of SImode. */
+
+bool
+qdsp6_cannot_change_mode_class(
+  enum machine_mode from,
+  enum machine_mode to,
+  enum reg_class rclass
+)
+{
+  if(from == to){
+    return false;
+  }
+
+  if((   rclass == PREDICATE_DOT_OLD_REGS
+      || rclass == PREDICATE_DOT_NEW_REGS
+      || rclass == PREDICATE_REGS)
+     && from == SImode
+     && to == QImode){
+    return true;
+  }
+
+  return false;
+}
+
+
+
 
 /* Implements macro CONST_OK_FOR_CONSTRAINT_P
 
@@ -1046,11 +1082,15 @@ Basic Stack Layout
    the address of the stack frame COUNT frames above the current one. */
 
 rtx
-qdsp6_return_addr_rtx(int count ATTRIBUTE_UNUSED, rtx frame)
+qdsp6_return_addr_rtx(int count, rtx frame)
 {
   rtx return_addr;
 
   cfun->machine->calls_builtin_return_address = true;
+
+  if(count == 0){
+    frame = gen_rtx_REG(Pmode, HARD_FRAME_POINTER_REGNUM);
+  }
 
   return_addr = memory_address(Pmode,
                                plus_constant(frame, GET_MODE_SIZE (Pmode)));
@@ -2249,6 +2289,9 @@ qdsp6_legitimate_address_p(
   return false;
 }
 
+
+
+
 /* Construct a unique section name based on the decl name and the
    categorization performed above.  Original in gcc/varasm.c  */
 void
@@ -2333,7 +2376,6 @@ default_unique_section_2 (tree decl, int reloc)
   plen = strlen (prefix);
 
   name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
-  
   name = targetm.strip_name_encoding (name);
   nlen = strlen (name);
 
@@ -2344,17 +2386,26 @@ default_unique_section_2 (tree decl, int reloc)
   DECL_SECTION_NAME (decl) = build_string (nlen + plen, string);
 }
 
+
+
+
 static void
 qdsp6_unique_section (tree decl, int reloc)
 {
   default_unique_section_2 (decl, reloc);
 }
 
-int
-sdata_symbolic_operand_size(rtx op)
+
+
+
+/* _LSY_ Loks for smallest addressable entity in
+   a declaration, not overall declaration size. */  
+static int
+sdata_symbolic_operand_smallest_accessable_size(rtx op)
 {
-  HOST_WIDE_INT offset = 0, size = 0;
+  HOST_WIDE_INT size = -1;
   tree t;
+
   switch(GET_CODE (op)){
     case CONST:
       op = XEXP (op, 0);
@@ -2363,7 +2414,6 @@ sdata_symbolic_operand_size(rtx op)
            && GET_CODE (XEXP (op, 1)) == CONST_INT)){
         return -1;
       }
-      offset = INTVAL (XEXP (op, 1));
       op = XEXP (op, 0);
       /* FALL THROUGH */
     case SYMBOL_REF:
@@ -2371,13 +2421,20 @@ sdata_symbolic_operand_size(rtx op)
         size = GET_MODE_SIZE (get_pool_mode(op));
       }
       else {
-        if(!SYMBOL_REF_SMALL_P (op))	return -1; 
+        if(!SYMBOL_REF_SMALL_P (op))    return -1;
         t = SYMBOL_REF_DECL (op);
-        if(DECL_P (t))	t = DECL_SIZE_UNIT (t);	
-        else 		t = TYPE_SIZE_UNIT (TREE_TYPE (t)); 
-        if(t && host_integerp(t, 0)){
-          size = tree_low_cst(t, 0);
-          if(size < 0)	size = -1; 
+	/* if we want to take overall declaration size
+	   the following code will work just fine:
+	   if(DECL_P (t))  t = DECL_SIZE_UNIT (t);
+           else            t = TYPE_SIZE_UNIT (TREE_TYPE (t));
+           if(t && host_integerp(t, 0)){
+             size = tree_low_cst(t, 0);
+             if(size < 0)  size = -1;
+           }
+ 	*/ 
+ 	if(t){
+          size = smallest_accessable_entity_in_declaration(t);
+          if(size < 0)  size = -1;
         }
       }
       return size;
@@ -2385,6 +2442,8 @@ sdata_symbolic_operand_size(rtx op)
       return -1;
   }
 }
+
+
 
 
 /* copy of general_operand() rtl predicate plus memory sorting */  
@@ -2456,7 +2515,7 @@ qdsp6_GP_or_reg_operand_c (rtx op, enum machine_mode mode)
       rtx y = XEXP (op, 0);
 
       if (! volatile_ok && MEM_VOLATILE_P (op))	return 0; 
-      // _LSY_ if (GET_CODE (y) == ADDRESSOF)		return 1; 
+      /* _LSY_ if (GET_CODE (y) == ADDRESSOF)		return 1; */  
 
       /* Use the mem's mode, since it will be reloaded thus.  */
       mode = GET_MODE (op);
@@ -2464,32 +2523,48 @@ qdsp6_GP_or_reg_operand_c (rtx op, enum machine_mode mode)
       /* Catch GP relative MEM accesses */  
       if(sdata_symbolic_operand(y, Pmode)){
     	/* Will be GP relative */
-		int mem_size = 0; 
+	int mem_size = 0; 
 
-		if((GET_CODE (op) == MEM) && MEM_SIZE (op))	
-			mem_size	= INTVAL (MEM_SIZE (op)); 
-		// Dev warning. if(GET_MODE_SIZE(mode) != mem_size)	
-		//	fprintf(stderr,"Warning. GET_MODE_SIZE(%d) != mem_size(%d)\n",GET_MODE_SIZE(mode),mem_size); 
+	if((GET_CODE (op) == MEM) && MEM_SIZE (op))	
+		mem_size	= INTVAL (MEM_SIZE (op)); 
+	/* Dev warning. if(GET_MODE_SIZE(mode) != mem_size)	
+           fprintf(stderr,"Warning. GET_MODE_SIZE(%d) != mem_size(%d)\n",
+	   GET_MODE_SIZE(mode),mem_size); 
+        */
 
-		/* This makes this predicate to reject GP relative 
-		addressing if access unit is smaller than declaration unit*/ 
-		if(TARGET_SECTION_SORTING_CODE_SUPPORT 
-		&& TARGET_SECTION_SORTING && (mem_size < sdata_symbolic_operand_size(y))){
-			if(reload_completed)	; // Dev warning. fprintf(stderr,"Warning. Skip late section sorting match\n"); 
-			else	return 0;
-		}
+	/* This makes this predicate to reject GP relative 
+	   addressing if access unit is smaller than declaration unit*/ 
+	if(TARGET_SECTION_SORTING_CODE_SUPPORT 
+	&& TARGET_SECTION_SORTING 
+	/* There is a difference in approach possible here: In case of a struct
+           we can consider overal struct size as grounds for rejection, on the other
+           hand we can see what is the smallest accessable member of the struct is, and 
+           use that instead. Currently it makes no significant difference in performance
+           or size, but we can easily think of a theoretical example where it might.
+           Alternative code:
+           mem_size < sdata_symbolic_operand_size(y)
+        */
+	&& (mem_size < sdata_symbolic_operand_smallest_accessable_size(y))){ 
+	   if(reload_completed)	; /* Dev warning. fprintf(stderr,
+                                     "Warning. Skip late section sorting match\n"); */ 
+	   else	return 0;
+	}
       }
       if (memory_address_p (mode, y))	return 1;
    }
-
   return 0;
 }
+
+
+
 
 int
 qdsp6_nonimmediate_operand_with_GP_c (rtx op, enum machine_mode mode)
 {
   return (! CONSTANT_P (op) && GP_or_reg_operand (op, mode));
 }
+
+
 
 
 static GTY(()) tree qdsp6_builtin_mask_for_load;
@@ -2951,6 +3026,9 @@ qdsp6_asm_select_rtx_section(
 }
 #endif /* !GCC_3_4_6 */
 
+
+
+
 extern void switch_to_section (section *);                 
 
 #define MAX_DECLARE_RECURSION   1024
@@ -2967,6 +3045,9 @@ has_this_tree_been_visited(tree node){
    return 0;
 }
 
+
+
+
 void
 remember_this_tree(tree node){
    int i;
@@ -2982,6 +3063,9 @@ remember_this_tree(tree node){
    }
    return;
 }
+
+
+
 
 /* descent_smallest designed to identify the smallest addressable entity
    in a declaration. Used for sdata elements sorting */ 
@@ -3122,6 +3206,9 @@ descent_smallest(const char *prefix, tree node, unsigned int smallest){
     return new_smallest;  
 }
 
+
+
+
 /* smallest_accessable_entity_in_declaration designed to identify the smallest addressable entity
 in a declaration. Used for sdata elements sorting */ 
 unsigned int
@@ -3131,6 +3218,9 @@ smallest_accessable_entity_in_declaration(tree decl)
    /* Here I assume there are no atomic data types larger than 128 bytes in this machine */ 
    return descent_smallest(" top ", decl, DEFAULT_LARGEST_ALIGNMENT); 
 }
+
+
+
 
 static bool
 bss_initializer_p (const_tree decl)
@@ -3144,12 +3234,14 @@ bss_initializer_p (const_tree decl)
 }
 
 
+
+
 /* Copycat from similar internal declaration */ 
 enum section_category
 qdsp6_categorize_decl_for_section (const_tree decl, int reloc)
 {
   enum section_category ret;
-	  
+
   if (TREE_CODE (decl) == FUNCTION_DECL)    return SECCAT_TEXT;
   else if (TREE_CODE (decl) == STRING_CST)
     {
@@ -3217,6 +3309,9 @@ qdsp6_categorize_decl_for_section (const_tree decl, int reloc)
   return ret;
 }
 
+
+
+
 /* Similar to default_elf_select_section from varasm.c  but is capable of sorting sdata 
    into subsections. sbss is also handled in a similar way, but not in this 
    function */ 
@@ -3228,7 +3323,7 @@ qdsp6_select_section (tree decl, int reloc,
                         unsigned HOST_WIDE_INT align)
 {
   const char *sname;
-  
+
   switch (qdsp6_categorize_decl_for_section (decl, reloc)){ 
     case SECCAT_TEXT:
       /* We're not supposed to be called on FUNCTION_DECLs.  */
@@ -3294,12 +3389,15 @@ qdsp6_select_section (tree decl, int reloc,
   return get_named_section (decl, sname, reloc);
 }
 
+
+
+
 void
 qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
 			       tree decl ATTRIBUTE_UNUSED)
 {
   char flagchars[10], *f = flagchars;
-  
+
   /* _LSY_ Note, unique section name does not matter for .comm declarations - it will be managed by linker, 
          so here we do not construct unique section name even if flag_data_sections is specified */ 
 
@@ -3367,6 +3465,9 @@ qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
 		fprintf (asm_out_file, "\t.subsection\t-%d\n",smallest_accessable_entity_in_declaration(decl));
 }
 
+
+
+
 /* Implements hook TARGET_IN_SMALL_DATA_P */
 
 static bool
@@ -3408,6 +3509,8 @@ qdsp6_in_small_data_p(const_tree exp)
 }
 
 
+
+
 /*-------------------------------
 Output of Uninitialized Variables
 -------------------------------*/
@@ -3423,7 +3526,7 @@ qdsp6_asm_output_aligned_decl_common(
   unsigned HOST_WIDE_INT alignment
 ){
     unsigned int flags = SECTION_WRITE | SECTION_BSS | SECTION_NAMED; 
-	
+
 	if(decl && sdata_symbolic_operand(XEXP (DECL_RTL (decl), 0), Pmode))
 			switch_to_section(get_section(".sbss",flags,decl)); 
 	else 	switch_to_section(get_section(".bss",flags,decl)); 
@@ -3444,6 +3547,9 @@ qdsp6_asm_output_aligned_decl_common(
                   size, alignment / BITS_PER_UNIT);
 	}
 }
+
+
+
 
 /* Implements macro ASM_OUTPUT_ALIGNED_DECL_LOCAL
 
@@ -3486,6 +3592,9 @@ qdsp6_asm_output_aligned_decl_local(
                   size, alignment / BITS_PER_UNIT);
 	}
 }
+
+
+
 
 /*------------------------------
 Output of Assembler Instructions
@@ -4342,9 +4451,7 @@ qdsp6_machine_dependent_reorg(void)
     }
   }
   else if(qdsp6_falign == QDSP6_FALIGN_LOOPS){
-    rtx prev	= NULL;  
     rtx label; 
-    int	insn_code = 0,tag;
 
     /* _LSY_ Go backwards and falign only labels that are targets
        for backward jumps */ 
@@ -7500,10 +7607,7 @@ static void qdsp6_free_packing_info(void);
 
 
 static bool final_packing = false;
-static bool let_cmp_jump_pack_together	= false; /* _LSY_ Allow in non final pass to 
-						   allocate compare and jum.new in the same
-						   packet */  
-
+static bool let_cmp_jump_pack_together = false;
 static state_t qdsp6_state;
 
 static GTY(()) struct qdsp6_packet_info *qdsp6_head_packet;
@@ -7511,7 +7615,6 @@ static GTY(()) struct qdsp6_packet_info *qdsp6_tail_packet;
 static GTY(()) struct qdsp6_bb_aux_info *qdsp6_head_bb_aux;
 static GTY(()) struct qdsp6_transformed_insn_stack *qdsp6_insn_stack;
 
-// _LSY_ Keep an alternative list to analyze better schedule. 
 
 
 
@@ -7770,6 +7873,7 @@ qdsp6_wandered_too_far_p(rtx insn)
     case CODE_FOR_cond_jump:
     case CODE_FOR_loop0:
     case CODE_FOR_loop1:
+    case CODE_FOR_gpr_cond_jump:
       if(get_attr_length(insn) > 4){
         return true;
       }
@@ -7780,6 +7884,9 @@ qdsp6_wandered_too_far_p(rtx insn)
       return false;
   }
 }
+
+
+
 
 /* Return true if TEST is a valid relational operator for a conditional jump */
 static int
@@ -7792,6 +7899,9 @@ qdsp6_cond_jump_compare_operator (rtx test)
   else
     return (code == NE || code == EQ);
 }
+
+
+
 
 static int
 qdsp6_get_flags(rtx insn)
@@ -8184,11 +8294,12 @@ qdsp6_control_conflict_p(
 
 
 
+
 static bool
 qdsp6_predicable(struct qdsp6_insn_info *insn_info)
 {
   rtx cond_exec;
-  rtx qdsp6_cond_exec_wrapper; 
+  rtx cond_exec_wrapper; 
 
   /* Ignore calls for now, which are predicable in V1. */
   if(!TARGET_V2_FEATURES){
@@ -8201,31 +8312,29 @@ qdsp6_predicable(struct qdsp6_insn_info *insn_info)
   }
 
   /* Form a COND_EXEC wrapper to test for predicability. */
-  //if(!qdsp6_cond_exec_wrapper){
-    cond_exec = gen_rtx_COND_EXEC (VOIDmode,
-                                   gen_rtx_NE (BImode,
-                                               gen_rtx_REG (BImode, P0_REGNUM),
-                                               const0_rtx),
-                                   NULL_RTX);
-    start_sequence();
-    emit_insn(cond_exec);
-    qdsp6_cond_exec_wrapper = get_insns();
-    end_sequence();
-  //}
+  cond_exec = gen_rtx_COND_EXEC (VOIDmode,
+    gen_rtx_NE (BImode,
+                gen_rtx_REG (BImode, P0_REGNUM),
+                const0_rtx),
+                NULL_RTX);
+  start_sequence();
+  emit_insn(cond_exec);
+  cond_exec_wrapper = get_insns();
+  end_sequence();
 
   /* Wrap the pattern of the insn in a COND_EXEC. */
-  COND_EXEC_CODE (PATTERN (qdsp6_cond_exec_wrapper))
+  COND_EXEC_CODE (PATTERN (cond_exec_wrapper))
     = PATTERN (insn_info->insn);
 
   /* If the COND_EXEC version exists, then the original insn is predicable. 
           Must check both instruction and operand constraints */
 		  
-   if(MEM_P (qdsp6_cond_exec_wrapper)){
-	if (! memory_address_p (GET_MODE (qdsp6_cond_exec_wrapper), 
-		XEXP (qdsp6_cond_exec_wrapper, 0)))
+   if(MEM_P (cond_exec_wrapper)){
+	if (! memory_address_p (GET_MODE (cond_exec_wrapper), 
+		XEXP (cond_exec_wrapper, 0)))
 		return 0; 
    }
-   else if(insn_invalid_p(qdsp6_cond_exec_wrapper)){
+   else if(insn_invalid_p(cond_exec_wrapper)){
      	return 0; 
    }
    return 1; 
@@ -8433,7 +8542,7 @@ qdsp6_insns_truly_dependent(
         if(QDSP6_CONFLICT_P (write, read)){
           if(PO_REGNO_P (read->regno)
              && (!QDSP6_CONTROL_P (reader) || final_packing || 
-			 let_cmp_jump_pack_together)	// _LSY_ let cond/jump merge 
+			 let_cmp_jump_pack_together)	/* _LSY_ let cond/jump merge */  
              && qdsp6_dot_newable(reader)){
             *dependence |= QDSP6_DEP_DOT_NEWABLE;
           }
@@ -8825,8 +8934,8 @@ qdsp6_pack_insns(void)
   struct qdsp6_packet_info *packet;
   struct qdsp6_insn_info *insn_info;
   rtx insn;
-  rtx bb_head_insn;
-  rtx bb_end_insn;
+  rtx bb_head_insn = NULL;
+  rtx bb_end_insn  = NULL;
   int start_packet;
   int dependence;
 
@@ -8835,8 +8944,15 @@ qdsp6_pack_insns(void)
 
   if(!final_packing){
     bb = ENTRY_BLOCK_PTR->next_bb;
-    bb_head_insn = qdsp6_bb_real_head_insn(bb);
-    bb_end_insn = qdsp6_bb_real_end_insn(bb);
+    do{
+      if(bb){ 
+        bb_head_insn = qdsp6_bb_real_head_insn(bb);
+        bb_end_insn = qdsp6_bb_real_end_insn(bb);
+        if(!(bb_head_insn && bb_end_insn)){
+          bb = bb->next_bb;
+        }
+      }
+    }while(bb && !(bb_head_insn && bb_end_insn));
     gcc_assert(bb_head_insn && bb_end_insn);
   }
   else {
@@ -8921,6 +9037,125 @@ qdsp6_pack_insns(void)
 
   }
 
+}
+
+
+
+
+static int
+check_call_reorder_feasibility(struct qdsp6_insn_info *insn_info){  
+
+   struct qdsp6_reg_access *write;
+   struct qdsp6_reg_access *read;
+   char call_used_regs[] = CALL_USED_REGISTERS;
+
+   gcc_assert(insn_info);
+   /* If this is a call, I should assume it to alias with any memory access,
+               but I might try to reason about calee-save registers	*/
+   if(QDSP6_MEM_P (insn_info))	return QDSP6_DEP_UNCONDITIONAL; 
+    for(write = insn_info->reg_writes; write; write = write->next){
+	  if(call_used_regs[write->regno] || (write->regno == LINK_REGNUM))
+			return QDSP6_DEP_UNCONDITIONAL;
+    }
+    for(read = insn_info->reg_reads; read; read = read->next){
+	  if(call_used_regs[read->regno] || (read->regno == LINK_REGNUM))
+			return QDSP6_DEP_UNCONDITIONAL;
+    }
+	return QDSP6_DEP_NONE;
+}
+
+
+
+
+/* This function is  used by tail merging
+   Looks at the relationship of two instructions
+   and tries to establish their independenc. 
+   Conservative.  
+   Shaped after qdsp6_insns_truly_dependent(from,to,&dependence); 	*/ 
+
+int
+qdsp6_instructions_dependent (rtx from,rtx to){
+ struct qdsp6_insn_info *insn_info_from = NULL; 
+ struct qdsp6_insn_info *insn_info_to   = NULL; 
+ struct qdsp6_mem_access *store;
+ struct qdsp6_mem_access *load;
+ struct qdsp6_reg_access *write;
+ struct qdsp6_reg_access *read;
+ 
+
+  /* I know it is INSN_P for both cases, and it should not be a jump, 
+          since we are not at the "bottom" of BB, but I will double check 
+          for generality */ 
+  if(!INSN_P(from) || 
+    (GET_CODE (PATTERN (from)) == USE) || 
+	(GET_CODE (PATTERN (from)) == CLOBBER))
+	return QDSP6_DEP_UNCONDITIONAL; 
+  if(!INSN_P(to) || 
+    (GET_CODE (PATTERN (to)) == USE) || 
+	(GET_CODE (PATTERN (to)) == CLOBBER))
+	return QDSP6_DEP_UNCONDITIONAL; 
+  
+  insn_info_from = qdsp6_get_insn_info(from); 
+  insn_info_to   = qdsp6_get_insn_info(to); 
+				
+  if(QDSP6_JUMP_P(insn_info_from) || QDSP6_JUMP_P(insn_info_to))
+    /* I really should not have jumps here... */ 
+	return QDSP6_DEP_UNCONDITIONAL;
+  
+  if(QDSP6_EMULATION_CALL_P (insn_info_from) || 
+     QDSP6_EMULATION_CALL_P (insn_info_to))
+    /* not handling these yet */ 
+    return QDSP6_DEP_UNCONDITIONAL;
+
+  /* If this is a call, I should assume it to alias with any memory access,
+               but I might try to reason about calee-save registers	*/
+  if(QDSP6_CALL_P (insn_info_from))
+    return check_call_reorder_feasibility(insn_info_to);  
+
+  /* If this is a call, I should assume it to alias with any memory access,
+               but I might try to reason about calee-save registers	*/
+  if(QDSP6_CALL_P(insn_info_to))
+    return check_call_reorder_feasibility(insn_info_from);  
+  
+  /* this will cover the case of memory output dependency   */
+  if((QDSP6_VOLATILE_P (insn_info_from) || QDSP6_VOLATILE_P (insn_info_to)) 
+  && (QDSP6_MEM_P (insn_info_from) && QDSP6_MEM_P (insn_info_to))) 
+    return QDSP6_DEP_UNCONDITIONAL; 
+
+  /* Check for possible true memory dependencies. */
+  for(store = insn_info_from->stores; (store && store->mem); store = store->next){
+    for(load = insn_info_to->loads; (load && load->mem); load = load->next){
+	   if(true_dependence(store->mem, VOIDmode, load->mem, rtx_varies_p))
+		  return QDSP6_DEP_UNCONDITIONAL;
+    }
+  }
+
+  /* Check for possible anti memory dependencies. */
+  for(store = insn_info_to->stores; (store && store->mem); store = store->next){
+    for(load = insn_info_from->loads; (load && load->mem); load = load->next){
+	   if(true_dependence(store->mem, VOIDmode, load->mem, rtx_varies_p))
+		  return QDSP6_DEP_UNCONDITIONAL;
+    }
+  }
+  
+  /* Check for true register dependencies. */
+  for(write = insn_info_from->reg_writes; write; write = write->next){
+    for(read = insn_info_to->reg_reads; read; read = read->next){
+	  if(write->regno == read->regno)
+			return QDSP6_DEP_UNCONDITIONAL;
+    }
+  }
+  /* Check for anti register dependencies. */
+  for(write = insn_info_to->reg_writes; write; write = write->next){
+    for(read = insn_info_from->reg_reads; read; read = read->next){
+	  if(write->regno == read->regno)
+		return QDSP6_DEP_UNCONDITIONAL;
+    }
+  }
+  /* We do not need to check for output dependency since this is a check inside BB, and DCE has been recently
+     performed */ 
+
+  return QDSP6_DEP_NONE;
 }
 
 
@@ -9053,6 +9288,8 @@ qdsp6_move_insn(
 }
 
 
+
+
 static void
 qdsp6_sanity_check_cfg_packet_info(void)
 {
@@ -9122,6 +9359,8 @@ qdsp6_sanity_check_cfg_packet_info(void)
 }
 
 
+
+
 static unsigned int 
 qdsp6_count_packets(void)
 {
@@ -9132,7 +9371,8 @@ qdsp6_count_packets(void)
   return total; 
 }
 
-#define MAX_NUM_EDGES_IN_BB	1024
+
+
 
 static void
 qdsp6_pull_up_insns(void)
@@ -9140,7 +9380,7 @@ qdsp6_pull_up_insns(void)
 #if !GCC_3_4_6
   basic_block bb;
   basic_block successor_bb;
-  edge e,tmp_e;
+  edge e;
   edge_iterator ei;
   struct qdsp6_packet_info *top_packet;
   struct qdsp6_packet_info *forward_edge_packet;
@@ -9156,6 +9396,7 @@ qdsp6_pull_up_insns(void)
   int i;
   int j,k;
   int num_edges = 0; 
+  /* This fixed way of book keeping will need to be updated */
   edge sorted_edge_list[MAX_NUM_EDGES_IN_BB];
 
 
@@ -9186,16 +9427,16 @@ qdsp6_pull_up_insns(void)
   FOR_EACH_BB (bb){
     if(!(BB_HEAD_PACKET (bb) && BB_END_PACKET (bb))
        || !JUMP_P (BB_END (bb))){
+      /* || !QDSP6_DIRECT_JUMP_P (qdsp6_get_insn_info(BB_END (bb)))*/ 
       continue;
     }
-    // construct a sorted list of edges 
+    /* construct a sorted list of edges */
     num_edges = 0; 
     FOR_EACH_EDGE (e, ei, bb->succs){
       edge insert_this = e; 
-      edge tmp; 
-      // Insert in sorted order
+      /* Insert in sorted order */
       /* _LSY_ Here we can use a better sorting algorithm, but V2 will not have more than 2 edges
-	 so this brut force should work for now */ 
+	 so this brute force should work for now */ 
       for(k=0;k<num_edges;k++){
 	if(e->probability >= sorted_edge_list[k]->probability){
 	  int ll; 
@@ -9217,6 +9458,9 @@ qdsp6_pull_up_insns(void)
          || successor_bb->index == EXIT_BLOCK
          || !(BB_HEAD_PACKET (successor_bb) && BB_END_PACKET (successor_bb))
          || !single_pred_p(successor_bb)){
+    /*   || e->probability < 0.1 ) Can set a threshold  to prevent low probability code 
+         from speculation, but need more investigation. 
+    */
         continue;
       }
       gcc_assert(single_pred(successor_bb) == bb);
@@ -9395,9 +9639,12 @@ qdsp6_pull_up_insns(void)
 #if 0
   verify_flow_info();
 #endif /* 0 */
-  /* _LSY_ Degrades performance 
-	cleanup_cfg(CLEANUP_EXPENSIVE | CLEANUP_CROSSJUMP);
+  /* CLEANUP_CROSSJUMP will not work any more here, 
+     but it is OK to try to clean up potential empty BBs
+     if any were created by the PULL-UP phase 
   */ 
+	cleanup_cfg(CLEANUP_EXPENSIVE);  
+ 
 
 #endif /* !GCC_3_4_6 */
 
@@ -9460,6 +9707,9 @@ qdsp6_free_packing_info(void)
   dfa_finish();
 }
 
+
+
+
 static void
 qdsp6_packet_optimizations(void)
 {
@@ -9468,8 +9718,6 @@ qdsp6_packet_optimizations(void)
   }
 
 #if !GCC_3_4_6
-
-  unsigned int cost_with,cost_without; 
 
   let_cmp_jump_pack_together      = true;
   shorten_branches(get_insns());
@@ -9481,6 +9729,8 @@ qdsp6_packet_optimizations(void)
 
 #endif /* !GCC_3_4_6 */
 }
+
+
 
 
 static void

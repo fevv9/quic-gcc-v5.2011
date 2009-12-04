@@ -2212,30 +2212,32 @@
 )
 
 (define_insn "ashlsi3_real_v4"
-  [(set (match_operand:SI 0 "gr_register_operand"          "=Rg,  Rg, Rg, Rg,Rg")
-        (ashift:SI (match_operand:SI 1 "nonmemory_operand"  "Rg,  Rg, Rg,Is6,Rg")
-                   (match_operand:SI 2 "nonmemory_operand" "K16,Iu01,Iu5, Rg,Rg")))]
+  [(set (match_operand:SI 0 "gr_register_operand"          "=Rg,  Rg,  Rg, Rg, Rg,Rg")
+        (ashift:SI (match_operand:SI 1 "nonmemory_operand"  "Rg,  Rg,  Rg, Rg,Is6,Rg")
+                   (match_operand:SI 2 "nonmemory_operand" "K16,Iu00,Iu01,Iu5, Rg,Rg")))]
   "TARGET_V4_FEATURES"
   "@
    %0 = aslh(%1)
+   %0 = %1
    %0 = add(%1,%1)
    %0 = asl(%1,#%2)
    %0 = lsl(#%1,%2)
    %0 = asl(%1,%2)"
-  [(set_attr "type" "A,A,S,S,S")]
+  [(set_attr "type" "A,A,A,S,S,S")]
 )
 
 (define_insn "ashlsi3_real"
-  [(set (match_operand:SI 0 "gr_register_operand"           "=Rg,  Rg, Rg,Rg")
-        (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg,  Rg, Rg,Rg")
-                   (match_operand:SI 2 "nonmemory_operand"  "K16,Iu01,Iu5,Rg")))]
+  [(set (match_operand:SI 0 "gr_register_operand"           "=Rg,  Rg,  Rg, Rg,Rg")
+        (ashift:SI (match_operand:SI 1 "gr_register_operand" "Rg,  Rg,  Rg, Rg,Rg")
+                   (match_operand:SI 2 "nonmemory_operand"  "K16,Iu00,Iu01,Iu5,Rg")))]
   "!TARGET_V4_FEATURES"
   "@
    %0 = aslh(%1)
+   %0 = %1
    %0 = add(%1,%1)
    %0 = asl(%1,#%2)
    %0 = asl(%1,%2)"
-  [(set_attr "type" "A,A,S,S")]
+  [(set_attr "type" "A,A,A,S,S")]
 )
 
 (define_insn "ashldi3"
@@ -3034,8 +3036,8 @@
 
 ;; char -> int
 (define_insn "extendqisi2"
-  [(set (match_operand:SI 0 "gr_register_operand"                 "=Rg,    Rg,Rg")
-        (sign_extend:SI (match_operand:QI 1 "nonimmediate_operand" "Rg,Anoext, m")))]
+  [(set (match_operand:SI 0 "gr_register_operand"                         "=Rg,    Rg,Rg")
+        (sign_extend:SI (match_operand:QI 1 "nonimmediate_operand_with_GP" "Rg,Anoext, m")))]
   ""
   "@
    %0 = sxtb(%1)
@@ -3060,8 +3062,8 @@
 
 ;; short -> int
 (define_insn "extendhisi2"
-  [(set (match_operand:SI 0 "gr_register_operand"                 "=Rg,    Rg,Rg")
-        (sign_extend:SI (match_operand:HI 1 "nonimmediate_operand" "Rg,Anoext, m")))]
+  [(set (match_operand:SI 0 "gr_register_operand"                         "=Rg,    Rg,Rg")
+        (sign_extend:SI (match_operand:HI 1 "nonimmediate_operand_with_GP" "Rg,Anoext, m")))]
   ""
   "@
    %0 = sxth(%1)
@@ -3303,7 +3305,7 @@
    %0 = mux(%1,%2,#%3)
    %0 = mux(%1,#%2,%3)
    %0 = mux(%1,#%2,#%3)"
-  [(set_attr "type" "A")]
+  [(set_attr "type" "A,A,A,A")]
 )
 
 (define_insn "muxfsi"
@@ -3320,7 +3322,7 @@
    %0 = mux(%1,%3,#%2)
    %0 = mux(%1,#%3,%2)
    %0 = mux(%1,#%3,#%2)"
-  [(set_attr "type" "A")]
+  [(set_attr "type" "A,A,A,A")]
 )
 
 
@@ -6059,7 +6061,7 @@
         (plus:SI
           (minus:SI (match_operand:SI 1 "gr_register_operand" "Rg")
                     (match_operand:SI 2 "gr_register_operand" "Rg"))
-          (match_operand:SI 3 "nonmemory_operand"             "0")))]
+          (match_operand:SI 3 "nonmemory_operand"              "0")))]
   "!TARGET_V4_FEATURES"
   "%0 += sub(%1,%2)"
   [(set_attr "type" "X")]
@@ -6380,11 +6382,11 @@
 )
 
 (define_insn "macsi3"
-  [(set (match_operand:SI 0 "gr_register_operand"            "=Rg, Rg, Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"           "=Rg, Rg, Rg")
         (plus:SI
           (mult:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg, Rg")
                    (match_operand:SI 2 "nonmemory_operand"   "Rg,Iu8,In8"))
-          (match_operand:SI 3 "nonmemory_operand"            "0,  0,  0")))]
+          (match_operand:SI 3 "nonmemory_operand"             "0,  0,  0")))]
   "!TARGET_V4_FEATURES"
   "@
    %0 += mpyi(%1,%2)

@@ -295,6 +295,11 @@ Storage Layout
 /* No native data types have more than 8-byte alignment by default. */
 #define BIGGEST_ALIGNMENT 64
 
+/* This is only used for internal sorting during packetization
+   and eventually need to be replaced with a linked list or any
+   other scalable method of bookkeeping */ 
+#define MAX_NUM_EDGES_IN_BB	1024
+
 /* QDSP6 has byte-sized stores. */
 
 #define DATA_ALIGNMENT(TYPE, ALIGN) \
@@ -497,6 +502,9 @@ enum reg_class {
 /* In base+index addressing, the index must be a general purpose register. */
 #define INDEX_REG_CLASS \
   ((TARGET_V4_FEATURES && TARGET_BASE_PLUS_INDEX) ? GENERAL_REGS : NO_REGS)
+
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS) \
+  qdsp6_cannot_change_mode_class(FROM, TO, CLASS)
 
 /* The following macro defines cover classes for Integrated Register
    Allocator.  Cover classes is a set of non-intersected register
