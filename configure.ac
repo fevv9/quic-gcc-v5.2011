@@ -2972,5 +2972,6 @@ AC_SUBST(datarootdir)
 AC_SUBST(docdir)
 AC_SUBST(pdfdir)
 AC_SUBST(htmldir)
+AC_SUBST(EXTRA_OFILES)
 
 AC_OUTPUT(Makefile)

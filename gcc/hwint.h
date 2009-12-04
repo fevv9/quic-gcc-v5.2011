@@ -18,7 +18,12 @@
 /* The string that should be inserted into a printf style format to
    indicate a "long long" operand.  */
 #ifndef HOST_LONG_LONG_FORMAT 
+/* mingw cannot parse "ll" for long long. It needs I64 instead. */
+#ifdef __MINGW32__
+#define HOST_LONG_LONG_FORMAT "I64"
+#else
 #define HOST_LONG_LONG_FORMAT "ll"
+#endif
 #endif
 
 /* If HAVE_LONG_LONG and SIZEOF_LONG_LONG aren't defined, but
