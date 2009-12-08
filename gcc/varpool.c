@@ -406,6 +406,91 @@ varpool_remove_unreferenced_decls (void)
   varpool_analyze_pending_decls ();
 }
 
+/* Merge sort helper function - reorder
+   two sub-queues if needed and merge them */ 
+static struct varpool_node *
+merge_varpool_node_list (
+    struct varpool_node *left, 
+    struct varpool_node *right) 
+{
+  /* Do not merge with empty list */ 
+  if (!left)   return right;
+  if (!right)  return left;
+
+  /* Once we start to ascent and remerge in new
+     sorted order, this will define "largest-to-smallest"
+     order. */ 
+  if (DECL_ALIGN(left->decl) > DECL_ALIGN(right->decl)) 
+   {
+    left->next_needed = merge_varpool_node_list
+                    (left->next_needed, right);
+    return left; 
+   } 
+
+  right->next_needed = merge_varpool_node_list
+                    (left, right->next_needed);
+  return right; 
+}
+
+/* Merge sort takes the input list and treats it as a collection of
+ small sorted lists. It makes log N passes along the list, and in 
+ each pass it combines each adjacent pair of small sorted lists 
+ into one larger sorted list. When a pass only needs to do this 
+ once, the whole output list must be sorted. 
+*/
+static struct varpool_node *
+sort_varpool_node_list(struct varpool_node *list) 
+{
+ struct varpool_node *left;
+ struct varpool_node *right;
+
+  /* If down to one node, or no nodes to sort,
+     we either have an empty list, or we down to
+     elemental list (single entry). In either
+     case return the original node (list) */
+  if (!list || !(list->next_needed)) 
+     return list;
+
+  /* Set default split point */ 
+  left  = list;
+  right = list->next_needed;
+
+  /* This loop wants to find the _middle_ of the list 
+     without knowing total number of elements. 
+     It moves "right" at twice the "speed" of "list", 
+     so at the end of the loop (number of iterations 
+     about n/2-1) "list" roughly points to the middle. 
+     Keep on shifting the split point 
+     while possible, then split */ 
+  while (right && right->next_needed) 
+   {
+    list = list->next_needed;
+    right = list->next_needed->next_needed;
+   }
+
+  right = list->next_needed;
+  list->next_needed = NULL;
+
+  /* Recursive call to sort two 
+     sub-queues - once we are down to 
+     elemental lists - they will be remerged
+     in proper (sorted) order. */ 
+  return merge_varpool_node_list(
+    sort_varpool_node_list(left), 
+    sort_varpool_node_list(right));
+}
+
+/*  Go through the existing queue and try to rearrange it
+   for better layout order based on alignment requirments */
+static void
+sort_varpool_needed_node_queue_by_alignment ()
+{
+  if (varpool_nodes_queue 
+  && varpool_last_needed_node 
+  &&(varpool_last_needed_node != varpool_nodes_queue))
+   varpool_nodes_queue = sort_varpool_node_list(varpool_nodes_queue); 
+}
+
 /* Output all variables enqueued to be assembled.  */
 bool
 varpool_assemble_pending_decls (void)
@@ -419,6 +504,11 @@ varpool_assemble_pending_decls (void)
      we don't create references to new function, but it should not be used
      elsewhere.  */
   varpool_analyze_pending_decls ();
+
+  /* Sort the needed variables based on their alignment 
+     It only affects the order in whick declarations will
+     be output - largest to smallest */ 
+  sort_varpool_needed_node_queue_by_alignment(); 
 
   while (varpool_nodes_queue)
     {
