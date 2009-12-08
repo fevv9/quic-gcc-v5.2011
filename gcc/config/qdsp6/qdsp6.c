@@ -218,7 +218,8 @@ static void qdsp6_packet_optimizations(void);
 static void qdsp6_final_pack_insns(void);
 
 bool        qdsp6_cannot_change_mode_class (enum machine_mode, enum machine_mode,enum reg_class);
-static int  sdata_symbolic_operand_smallest_accessable_size(rtx); 
+static unsigned HOST_WIDE_INT  
+            sdata_symbolic_operand_smallest_accessable_size(rtx);
 
 
 /* Initialize the GCC target structure. */
@@ -458,14 +459,15 @@ Miscellaneous Parameters
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
-static enum section_category	qdsp6_categorize_decl_for_section (const_tree decl, int reloc); 
-void				default_unique_section_2 (tree decl, int reloc); 
-unsigned int		smallest_accessable_entity_in_declaration(tree decl); 
-bool				has_this_tree_been_visited(tree node); 
-void				remember_this_tree(tree node); 
-unsigned int		descent_smallest(const char *prefix, tree node, unsigned int smallest); 
-int					qdsp6_named_section_sbss (tree decl, const char *name, int reloc); 
-extern 				section * get_named_section (tree decl, const char *name, int reloc); 
+static enum section_category	
+                        qdsp6_categorize_decl_for_section (const_tree decl, int reloc); 
+void                    default_unique_section_2 (tree decl, int reloc); 
+unsigned HOST_WIDE_INT  smallest_accessable_entity_in_declaration(tree decl); 
+bool                    has_this_tree_been_visited(tree node); 
+void                    remember_this_tree(tree node); 
+unsigned int            descent_smallest(const char *prefix, tree node, unsigned int smallest); 
+int                     qdsp6_named_section_sbss (tree decl, const char *name, int reloc); 
+extern section *        get_named_section (tree decl, const char *name, int reloc); 
 /*---------------------------
 Run-time Target Specification
 ---------------------------*/
@@ -2012,10 +2014,10 @@ qdsp6_unique_section (tree decl, int reloc)
 
 /* _LSY_ Loks for smallest addressable entity in
    a declaration, not overall declaration size. */  
-static int
+static unsigned HOST_WIDE_INT 
 sdata_symbolic_operand_smallest_accessable_size(rtx op)
 {
-  HOST_WIDE_INT size = -1;
+  unsigned HOST_WIDE_INT size = 16;
   tree t;
 
   switch(GET_CODE (op)){
@@ -2024,7 +2026,7 @@ sdata_symbolic_operand_smallest_accessable_size(rtx op)
       if(!(GET_CODE (op) == PLUS
            && GET_CODE (XEXP (op, 0)) == SYMBOL_REF
            && GET_CODE (XEXP (op, 1)) == CONST_INT)){
-        return -1;
+        return size;
       }
       op = XEXP (op, 0);
       /* FALL THROUGH */
@@ -2033,7 +2035,7 @@ sdata_symbolic_operand_smallest_accessable_size(rtx op)
         size = GET_MODE_SIZE (get_pool_mode(op));
       }
       else {
-        if(!SYMBOL_REF_SMALL_P (op))    return -1;
+        if(!SYMBOL_REF_SMALL_P (op))    size;
         t = SYMBOL_REF_DECL (op);
 	/* if we want to take overall declaration size
 	   the following code will work just fine:
@@ -2044,14 +2046,11 @@ sdata_symbolic_operand_smallest_accessable_size(rtx op)
              if(size < 0)  size = -1;
            }
  	*/ 
- 	if(t){
+ 	if(t)
           size = smallest_accessable_entity_in_declaration(t);
-          if(size < 0)  size = -1;
-        }
       }
-      return size;
     default:
-      return -1;
+      return size;
   }
 }
 
@@ -2134,10 +2133,10 @@ qdsp6_GP_or_reg_operand_c (rtx op, enum machine_mode mode)
       /* Catch GP relative MEM accesses */  
       if(sdata_symbolic_operand(y, Pmode)){
     	/* Will be GP relative */
-	int mem_size = 0; 
+	unsigned HOST_WIDE_INT mem_size = 0; 
 
 	if((GET_CODE (op) == MEM) && MEM_SIZE (op))	
-		mem_size	= INTVAL (MEM_SIZE (op)); 
+		mem_size = INTVAL (MEM_SIZE (op)); 
 	/* Dev warning. if(GET_MODE_SIZE(mode) != mem_size)	
            fprintf(stderr,"Warning. GET_MODE_SIZE(%d) != mem_size(%d)\n",
 	   GET_MODE_SIZE(mode),mem_size); 
@@ -2754,15 +2753,6 @@ descent_smallest(const char *prefix, tree node, unsigned int smallest){
       }
       new_smallest	= descent_smallest ("chain", TREE_CHAIN (node), new_smallest);
       break;
-/* _LSY_  
-   case tcc_gimple_stmt:
-      {
-		int i; 
-		for (i = 0; i < TREE_CODE_LENGTH (TREE_CODE (node)); i++)
-          new_smallest	= descent_smallest ("arg",GIMPLE_STMT_OPERAND (node, i),new_smallest); 
-      }  
-      break;
-*/ 
     case tcc_constant:  	/* a constant */
     case tcc_exceptional: 	/* something random, like an identifier.  */
       switch (TREE_CODE (node)){ 
@@ -2824,7 +2814,7 @@ descent_smallest(const char *prefix, tree node, unsigned int smallest){
 
 /* smallest_accessable_entity_in_declaration designed to identify the smallest addressable entity
 in a declaration. Used for sdata elements sorting */ 
-unsigned int
+unsigned HOST_WIDE_INT
 smallest_accessable_entity_in_declaration(tree decl)
 {
    list_of_visited_declaration_counter  = 0;
@@ -3063,8 +3053,8 @@ qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
   putc ('\n', asm_out_file);
   
   /* _LSY_ Also put subsection for better sorting */ 
-  if(TARGET_SECTION_SORTING && decl)
-		fprintf (asm_out_file, "\t.subsection\t-%d\n",smallest_accessable_entity_in_declaration(decl));
+  if(TARGET_SECTION_SORTING && decl && (smallest_accessable_entity_in_declaration(decl) > 1))
+     fprintf (asm_out_file, "\t.subsection\t-%d\n",floor_log2(smallest_accessable_entity_in_declaration(decl)));
 }
 
 /* Implements hook TARGET_IN_SMALL_DATA_P */
@@ -3133,7 +3123,7 @@ qdsp6_asm_output_aligned_decl_common(
     	assemble_name(stream, name);
     	fprintf(stream, "," HOST_WIDE_INT_PRINT_UNSIGNED
                 "," HOST_WIDE_INT_PRINT_UNSIGNED
-				"," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
+		"," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
                   size, alignment / BITS_PER_UNIT, smallest_accessable_entity_in_declaration(decl)); 
 	}
 	else{ 
@@ -3170,21 +3160,21 @@ qdsp6_asm_output_aligned_decl_local(
 		switch_to_section(get_section(".sbss",flags,decl));
   else 	switch_to_section(get_section(".bss",flags,decl));
 
-	if(TARGET_SECTION_SORTING && decl){ 
+  if(TARGET_SECTION_SORTING && decl){ 
     	fprintf(stream, "\t.lcomm\t");
     	assemble_name(stream, name);
     	fprintf(stream, "," HOST_WIDE_INT_PRINT_UNSIGNED
                 "," HOST_WIDE_INT_PRINT_UNSIGNED
-				"," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
+		"," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
                   size, alignment / BITS_PER_UNIT, smallest_accessable_entity_in_declaration(decl)); 
-	}
-	else{
-		fprintf(stream, "\t.lcomm\t");
-		assemble_name(stream, name);
-		fprintf(stream, "," HOST_WIDE_INT_PRINT_UNSIGNED
+   }
+   else{
+	fprintf(stream, "\t.lcomm\t");
+	assemble_name(stream, name);
+	fprintf(stream, "," HOST_WIDE_INT_PRINT_UNSIGNED
                   "," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
                   size, alignment / BITS_PER_UNIT);
-	}
+   }
 }
 
 /*------------------------------
