@@ -6603,17 +6603,19 @@ qdsp6_expand_movmem(rtx operands[])
   align = MIN (INTVAL (operands[3]), BIGGEST_ALIGNMENT / BITS_PER_UNIT);
   if(GET_CODE (operands[2]) == CONST_INT){
     length = INTVAL (operands[2]);
-    simple_copy_p = length <= align && exact_log2(length) != -1;
+    length &= 0xFFFFFFFFLL;
+    simple_copy_p = (length <= align && exact_log2(length) != -1)
+                    || length == 0;
   }
   else {
-    length = 0;
+    length = -1;
     simple_copy_p = false;
   }
-  gcc_assert(length >= 0);
+  gcc_assert(length >= -1);
   gcc_assert((align & (align - 1)) == 0);
 
   cycles = length / align + 1;
-  for(leftovers = length % align; leftovers; leftovers >>= 1){
+  for(leftovers = length & (align - 1); leftovers; leftovers >>= 1){
     cycles += leftovers & 1;
   }
 
@@ -6621,7 +6623,7 @@ qdsp6_expand_movmem(rtx operands[])
      && (simple_copy_p
          || (!optimize_size
              && (align & 3) == 0
-             && length != 0
+             && length != -1
              && cycles <= (optimize >= 3 ? O3_inline_cycle_threshold
                                          : O2_inline_cycle_threshold)))){
     qdsp6_expand_movmem_inline(operands, volatile_p);
