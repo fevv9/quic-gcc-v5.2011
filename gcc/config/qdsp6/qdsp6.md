@@ -962,21 +962,6 @@
   }
 )
 
-(define_insn "cond_movdi_real"
-  [(cond_exec
-     (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand" "RpRnp,RpRnp,RpRnp")
-        (const_int 0)])
-  (set (match_operand:DI 0 "nonimmediate_operand" "=Rg,Rg,U")
-        (match_operand:DI 1 "general_operand"       "Rg,U,Rg")))]
-  ""
-  "@
-   if (%C2) %P0 = combine(%H1,%L1)
-   if (%C2) %P0 = memd(%1)
-   if (%C2) memd(%0) = %P1"
-  [(set_attr "type" "A,Load,Store")]
-)
-
 (define_insn "movdi_real"
   [(set (match_operand:DI 0 "nonimmediate_operand" "=Rg,    Rg,Rg,Anoext, m, Rg,   Rg,Rg,Rg,Rc")
         (match_operand:DI 1 "general_operand"       "Rg,Anoext, m,    Rg,Rg,Is8,Ks8s8, i,Rc,Rg"))]
@@ -1213,21 +1198,6 @@
   }
 )
 
-(define_insn "cond_movdf_real"
-  [(cond_exec
-     (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand" "RpRnp")
-        (const_int 0)])
-   (set (match_operand:DF 0 "nonimmediate_operand"  "=Rg")
-        (match_operand:DF 1 "general_operand"        "Rg")))]
-  ""
-  {
-    return "if (%C2) %P0 = %P1";
-  }
-  [(set_attr "type" "A")]
-)
-
-
 (define_insn "movdf_real"
   [(set (match_operand:DF 0 "nonimmediate_operand" "=Rg,    Rg,Rg,Anoext, m,Rg")
         (match_operand:DF 1 "general_operand"       "Rg,Anoext, m,    Rg,Rg, i"))]
@@ -1278,6 +1248,24 @@
     operands[4] = gen_int_mode(WORDS_BIG_ENDIAN ? l[0] : l[1], SImode);
     operands[5] = gen_int_mode(WORDS_BIG_ENDIAN ? l[1] : l[0], SImode);
   }
+)
+
+(define_insn "cond_movdf"
+  [(cond_exec
+     (match_operator:BI 2 "predicate_operator"
+       [(match_operand:BI 3 "pr_register_operand"      "RpRnp,RpRnp, RpRnp,RpRnp, RpRnp")
+        (const_int 0)])
+     (set (match_operand:DF 0 "conditional_dest_operand" "=Rg,   Rg,    Rg,Acond,Aecond")
+          (match_operand:DF 1 "conditional_src_operand"   "Rg,Acond,Aecond,   Rg,    Rg")))]
+  "!memory_operand(operands[0], DFmode)
+   || gr_register_operand(operands[1], DFmode)"
+  "@
+   if (%C2) %P0 = %P1
+   if (%C2) %P0 = memd(%1)
+   if (%C2) %P0 = memd(%E1)
+   if (%C2) memd(%0) = %P1
+   if (%C2) memd(%E0) = %P1"
+  [(set_attr "type" "A,Load,ELoad,Store,EStore")]
 )
 
 
