@@ -19,8 +19,8 @@ Target Report RejectNegative Joined
 currently an alias for march
 
 mabi=
-Target Report RejectNegative Joined
-Adhere to the specified ABI (default abi1)
+Target Report Undocumented RejectNegative Joined
+Adhere to the specified ABI (default abi1 for V2, abi2 otherwise)
 
 moslib=
 Target Report RejectNegative Joined

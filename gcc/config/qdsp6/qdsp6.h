@@ -691,7 +691,8 @@ Basic Stack Layout
 Exception Handling Support
 ------------------------*/
 
-#define EH_RETURN_DATA_REGNO(N) ((N) < 4 ? (N + 20) : INVALID_REGNUM)
+#define EH_RETURN_DATA_REGNO(N) \
+  ((N) < 4 ? (N) + (qdsp6_abi != QDSP6_ABI_1 ? 0 : 20) : INVALID_REGNUM)
 
 #define EH_RETURN_STACKADJ_RTX gen_rtx_REG (Pmode, 28)
 
@@ -1244,7 +1245,8 @@ struct qdsp6_abi_table_entry {
     {"linux", QDSP6_ABI_LINUX} \
   }
 
-#define QDSP6_ABI_TABLE_DEFAULT_INDEX QDSP6_ABI_1
+#define QDSP6_ABI_TABLE_DEFAULT_INDEX \
+  (TARGET_V3_FEATURES ? QDSP6_ABI_2 : QDSP6_ABI_1)
 
 #if GCC_3_4_6
 extern const char *qdsp6_oslib_string;
