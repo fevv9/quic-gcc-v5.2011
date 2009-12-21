@@ -7607,7 +7607,6 @@ static void qdsp6_free_packing_info(void);
 
 
 static bool final_packing = false;
-static bool let_cmp_jump_pack_together = false;
 static state_t qdsp6_state;
 
 static GTY(()) struct qdsp6_packet_info *qdsp6_head_packet;
@@ -8541,8 +8540,6 @@ qdsp6_insns_truly_dependent(
         }
         if(QDSP6_CONFLICT_P (write, read)){
           if(PO_REGNO_P (read->regno)
-             && (!QDSP6_CONTROL_P (reader) || final_packing || 
-			 let_cmp_jump_pack_together)	/* _LSY_ let cond/jump merge */  
              && qdsp6_dot_newable(reader)){
             *dependence |= QDSP6_DEP_DOT_NEWABLE;
           }
@@ -9717,17 +9714,11 @@ qdsp6_packet_optimizations(void)
     return;
   }
 
-#if !GCC_3_4_6
-
-  let_cmp_jump_pack_together      = true;
   shorten_branches(get_insns());
   qdsp6_init_packing_info();
   qdsp6_pack_insns();
   qdsp6_pull_up_insns();
   qdsp6_free_packing_info();
-  let_cmp_jump_pack_together      = false;
-
-#endif /* !GCC_3_4_6 */
 }
 
 
