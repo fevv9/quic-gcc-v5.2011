@@ -82,7 +82,7 @@
 ;; Used to determine which slots an insn can use when scheduling insns
 
 (define_attr "type"
-             "A,X,Load,Store,Memop,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,EM,ES,EJ,EJR,ECR,multiple,J_dotnew"
+             "A,X,Load,Store,Memop,NewValue,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR,multiple,J_dotnew"
              (const_string "multiple"))
 
 
@@ -93,7 +93,7 @@
 
 (define_attr "length" ""
              (if_then_else (eq_attr "type"
-                                    "EA,EX,ELoad,EStore,EMemop,EM,ES,EJ,EJR,ECR")
+                                    "EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR")
                            (const_string "8")
                            (const_string "4")))
 
@@ -392,6 +392,10 @@
                                                 (eq_attr "type" "Memop"))
  "Slot0 + Store0 + Store1")
 
+(define_insn_reservation "v4_NewValue"   1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "NewValue"))
+ "Slot0 + Store0 + Store1")
+
 (define_insn_reservation "v4_M"          1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "M"))
                  "Slot2 | Slot3")
@@ -442,6 +446,10 @@
 
 (define_insn_reservation "v4_EMemop"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EMemop"))
+ "ESlot0 + Store0 + Store1")
+
+(define_insn_reservation "v4_ENewValue"  1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "ENewValue"))
  "ESlot0 + Store0 + Store1")
 
 (define_insn_reservation "v4_EM"         1 (and (eq_attr "arch" "v4")
@@ -4092,7 +4100,7 @@
       }
     }
   }
-  [(set_attr "type" "Load")]
+  [(set_attr "type" "NewValue")]
 )
 
 (define_insn "cond_dealloc_inverse"
@@ -4127,7 +4135,7 @@
       }
     }
   }
-  [(set_attr "type" "Load")]
+  [(set_attr "type" "NewValue")]
 )
 
 
@@ -9037,7 +9045,7 @@
         (mem:SI (reg:SI FP_REGNUM)))]
   "TARGET_V4_FEATURES"
   "dealloc_return"
-  [(set_attr "type" "Load")]
+  [(set_attr "type" "NewValue")]
 )
 
 (define_insn "deallocframe_function"
