@@ -1,7 +1,7 @@
 /*****************************************************************
-# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
 # All Rights Reserved.
-# Modified by QUALCOMM INCORPORATED on $Date$
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
 *****************************************************************/
 BUILTIN_INFO(Q6C2_cmpeq,QI_ftype_SISI,2)
 BUILTIN_INFO(Q6C2_cmpgt,QI_ftype_SISI,2)

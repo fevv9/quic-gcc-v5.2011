@@ -1,7 +1,7 @@
 /*****************************************************************
-# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
 # All Rights Reserved.
-# Modified by QUALCOMM INCORPORATED on $Date$
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
 *****************************************************************/
 /* Output Dwarf2 format symbol table information from GCC.
    Copyright (C) 1992, 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,

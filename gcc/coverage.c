@@ -1,7 +1,7 @@
 /*****************************************************************
-# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
 # All Rights Reserved.
-# Modified by QUALCOMM INCORPORATED on $Date$
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
 *****************************************************************/
 /* Read and write coverage files, and associated functionality.
    Copyright (C) 1990, 1991, 1992, 1993, 1994, 1996, 1997, 1998, 1999,

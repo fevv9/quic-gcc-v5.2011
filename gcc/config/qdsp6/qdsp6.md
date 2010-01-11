@@ -1,7 +1,7 @@
 ;; ##################################################################
-;; # Copyright (c) $Date$ QUALCOMM INCORPORATED.
+;; # Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
 ;; # All Rights Reserved.
-;; # Modified by QUALCOMM INCORPORATED on $Date$
+;; # Modified by Qualcomm Innovation Center, Inc. on $Date$
 ;; ##################################################################
 ;; QDSP6 machine description.
 ;; Copyright (C) 1998, 1999, 2000, 2002 Free Software Foundation, Inc.

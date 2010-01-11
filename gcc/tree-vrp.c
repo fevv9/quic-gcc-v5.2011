@@ -1,7 +1,7 @@
 /*****************************************************************
-# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
 # All Rights Reserved.
-# Modified by QUALCOMM INCORPORATED on $Date$
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
 *****************************************************************/
 /* Support routines for Value Range Propagation (VRP).
    Copyright (C) 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
