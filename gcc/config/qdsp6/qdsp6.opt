@@ -1,3 +1,9 @@
+##################################################################
+# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on $Date$
+##################################################################
+
 march=
 Target Report RejectNegative Joined
 Generate code for a given architecture (default qdsp6v2)

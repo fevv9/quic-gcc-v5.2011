@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on $Date$
+*****************************************************************/
 /* Support routines for Value Range Propagation (VRP).
    Copyright (C) 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>.

@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on $Date$
+*****************************************************************/
 /* High-level loop manipulation functions.
    Copyright (C) 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
    

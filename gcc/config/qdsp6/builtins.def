@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on $Date$
+*****************************************************************/
 BUILTIN_INFO(Q6C2_cmpeq,QI_ftype_SISI,2)
 BUILTIN_INFO(Q6C2_cmpgt,QI_ftype_SISI,2)
 BUILTIN_INFO(Q6C2_cmpgtu,QI_ftype_SISI,2)

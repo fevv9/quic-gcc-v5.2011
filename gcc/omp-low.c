@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on $Date$
+*****************************************************************/
 /* Lowering pass for OpenMP directives.  Converts OpenMP directives
    into explicit calls to the runtime library (libgomp) and data
    marshalling to implement data sharing and copying clauses.

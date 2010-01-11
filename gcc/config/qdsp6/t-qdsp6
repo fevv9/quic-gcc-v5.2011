@@ -1,3 +1,8 @@
+##################################################################
+# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on $Date$
+##################################################################
 # If any special flags are necessary when building libgcc2 put them here.
 TARGET_LIBGCC2_CFLAGS =
 

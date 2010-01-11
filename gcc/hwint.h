@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on $Date$
+*****************************************************************/
 /* HOST_WIDE_INT definitions for the GNU compiler.
    Copyright (C) 1998, 2002, 2004, 2008 Free Software Foundation, Inc.
 

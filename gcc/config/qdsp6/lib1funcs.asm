@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on $Date$
+*****************************************************************/
 /* libgcc routines for the QDSP6.
    Copyright (C) 1998, 1999 Free Software Foundation, Inc.
 
