@@ -617,7 +617,7 @@ either_is_restrict (rtx x, rtx y)
   HOST_WIDE_INT rtx_offset1, rtx_offset2;
   bool x_restrict, y_restrict;
 
-  if (!flag_midi_optimizations)
+  if (!flag_resolve_restrict_aliasing)
     return false;
 
   x_restrict = false;

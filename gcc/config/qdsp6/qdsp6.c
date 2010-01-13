@@ -65,6 +65,8 @@
 #include "langhooks.h"
 #include "df.h"
 #include "sched-int.h"
+
+
 enum qdsp6_architecture qdsp6_arch = QDSP6_ARCH_UNSPECIFIED;
 #if GCC_3_4_6
 const char * qdsp6_arch_string = QDSP6_ARCH_DEFAULT_STRING;
@@ -2488,105 +2490,534 @@ get_mem_expr_from_mem_rtx (rtx mem)
    }
   return mem_expr;
 }
-/* The Instruction Scheduler calculates Instruction Dependencies. Evaluate the dependencies
-   calculated by the Scheduler. Specifically, remove dependencies between stores to addresses
-   based on __restrict qualified pointers and loads from addresses. */
+/* The Instruction Scheduler calculates Instruction Dependencies. 
+   Evaluate the dependencies
+   calculated by the Scheduler. Specifically, 
+   remove dependencies between stores to addresses
+   based on __restrict qualified pointers and loads from addresses. */  
+
+
+static inline unsigned int 
+get_pair_comp_reg(unsigned int reg)  
+{ 
+    return (reg & 0x1) ? reg - 1 : reg + 1; 
+} 
+
+static inline bool
+pair_match(unsigned int x_reg,int x_pair,unsigned int y_reg,int y_pair)
+{
+     /*  x) r0     y) r0   */
+    if(x_reg == y_reg)  return true; 
+    
+    if(y_pair)
+      {
+        if(x_pair)
+          { /*   x) r1:0    y) r0:1    */ 
+            if(get_pair_comp_reg(x_reg) == get_pair_comp_reg(y_reg)
+            || get_pair_comp_reg(x_reg) == y_reg
+            || get_pair_comp_reg(y_reg) == x_reg)   return true;  
+          }
+        else
+          { /*   x) r1      y) r0:1    */
+            if(get_pair_comp_reg(y_reg) == x_reg)   return true;  
+          }
+    }
+    else
+      {
+        if(x_pair)
+          { /*   x) r1:0    y) r1    */
+            if(get_pair_comp_reg(x_reg) == y_reg)   return true;  
+          }
+      }
+    
+    return false; 
+}
+     
+static bool
+can_get_usable_reg_number
+(rtx dst_0,unsigned int *reg_number,int *updated,int *reg_pair)
+{
+    if(!dst_0)  return false; 
+       
+    switch(GET_CODE (dst_0))
+      {
+        case REG:
+            if(GET_MODE(dst_0) == DImode)   (*reg_pair)++; 
+            *reg_number = REGNO(dst_0);
+            return true; 
+        break; 
+        case POST_INC: 
+        case POST_DEC:
+        case PRE_INC:
+        case PRE_DEC:
+        case POST_MODIFY:
+        case PLUS:	
+        case MINUS: 
+            (*updated)++;            
+            return can_get_usable_reg_number(XEXP (dst_0 ,0),reg_number,updated,reg_pair); 
+        break;
+        default:
+            return false; 
+        break;
+    }
+    return false; 
+}
+
 static void
 qdsp6_sched_dependencies_eval (rtx head, rtx tail)
 {
-
   rtx insn, next_tail;
   
-  if (!flag_midi_optimizations)
+  if (!flag_resolve_restrict_aliasing)
     return;
 
   next_tail = NEXT_INSN (tail);
   for (insn = head; insn != next_tail; insn = NEXT_INSN (insn))
-    {
+   {
       
-      if (!INSN_P (insn))
-	continue;
-      rtx x = PATTERN (insn);
+    if (!INSN_P (insn))	
+	    continue;
+    rtx x = PATTERN (insn);
       
-      /* We are interested if the insn is a store insn. */
-      if (GET_CODE (x) == SET)
-	{
-	  if (MEM_P (SET_DEST (x)))
-	    {
-	      tree  mem_expr;
-	      rtx mem_op;
-	      tree base1, base2;
-	      HOST_WIDE_INT offset1 = 0, offset2 = 0;
-	      HOST_WIDE_INT size1 = -1, size2 = -1;
-	      HOST_WIDE_INT max_size1 = -1, max_size2 = -1;
+    /* We are interested if the insn is a store insn. */
+    if (GET_CODE (x) == SET)
+      {
+        rtx x_dst  = SET_DEST(x);
+        rtx x_src  = SET_SRC(x); 
+
+	    if (MEM_P (x_dst)) 
+          {
+	        tree base1, base2;
+            unsigned int	y_dst_regno   = 0;
+            unsigned int	y_src_regno   = 0;
+            unsigned int	x_dst_regno   = 0;
+            unsigned int	x_src_regno   = 0;
+            int             y_updates_reg = 0; 
+            int             x_updates_reg = 0; 
+            int             x_src_pair    = 0; 
+            int             y_src_pair    = 0; 
+            int             x_dst_pair    = 0; 
+            int             y_dst_pair    = 0; 
+
+	        base1 = get_mem_expr_from_mem_rtx (x_dst);
+            /* If mem_expr is still NULL or source of the mem op is 
+               not a register, then give up. */
+	        if (!base1 || !REG_P(x_src))
+		        continue;
+            while (handled_component_p (base1))
+		        base1 = TREE_OPERAND (base1, 0);
 	      
-	      mem_op  = SET_DEST (x);
-	      mem_expr = get_mem_expr_from_mem_rtx (mem_op);
-	      /* If mem_expr is still NULL then give up. */
-	      if (!mem_expr)
-		continue;
-	      base1 = mem_expr;
-	      while (handled_component_p (base1))
-		base1 = TREE_OPERAND (base1, 0);
-	      
-	      /* Things become intesting only if this is an access via a restrict pointer. */
-	      if (is_restrict_qualified (base1))
-		{
-		  
-		  sd_iterator_def sd_it;
-		  sd_iterator_def temp_it;
-		  dep_t dep;
-		  for (sd_it = sd_iterator_start (insn, SD_LIST_FORW);
-		       sd_iterator_cond (&sd_it, &dep);)
-		    {
-		      rtx y;
-		      y = PATTERN (DEP_CON (dep));
+	        /* Things become intesting only if this is an 
+               access via a restrict pointer. 
+             */
+            if (is_restrict_qualified (base1))
+              { 
+		        sd_iterator_def sd_it;
+		        dep_t dep;
+            /*  Go through all the dependent ops, 
+                and delete qualified
+                memory accesses 
+             */ 
+
+                for (sd_it = sd_iterator_start (insn, SD_LIST_FORW); 
+                             sd_iterator_cond (&sd_it, &dep);)  
+                  {
+                    rtx y = PATTERN (DEP_CON (dep));
+
+                 /* Naming convention:
+                    x) x_dst = x_src
+                    y) y_dst = y_src
+                 */ 
 			
-		      if (GET_CODE (y) == SET)
-			{
-			  if (MEM_P (SET_DEST (y)) || MEM_P (SET_SRC (y)))
-			    {
-			      rtx dst, src;
-			      tree mem_expr_dep;
-			      dst = SET_DEST (y);
-			      src = SET_SRC (y);
-			      if (MEM_P (dst))
-				mem_expr_dep = get_mem_expr_from_mem_rtx (dst);
-			      else
-				mem_expr_dep = get_mem_expr_from_mem_rtx (src);
+                    if (GET_CODE (y) == SET)
+                      {
+                        rtx y_dst = SET_DEST (y);
+                        rtx y_src = SET_SRC (y);
+                    
+                        if (MEM_P (y_dst))
+                          {
+                            tree mem_expr_dep = 
+                                   get_mem_expr_from_mem_rtx (y_dst);
 			      
-			      if (!mem_expr_dep)
-				{
-				  sd_iterator_next (&sd_it);
-				  continue;
-				}
-			      base2 = mem_expr_dep;
-			      while (handled_component_p (base2))
-				base2 = TREE_OPERAND (base2, 0);
-			      if (operand_equal_p (base1, base2, 0))
-				sd_iterator_next (&sd_it);
-			      else
-				{
-				/* If base1 is restrict qualified and base1 != base2 then remove this dependency */
-				  sd_delete_dep (sd_it);
-				  continue;
-				}
-			    }
-			  else  /* !MEM_P (SET_DEST (y)) & !MEM_P (SET_SRC (y))  */
-			    sd_iterator_next (&sd_it);
-			}
+                            if (!mem_expr_dep)  
+                              {
+				        /*  If no info exist, nothing else we can do here 
+                            if mem() operand list is empty, I also should 
+                            not reason about it.*/ 
+				                sd_iterator_next (&sd_it);
+				                continue;
+				              }
+
+                /* This is the case of store-to-store  dependency 
+                    x) mem(r0) = r0;
+                    y) mem(r0++) = r3;
+                    or
+                    x) mem(r0++) = r0;
+                    y) mem(r0) = r3;
+                    Here we might have an update of some sort 
+                    in XY making it more interdependent
+                    then simple memory dependency would suggest 
+                 */
+        
+                 /* Try to obtain register information including potential 
+                    pair register updates/uses 
+                  */ 
+
+        if(!can_get_usable_reg_number(y_src,&y_src_regno,&y_updates_reg,&y_src_pair)
+        || !can_get_usable_reg_number(XEXP ((x_dst),0),&x_dst_regno,&x_updates_reg,&x_dst_pair)
+        || !can_get_usable_reg_number(XEXP ((y_dst),0),&y_dst_regno,&y_updates_reg,&y_dst_pair)
+        || !can_get_usable_reg_number(x_src,&x_src_regno,&x_updates_reg,&x_src_pair))
+                                  {
+                                /*  At any failure we simply move on 
+                                    without modifying existent dependency 
+                                 */ 
+                                    sd_iterator_next (&sd_it);
+                                    continue;
+                                  }
+        
+         /* Here I know the reg numbers. Analyze all combinations */ 
+        if(((x_updates_reg || y_updates_reg) 
+            && pair_match(y_dst_regno,y_dst_pair,x_dst_regno,x_dst_pair))
+         /*  x) mem(r0) = r1;       <-- Use r0 
+             y) mem(r0++) = r2;     <-- Update/Use r0
+             or
+             x) mem(r0++) = r1;     <-- Update/Use r0 
+             y) mem(r0) = r2;       <--  Use r0
+          */
+        ||  (y_updates_reg && pair_match(y_dst_regno,y_dst_pair,x_src_regno,x_src_pair))
+         /*  x) mem(r1) = r0;       <-- Use r0 
+             y) mem(r0++) = r2;     <-- Update/Use r0
+          */
+        ||  (x_updates_reg && pair_match(y_src_regno,y_src_pair,x_dst_regno,x_dst_pair)))
+         /*  x) mem(r0++) = r1;     <-- Update/Use r0 
+             y) mem(r2) = r0;       <-- Use r0
+
+             The following case: 
+             pair_match(y_src_regno,y_src_pair,x_src_regno,x_src_pair)
+             x) mem(r1) = r0;       <-- Use r0 
+             y) mem(r2) = r0;       <-- Use r0 
+             Without a possibility of an update 
+             presents no interest 
+          */ 
+                              {
+                                sd_iterator_next (&sd_it);
+                                continue;
+                              }
+
+            /* Now once register dependencies are rooled out, carry on 
+               with memory dependency analysis 
+             */ 
+                            base2 = mem_expr_dep;
+			                while (handled_component_p (base2))		
+                                base2 = TREE_OPERAND (base2, 0);
+
+			                if (operand_equal_p (base1, base2, 0))
+                              {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                              }
+			                else
+                              {
+				             /* If base1 is restrict qualified and 
+                                base1 != base2 then remove this dependency */
+					            sd_delete_dep (sd_it);
+					            continue; 
+				              }
+
+                          }
+			            else if(MEM_P (y_src))
+                          {
+                            tree mem_expr_dep = get_mem_expr_from_mem_rtx (y_src);
+			      
+			                if (!mem_expr_dep)
+				              {
+				                sd_iterator_next (&sd_it);
+				                continue;
+				              }
+
+                /* This is the case of a load-to-store dependency:
+                   x) mem(r0) = r0;     <-- Use r0 
+                   y) r0 = mem(r2);     <-- Update/Use r0
+                   or
+                   x) mem(r0) = r0;    <-- Use r0 
+                   y) r2 = mem(r0++);  <-- Update/Use r0
+                             
+                   In this case y_dst cannot be a memory location
+                   Similarly to the previous case, extract reg info 
+                 */ 	 	
+        
+        if(!can_get_usable_reg_number(XEXP ((y_src),0),&y_src_regno,&y_updates_reg,&y_src_pair)
+        || !can_get_usable_reg_number(XEXP ((x_dst),0),&x_dst_regno,&x_updates_reg,&x_dst_pair)
+        || !can_get_usable_reg_number(y_dst,&y_dst_regno,&y_updates_reg,&y_dst_pair)
+        || !can_get_usable_reg_number(x_src,&x_src_regno,&x_updates_reg,&x_src_pair))
+          {
+            sd_iterator_next (&sd_it);
+            continue;
+          }
+
+          if(pair_match(y_dst_regno,y_dst_pair,x_dst_regno,x_dst_pair)
+            /*  x) mem(r0) = r1;    <-- Use r0 
+                y) r0 = mem(r2);    <-- Update r0
+            */
+         || pair_match(y_dst_regno,y_dst_pair,x_src_regno,x_src_pair)
+            /*  x) mem(r1) = r0;    <-- Use r0 
+                y) r0 = mem(r2);    <-- Update r0
+            */
+         || ((y_updates_reg || x_updates_reg) 
+            && pair_match(y_src_regno,y_src_pair,x_dst_regno,x_dst_pair))
+            /*  x) mem(r0) = r1;    <-- Use r0 
+                y) r2 = mem(r0++);  <-- Update/Use r0
+                or
+                x) mem(r0++) = r1;  <-- Update/Use r0
+                y) r2 = mem(r0);    <-- Use r0
+            */
+         || (y_updates_reg 
+            && pair_match(y_src_regno,y_src_pair,x_src_regno,x_src_pair)))
+            /*  x) mem(r1) = r0;    <-- Use r0 
+                y) r2 = mem(r0++);  <-- Update/Use r0
+            */
+                          {
+                            sd_iterator_next (&sd_it);
+                            continue;
+                          }
+                        
+                     /* Ok, now we have ruled out register dependency, 
+                        proceed with 
+				        memory dependency analysis */ 
+
+			            base2 = mem_expr_dep;
+			            while (handled_component_p (base2))		
+				            base2 = TREE_OPERAND (base2, 0);
+
+			            if (operand_equal_p (base1, base2, 0)){
+				            sd_iterator_next (&sd_it);
+                            continue; 
+                        }
+			            else
+                          {
+				         /* If base1 is restrict qualified and base1 != base2 then remove this dependency */                      
+				            sd_delete_dep (sd_it);
+				            continue; 
+				          }
+                      }
+			        else  /* !MEM_P (SET_DEST (y)) & !MEM_P (SET_SRC (y))  */
+			            sd_iterator_next (&sd_it);
+                }
 		      else	/* GET_CODE (y) != SET */
-			sd_iterator_next (&sd_it);
+			    sd_iterator_next (&sd_it);
 		    } /* End FOR LOOP */
-		  
-		} /* is_restrict_qualified (base1) */
+		  } /* is_restrict_qualified (base1) */
 	    } /* MEM_P (SET_DEST (x)) */
-	  
-	} /* GET_CODE (x) == SET */
+	   else if(MEM_P(x_src)){
+         /* X is a load */ 
 
-    } /* END MAIN FOR LOOP */
+	        tree base1, base2;
+            unsigned int	y_dst_regno   = 0;
+            unsigned int	y_src_regno   = 0;
+            unsigned int	x_dst_regno   = 0;
+            unsigned int	x_src_regno   = 0;
+            int             y_updates_reg = 0; 
+            int             x_updates_reg = 0; 
+            int             x_src_pair    = 0; 
+            int             y_src_pair    = 0; 
+            int             x_dst_pair    = 0; 
+            int             y_dst_pair    = 0; 
+   
+	        base1 = get_mem_expr_from_mem_rtx (x_src);
+	        /* If mem_expr is still NULL or source of the mem op is 
+               not a register, then give up. */
+	        if (!base1 || !REG_P(x_dst))
+		        continue;
+            while (handled_component_p (base1))
+		        base1 = TREE_OPERAND (base1, 0);
+	      
+	     /* Things become intesting only if this is an 
+            access via a restrict pointer. */
+            if (is_restrict_qualified (base1))
+              { 
+		        sd_iterator_def sd_it;
+		        dep_t dep;
+		     /* Go through all the dependent ops, 
+                and delete qualified
+                memory accesses */ 
+
+                for (sd_it = sd_iterator_start (insn, SD_LIST_FORW); 
+                             sd_iterator_cond (&sd_it, &dep);)  
+                  {
+                    rtx y = PATTERN (DEP_CON (dep));
+                    
+			
+                    if (GET_CODE (y) == SET)
+                      {
+                        rtx y_dst = SET_DEST (y);
+                        rtx y_src = SET_SRC (y);
+                    
+                        if (MEM_P (y_dst))
+                          {
+                            tree mem_expr_dep = 
+                                   get_mem_expr_from_mem_rtx (y_dst);
+			      
+                            if (!mem_expr_dep)  
+                              {
+				                sd_iterator_next (&sd_it);
+				                continue;
+				              }
+
+                /*  This is the case of load-to-store  dependency 
+                    x) r0 = mem(r0) ;
+                    y) mem(r0++) = r3;
+                    or
+                    x) r0 = mem(r0++) ;
+                    y) mem(r0) = r3;
+                    Here again we might have an update of some sort 
+                    X or Y 
+                 */
+        
+        
+        if(!can_get_usable_reg_number(y_src,&y_src_regno,&y_updates_reg,&y_src_pair)
+        || !can_get_usable_reg_number(x_dst,&x_dst_regno,&x_updates_reg,&x_dst_pair)
+        || !can_get_usable_reg_number(XEXP ((y_dst),0),&y_dst_regno,&y_updates_reg,&y_dst_pair)
+        || !can_get_usable_reg_number(XEXP ((x_src),0),&x_src_regno,&x_updates_reg,&x_src_pair))
+                              {
+                                sd_iterator_next (&sd_it);
+                                continue;
+                              }
+
+        /* I know the reg numbers that X/Y  updates */ 
+        if(pair_match(y_dst_regno,y_dst_pair,x_dst_regno,x_dst_pair)
+            /*  x) r0 = mem(r1);    <-- Update r0 
+                y) mem(r0++) = r2;  <-- Update/Use r0
+             */
+        || ((y_updates_reg || x_updates_reg) 
+            && pair_match(y_dst_regno,y_dst_pair,x_src_regno,x_src_pair))
+            /*  x) r1 = mem(r0);    <-- Use r0 
+                y) mem(r0++) = r2;  <-- Update r0
+                or
+                x) r1 = mem(r0++);  <-- Update r0 
+                y) mem(r0) = r2;    <-- Use r0
+             */
+        || pair_match(y_src_regno,y_src_pair,x_dst_regno,x_dst_pair)
+            /*  x) r0 = mem(r1) ;   <-- Update r0 
+                y) mem(r2) = r0;    <-- Use r0
+             */
+        || (x_updates_reg 
+            && pair_match(y_src_regno,y_src_pair,x_src_regno,x_src_pair)))
+            /*  x) r1 = mem(r0++);  <-- Update/Use r0  
+                y) mem(r2) = r0;    <-- Use r0 
+             */
+                              {           
+                                sd_iterator_next (&sd_it);
+                                continue;
+                              }
+
+
+                            
+                            base2 = mem_expr_dep;
+			                while (handled_component_p (base2))		
+                                base2 = TREE_OPERAND (base2, 0);
+
+			                if (operand_equal_p (base1, base2, 0))
+                              {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                              }
+			                else
+                              {
+				             /* If base1 is restrict qualified and 
+                                base1 != base2 then remove this dependency */
+					            sd_delete_dep (sd_it);
+					            continue; 
+				              }
+
+                          }
+			            else if(MEM_P (y_src))
+                           {		  	  
+                            tree mem_expr_dep = get_mem_expr_from_mem_rtx (y_src);
+			      
+			                if (!mem_expr_dep)
+				              {
+				                sd_iterator_next (&sd_it);
+				                continue;
+				              }
+
+                /*  This is the case of a load-to-load dependency:
+                    x) r0 = mem(r0) ;   <-- Use r0 
+                    y) r0 = mem(r2);    <-- Update r0
+                    or
+                    x) r0 = mem(r0) ;   <-- Use r0 
+                    y) r2 = mem(r0++);  <-- Update/Use r0
+                */ 	 	
+        
+       if(!can_get_usable_reg_number(XEXP ((y_src),0),&y_src_regno,&y_updates_reg,&y_src_pair)
+        || !can_get_usable_reg_number(x_dst,&x_dst_regno,&x_updates_reg,&x_dst_pair)
+        || !can_get_usable_reg_number(y_dst,&y_dst_regno,&y_updates_reg,&y_dst_pair)
+        || !can_get_usable_reg_number(XEXP ((x_src),0),&x_src_regno,&x_updates_reg,&x_src_pair))
+                              {
+                                sd_iterator_next (&sd_it);
+                                continue;
+                              }
+          
+             /* Analyze potential register deps:
+                First combination: 
+                pair_match(y_dst_regno,y_dst_pair,x_dst_regno,x_dst_pair)
+                x) r0 = mem(r1);    <-- Update r0 
+                y) r0 = mem(r2);    <-- Update r0
+                                      
+                We do not really care about this case 
+                Output dep with no update possible
+             */
+        if(pair_match(y_dst_regno,y_dst_pair,x_src_regno,x_src_pair)
+            /*  x) r1 = mem(r0) ;   <-- Uses r0 
+                y) r0 = mem(r2);    <-- Update r0
+             */
+        || pair_match(y_src_regno,y_src_pair,x_dst_regno,x_dst_pair)
+            /*  x) r0 = mem(r1) ;   <-- Update r0 
+                y) r2 = mem(r0);    <-- Uses r0
+             */
+        || ((y_updates_reg || x_updates_reg) 
+            && pair_match(y_src_regno,y_src_pair,x_src_regno,x_src_pair)))
+            /*  x) r1 = mem(r0);    <-- Use r0 
+                y) r2 = mem(r0++);  <-- Update/Use r0
+                or
+                x) r1 = mem(r0++);  <-- Update/Use r0 
+                y) r2 = mem(r0);    <-- Use r0
+             */        
+                              {            
+                                sd_iterator_next (&sd_it);
+                                continue;
+                              }
+                        
+                     /* Ok, now we have ruled out register dependency, 
+                        proceed with 
+				        memory dependency analysis */ 
+
+			            base2 = mem_expr_dep;
+			            while (handled_component_p (base2))		
+				            base2 = TREE_OPERAND (base2, 0);
+
+			            if (operand_equal_p (base1, base2, 0))
+                          {
+				            sd_iterator_next (&sd_it);
+                            continue; 
+                          }
+			            else
+                          {
+				         /* If base1 is restrict qualified and base1 != base2 then remove this dependency */    
+				            sd_delete_dep (sd_it);
+				            continue; 
+				          }
+                      }
+			        else  /* !MEM_P (SET_DEST (y)) & !MEM_P (SET_SRC (y))  */
+			            sd_iterator_next (&sd_it);
+                }
+		      else	/* GET_CODE (y) != SET */
+			    sd_iterator_next (&sd_it);
+		    } /* End FOR LOOP */
+		  } /* is_restrict_qualified (base1) */
+        }	         
+	  } /* GET_CODE (x) == SET */
+   } /* END MAIN FOR LOOP */
 }
-
 
 
 

@@ -911,7 +911,7 @@ decode_options (unsigned int argc, const char **argv)
   flag_tree_pre = opt2;
   flag_tree_switch_conversion = 1;
   flag_ipa_cp = opt2;
-  flag_midi_optimizations = opt2;
+  /* flag_resolve_restrict_aliasing = opt2; */
   /* Allow more virtual operators to increase alias precision.  */
 
   set_param_value ("max-aliased-vops",
