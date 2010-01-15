@@ -7086,7 +7086,150 @@ qdsp6_expand_movmem(rtx operands[])
   return false;
 }
 
+/* Block set instruction. The destination string is the first operand, given as a 
+   mem:BLK whose address is in mode Pmode. The number of bytes to set is the second operand, 
+   in mode m. The value to initialize the memory with is the third operand. Targets that only 
+   support the clearing of memory should reject any value that is not the constant 0.
 
+   The fourth operand is the known alignment of the destination, in the form of a const_int rtx. 
+   Thus, if the compiler knows that the destination is word-aligned, it may provide the value 4 for this operand.
+
+   Optional operands 5 and 6 specify expected alignment and size of block respectively. The expected 
+   alignment differs from alignment in operand 4 in a way that the blocks are not required to be aligned 
+   according to it in all cases. This expected alignment is also in bytes, just like operand 4. Expected 
+   size, when unknown, is set to (const_int -1). 
+
+   Implementation details-
+   1. From the alignment, figure out all valid modes which can be used to set memory. For example-
+      a. alignment == 4  -> valid modes (QI, HI, SI)
+      b. aligment == 128 -> valid modes (QI, HI, SI, DI)
+
+   2. Now loop thru all valid modes starting from the widest to the narrowest-
+      a. calculate loop count = bytes-to-copy / mode-size
+      b. if loop count == 0 -> not enough bytes to store
+      c. if loop count == 1 -> do simple store
+      d. if loop count > 1  -> do hardware loop
+*/
+
+bool
+qdsp6_expand_setmem(rtx operands[])
+{
+#define MEMSET_LIBCALL_THRESHOLD 64
+  HOST_WIDE_INT align_intval, nbytes_intval, initval_intval;
+  rtx destaddr, nbytes, initval, align;
+
+  if (!flag_optimize_memset)
+    return false;
+
+  destaddr = operands[0];
+  nbytes = operands[1];
+  initval = operands[2];
+  align = operands[3];
+
+  /* Sanity checks */
+  gcc_assert(destaddr && nbytes && initval);
+
+  /* nbytes should be constant */
+  if (GET_CODE(nbytes) != CONST_INT)
+    return false;
+
+  /* align should be constant. We should probably assert but... */
+  if (GET_CODE(align) != CONST_INT)
+    return false;
+
+  /* initval should be constant. */
+  if (GET_CODE(initval) != CONST_INT)
+    return false;
+
+  align_intval = INTVAL(align);
+  nbytes_intval = INTVAL(nbytes);
+  initval_intval = INTVAL(initval);
+
+  /* If nothing to set or large memory (memset might optimize it better), return */
+  if (nbytes_intval <= 0 || nbytes_intval > MEMSET_LIBCALL_THRESHOLD)
+    return false;
+
+  /* If not clearing memory, return */
+  if (initval_intval != 0)
+    return false;
+
+  /* Now starting from the narrowest mode, figure out all valid modes */
+  enum machine_mode valid_modes[MAX_MODE_INT-MIN_MODE_INT+1] = {VOIDmode};
+  enum machine_mode curr_mode;
+  int index = 0;
+
+  /* Step 1. See comments above */
+  for (curr_mode = GET_CLASS_NARROWEST_MODE(MODE_INT); curr_mode != VOIDmode;
+       curr_mode = GET_MODE_WIDER_MODE(curr_mode))
+    {
+      /* Is mode supported */
+      if (!targetm.scalar_mode_supported_p(curr_mode))
+        continue;
+
+      /* Make sure alignment does not exceed align */
+      if (GET_MODE_SIZE(curr_mode) > align_intval)
+        break;
+
+      valid_modes[index++] = curr_mode;
+    }
+
+  /* Index must be non-zero */
+  gcc_assert(index);
+
+  /* Get the base pointer */
+  rtx base_reg = copy_to_mode_reg(SImode, XEXP(destaddr, 0));
+  int nbytes_left = nbytes_intval;
+  /* Step 2. Starting from the widest mode, generate hardware loop stores */
+  for (index = index-1; index >= 0; index--)
+    {
+      rtx store_reg, label;
+      curr_mode = valid_modes[index];
+      int loop_count = nbytes_left / GET_MODE_SIZE(curr_mode);
+      /* Size is smaller than the alignment */
+      if (loop_count == 0)
+          continue;
+
+      /* r = #0 */
+      rtx zero_reg = gen_reg_rtx(curr_mode);
+      emit_move_insn(zero_reg, initval);
+
+      if (loop_count == 1)
+        {
+          /* Simple store */
+          store_reg = gen_rtx_MEM(curr_mode, base_reg);
+          MEM_COPY_ATTRIBUTES(store_reg, destaddr);
+          emit_move_insn(store_reg, zero_reg);
+
+          /* Increment the base pointer */
+          emit_insn(gen_addsi3(base_reg, base_reg, 
+                               gen_int_mode(GET_MODE_SIZE(curr_mode), SImode)));
+        }
+      else
+        {
+          /* Hardware loop */
+          store_reg = gen_rtx_MEM(curr_mode, base_reg);
+          MEM_COPY_ATTRIBUTES(store_reg, destaddr);
+          label = gen_label_rtx();
+          /* Hack for hardware loop */
+          rtx count_reg = gen_reg_rtx(SImode);
+          rtx doloop_fixup_code = GEN_INT(REGNO(count_reg));
+          rtx loopcount_rtx = gen_int_mode(loop_count, SImode);
+
+          emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+          emit_label(label);
+          emit_move_insn(store_reg, zero_reg);
+          emit_insn(gen_addsi3(base_reg, base_reg, 
+                               gen_int_mode(GET_MODE_SIZE(curr_mode), SImode)));
+          emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
+          qdsp6_hardware_loop();
+        }
+
+      /* Count leftover */
+      nbytes_left = nbytes_left % GET_MODE_SIZE(curr_mode);
+    }
+  gcc_assert(nbytes_left == 0);
+  return true;
+}
 
 
 #if 0

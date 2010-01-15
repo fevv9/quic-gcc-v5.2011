@@ -73,6 +73,7 @@ extern void qdsp6_print_operand(FILE *, rtx, int);
 extern void qdsp6_print_operand_address(FILE *, rtx);
 extern bool qdsp6_expand_movstr(rtx[]);
 extern bool qdsp6_expand_movmem(rtx[]);
+extern bool qdsp6_expand_setmem(rtx[]);
 extern bool qdsp6_expand_clrstr(rtx[]);
 extern bool qdsp6_expand_strlen(rtx[]);
 extern bool qdsp6_expand_cmpstr(rtx[]);
