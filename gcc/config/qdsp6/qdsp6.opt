@@ -108,6 +108,10 @@ mresolve-restrict-aliasing
 Common Target Var(flag_resolve_restrict_aliasing) Optimization
 Perform MIDI specific optimizations.
 
+mpred-mux
+Target Report Undocumented Mask(PRED_MUX)
+Convert mux's to predicated transfers where possible
+
 moptimize-memset
 Common Target Var(flag_optimize_memset) Optimization
 Optimize memset routine in the backend

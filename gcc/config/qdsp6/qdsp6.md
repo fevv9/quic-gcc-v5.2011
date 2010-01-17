@@ -6776,6 +6776,80 @@
 ;;-------------------;;
 
 
+; Optimized case for r0 = mux(!p0, r0, r2)
+; Change to if (p0) r0 = r2
+; This form can be transformed to a dot-new transfer
+(define_peephole2 
+  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+        (if_then_else:SI
+          (eq:BI
+            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (const_int 0))
+	  (match_dup 0)
+          (match_operand:SI 2 "nonmemory_operand"     "Rg")))]
+  "TARGET_PRED_MUX"
+  [(cond_exec
+     (ne:BI (match_dup 1) (const_int 0))
+     (set (match_dup 0) (match_dup 2)))]
+  ""
+)
+
+; Optimized case for r0 = mux(!p0, r2, r0)
+; Change to if (!p0) r0 = r2
+; This form can be transformed to a dot-new transfer
+(define_peephole2 
+  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+        (if_then_else:SI
+          (eq:BI
+            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (const_int 0))
+	  (match_operand:SI 2 "nonmemory_operand"     "Rg")
+          (match_dup 0)))]
+  "TARGET_PRED_MUX"
+  [(cond_exec
+     (eq:BI (match_dup 1) (const_int 0))
+     (set (match_dup 0) (match_dup 2)))]
+  ""
+)
+
+
+; Optimized case for r0 = mux(p0, r0, r2)
+; Change to if (!p0) r0 = r2
+; This form can be transformed to a dot-new transfer
+(define_peephole2 
+  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+        (if_then_else:SI
+          (ne:BI
+            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (const_int 0))
+	  (match_dup 0)
+          (match_operand:SI 2 "nonmemory_operand"     "Rg")))]
+  "TARGET_PRED_MUX"
+  [(cond_exec
+     (eq:BI (match_dup 1) (const_int 0))
+     (set (match_dup 0) (match_dup 2)))]
+  ""
+)
+
+; Optimized case for r0 = mux(p0, r2, r0)
+; Change to if (p0) r0 = r2
+; This form can be transformed to a dot-new transfer
+(define_peephole2 
+  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+        (if_then_else:SI
+          (ne:BI
+            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (const_int 0))
+	  (match_operand:SI 2 "nonmemory_operand"     "Rg")
+          (match_dup 0)))]
+  "TARGET_PRED_MUX"
+  [(cond_exec
+     (ne:BI (match_dup 1) (const_int 0))
+     (set (match_dup 0) (match_dup 2)))]
+  ""
+)
+
+
 
 (define_peephole2
   [(set (match_operand:SI 0 "gr_register_operand" "")
@@ -6892,6 +6966,7 @@
                          (match_dup 5)))]
   ""
 )
+
 
 
 

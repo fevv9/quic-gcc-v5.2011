@@ -652,6 +652,11 @@ qdsp6_optimization_options(int level, int size)
 
   qdsp6_falign = QDSP6_NO_FALIGN;
 
+  if (level >= 1)
+    {
+      target_flags |= MASK_PRED_MUX;
+    }
+
   if(size){
     target_flags |= MASK_EXTENDED_CROSSJUMPING; 
   }
