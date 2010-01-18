@@ -181,6 +181,7 @@ static void qdsp6_output_operand(FILE *f, rtx x, int code);
 static void qdsp6_fixup_cfg(void);
 static void qdsp6_fixup_doloops(void);
 static void qdsp6_machine_dependent_reorg(void);
+static void qdsp6_local_combine_pass(void);
 
 static void qdsp6_init_builtins(void);
 static rtx expand_one_builtin(
@@ -659,6 +660,7 @@ qdsp6_optimization_options(int level, int size)
 
   if(size){
     target_flags |= MASK_EXTENDED_CROSSJUMPING; 
+    target_flags |= MASK_LOCAL_COMBINE;
   }
 
   if(level >= 3 && !size){
@@ -4394,8 +4396,6 @@ qdsp6_fixup_doloops(void)
 }
 
 
-
-
 /* Implements hook TARGET_MACHINE_DEPENDENT_REORG */
 
 static void
@@ -4419,6 +4419,11 @@ qdsp6_machine_dependent_reorg(void)
   if(cfun->machine->has_hardware_loops){
     qdsp6_fixup_doloops();
   }
+  
+  if (TARGET_LOCAL_COMBINE) 
+    {
+      qdsp6_local_combine_pass();
+    }
 
   if(TARGET_PULLUP && optimize && flag_schedule_insns_after_reload){
     qdsp6_packet_optimizations();
@@ -8090,6 +8095,14 @@ qdsp6_get_flags(rtx insn)
   else if(CALL_P (insn)){
     flags |= QDSP6_CALL;
   }
+  /* Ignore instructions that do nothing */
+  else if ((GET_CODE (PATTERN (insn)) == CLOBBER) ||
+	   (GET_CODE (PATTERN (insn)) == USE) || 
+	   (GET_CODE (PATTERN (insn)) == ADDR_VEC) ||
+	   (GET_CODE (PATTERN (insn)) == ADDR_DIFF_VEC))
+    {
+      /* do nothing */
+    }
   else if(get_attr_emulation_call(insn) == EMULATION_CALL_YES){
     flags |= QDSP6_EMULATION_CALL;
   }
@@ -8233,14 +8246,269 @@ qdsp6_get_insn_info(rtx insn)
 
   /* Transfers of immediate values that cannot be encoded in a transfer
      immediate instruction are implemented as GP-relative loads. */
-  if(get_attr_type(insn) == TYPE_LOAD){
-    insn_info->flags |= QDSP6_MEM;
-  }
-
+  if ((GET_CODE (PATTERN (insn)) == CLOBBER) ||
+      (GET_CODE (PATTERN (insn)) == USE) || 
+      (GET_CODE (PATTERN (insn)) == ADDR_VEC) ||
+      (GET_CODE (PATTERN (insn)) == ADDR_DIFF_VEC))
+    {
+      /* do nothing */
+    }
+  else if (get_attr_type(insn) == TYPE_LOAD)
+    {
+      insn_info->flags |= QDSP6_MEM;
+    }
+  
   return insn_info;
 }
 
 
+/* Given register reg, return its corresponding pair register */
+static inline unsigned int 
+get_pair_reg(unsigned int regno)
+{
+  return (regno & 0x1) ? regno - 1 : regno + 1;
+}
+
+
+/* 
+   Given a vector tranfer_source that maps register numbers to insn pointers:
+   Iterate through the vector.
+   If an element of the vector is a register copy with orig_reg as a source, 
+   replace that element with replacement 
+*/
+static void
+qdsp6_replace_transfer_map(VEC(rtx, gc)* transfer_source, unsigned orig_reg, 
+			   rtx replacement)
+{
+  unsigned int iter;
+
+  gcc_assert((replacement == NULL_RTX) || INSN_P(replacement));
+
+  for (iter = 0; iter <  FIRST_PSEUDO_REGISTER; ++iter) 
+    {
+      rtx element = VEC_index(rtx, transfer_source, iter);
+      if (element != NULL_RTX) 
+	{
+	  rtx element_source = SET_SRC (single_set (element));
+	  if (REG_P (element_source) && 
+	      (REGNO (element_source) == orig_reg))
+	    {
+	      VEC_replace(rtx, transfer_source, iter, replacement);
+	    }
+	}
+    }
+}
+
+
+/* Predicate that returns true if insn is a register-to-register or
+   a register-to-immediate copy */
+static inline bool 
+qdsp6_register_copy_word_p (rtx insn)
+{
+  rtx reg_copy;
+  bool dest_reg, src_reg_imm;
+  if (!insn || (!(reg_copy = single_set(insn))))
+    {
+      return false;
+    }
+  
+  dest_reg = register_operand(SET_DEST (reg_copy), SImode);
+  src_reg_imm = register_operand(SET_SRC (reg_copy), SImode) || 
+    const_int_operand(SET_SRC (reg_copy), SImode);
+
+  return (dest_reg && src_reg_imm);
+}
+
+/* Predicate that checks if REG is a lower component of a pair register */
+#define QDSP6_LOWER_PAIR(REG)         (!(REG & 0x1))
+
+
+/* 
+   Pass that scans through all basic blocks and changes register-register
+   and register-immediate transfers into combine instructions where possible.
+   For instance, it combines:
+   r0 = r3
+   ...
+   r1 = r4
+   into r1:0 = combine(r4,r3)
+
+   High-level overview of the pass:
+   --------------------------------
+   Iterate over all instructions I in the basic block. 
+   Maintain a map M from register number to insn pointer of the last write 
+   of that register
+   For all register reads, R, clear map(R)
+   Consider all transfer instructions of the form rx = y, where rx is a 
+   register and y is a register or an immediate
+   Consult the map to verify if the corresponding pair register for rx
+   was written to by a transfer. If so, replace the transfers with a combine
+   instruction
+   For all non-transfer instructions, iterate over the register writes
+   and invalidate the corresponding entry in the map
+*/
+static void
+qdsp6_local_combine_pass(void) 
+{
+  rtx insn;
+  basic_block bb;
+  rtx head_insn;
+  rtx end_insn;
+
+  /* transfer_source: vector that holds the sources used by a transfer 
+     instruction. The index is the physical register defined by the transfer. 
+     The vector element is the rtx of the source used by the transfer 
+     instruction. 
+     This vector depends on NULL_RTX being defined to 0
+  */
+  VEC(rtx, gc) *transfer_source = NULL;
+  VEC_safe_grow_cleared(rtx, gc, transfer_source, FIRST_PSEUDO_REGISTER);  
+  
+  FOR_EACH_BB(bb)
+    {
+      rtx combine_insn;
+      head_insn = BB_HEAD (bb);
+      end_insn = BB_END (bb);
+      insn = head_insn;
+
+      /* Reset the vector */
+      VEC_truncate(rtx, transfer_source, 0);
+      VEC_safe_grow_cleared(rtx, gc, transfer_source, FIRST_PSEUDO_REGISTER);
+      
+      FOR_BB_INSNS (bb, insn)
+	{
+	  struct qdsp6_insn_info *insn_info;
+	  struct qdsp6_reg_access *read;
+	  struct qdsp6_reg_access *write;
+
+	  /* Only process instructions */
+	  if (!INSN_P(insn)) 
+	    {
+	      continue;
+	    }
+	  insn_info = qdsp6_get_insn_info(insn);
+
+	  /* Process all instructions -- transfers and non-transfers. If the 
+	     instruction is reading the register. Remove from map. This condition
+	     must be checked before processing register copies. Else, the code will
+	     incorrectly handle this situation:
+	     r1 = r25
+	     r0 = r1   ;; We must invalidate r1 before processing this instruction
+                       ;; We cannot insert a r1:0=combine(r25,r1) here
+	  */
+	  for(read = insn_info->reg_reads; read; read = read->next)
+	    {
+	      VEC_replace(rtx, transfer_source, read->regno, NULL_RTX);
+	    }
+	  
+
+	  if (qdsp6_register_copy_word_p (insn))
+	    {
+	      rtx source;
+	      unsigned int dest_pair_regno;
+	      rtx dest_pair_insn, source_pair;
+	      unsigned int dest_regno = REGNO (SET_DEST(single_set (insn)));
+	      gcc_assert(dest_regno < FIRST_PSEUDO_REGISTER);
+
+	      /* Get the source for this transfer instruction */
+	      source = SET_SRC (single_set (insn));
+	      VEC_replace(rtx, transfer_source, dest_regno, insn);
+
+	      /* A register has been defined. If that register is an element of
+		 transfer_source, we can no longer consider that transfer to be valid.
+		 Invalidate that element */
+	      qdsp6_replace_transfer_map (transfer_source, dest_regno, NULL_RTX);
+	      
+	      /* Get the pair register for dest_regno */
+	      dest_pair_regno = get_pair_reg(dest_regno);
+	      if ((dest_pair_insn = VEC_index(rtx, transfer_source, dest_pair_regno)))
+		{
+		  enum machine_mode dummy_mode;
+		  source_pair = SET_SRC (single_set (dest_pair_insn));
+
+		  /* Check if the sources for transfer instructions defining the pair are either:
+		     1. Both registers, in which case we can use combine(reg, reg), or
+		     2. Both immediates, in which case we can use combine(imm, imm)
+		  */
+		  /*
+		        To consider: Can I make the int operand belongs to s8 code more generic?
+		  */
+		  if ((REG_P (source_pair) && REG_P (source)) || 
+		      (CONST_INT_P (source_pair) && CONST_INT_P (source) && 
+		       s8_const_int_operand(source, dummy_mode) && 
+		       s8_const_int_operand(source_pair, dummy_mode)))
+		    {
+		      rtx dest_reg_rtx  = gen_rtx_REG(SImode, dest_regno);
+		      rtx dest_pair_rtx = gen_rtx_REG(SImode, dest_pair_regno);
+		      
+		      /* Check if the current instruction defines the lower or the higher pair
+			 and create the appropriate combine instruction */
+		      if (QDSP6_LOWER_PAIR (dest_regno))
+			{
+			  combine_insn = 
+			    emit_insn_after( gen_combinesi (dest_pair_rtx, 
+							    source_pair, 
+							    dest_reg_rtx,
+							    source), 
+					     insn);
+			}
+		      else 
+			{
+			  combine_insn = 
+			    emit_insn_after( gen_combinesi (dest_reg_rtx, 
+							    source, 
+							    dest_pair_rtx,
+							    source_pair), 
+					     insn);
+			}
+
+		      delete_insn(insn);
+		      /* If this pass hasn't already deleted dest_pair_insn, then 
+			 delete it
+			 This can happen if dest_pair_insn has been replaced with a combine,
+			 and then the defined register is used in another replacement */
+		      if (!INSN_DELETED_P (dest_pair_insn)) 
+			{
+			  delete_insn(dest_pair_insn);
+			}
+		      insn = combine_insn;
+		    }
+		}
+	    } /* qdsp6_is_register_copy */
+	  else 
+	    {
+	      /* For Call instructions we need to invalidate all caller-saved registers */
+	      if (CALL_P(insn)) {
+		unsigned int i;
+		for (i = 0; i < VEC_length(rtx, transfer_source); ++i) 
+		  {
+		    if (call_used_regs[i])
+		      {
+			VEC_replace(rtx, transfer_source, i, NULL_RTX); 
+			/* If any element of the vector contains a caller-save register
+			   invalidate that entry */
+			qdsp6_replace_transfer_map (transfer_source, i, NULL_RTX);
+		      }
+		  }
+	      }
+
+	      /* An non-transfer instruction is writing to a register. Remove from map */
+	      for(write = insn_info->reg_writes; write; write = write->next)
+		{
+		  unsigned int defined_reg = write->regno;
+		  
+		  VEC_replace(rtx, transfer_source, defined_reg, NULL_RTX);
+		  /* Register defined_reg is redefined. Iterate through vector and remove all 
+		     occurrences of register defined_reg as a source 
+		     
+		     This can be made more efficient by maintaining a map of regno to 
+		     a list of indices in transfer_source that contain regno as an 
+		     element */
+		  qdsp6_replace_transfer_map(transfer_source, defined_reg, NULL_RTX); 
+		}
+	    }
+	}
+    }
+}
 
 
 static struct qdsp6_packet_info *

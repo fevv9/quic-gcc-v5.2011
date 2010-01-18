@@ -104,6 +104,10 @@ mv1-v2-uncached-data
 Target Report Undocumented Mask(UNCACHED_DATA)
 Limit the number of memory accesses in a packet to one
 
+mlocal-combine
+Target Report Undocumented Mask(LOCAL_COMBINE)
+Run local combine pass
+
 mresolve-restrict-aliasing
 Common Target Var(flag_resolve_restrict_aliasing) Optimization
 Perform MIDI specific optimizations.
