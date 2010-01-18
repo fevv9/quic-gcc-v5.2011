@@ -2100,7 +2100,6 @@ qdsp6_legitimate_address_p(
   rtx xop1 = NULL_RTX;
   rtx xop1op0 = NULL_RTX;
   rtx xop1op1 = NULL_RTX;
-  bool check_mode;
   bool allow_extension = false;
   bool allow_gp = false;
   bool allow_absolute = false;
@@ -2154,18 +2153,6 @@ qdsp6_legitimate_address_p(
     allow_base_plus_index = false;
   }
 
-  /* ??? DFmode? BImode? Why do we check the mode anyway? */
-  check_mode =    mode == DImode
-               || mode == SImode
-               || mode == SFmode
-               || mode == HImode
-               || mode == QImode
-               || mode == V2SImode
-               || mode == V4HImode
-               || mode == V8QImode
-               || mode == V2HImode
-               || mode == V4QImode;
-
   /* Extract operands and canonicalize commutitive operators. */
   if(GET_CODE (x) == PLUS || GET_CODE (x) == POST_MODIFY){
     xop0 = XEXP (x, 0);
@@ -2211,7 +2198,6 @@ qdsp6_legitimate_address_p(
      addresses later.  Note that we don't check the range of the constant. */
   if(!reg_ok_strict_p
      && GET_CODE (x) == PLUS
-     && check_mode
      && REG_P (xop0)
      && REGNO (xop0) == FRAME_POINTER_REGNUM
      && GET_CODE (xop1) == CONST_INT){
@@ -2220,7 +2206,6 @@ qdsp6_legitimate_address_p(
 
   /* base+offset/index address */
   if(   GET_CODE (x) == PLUS
-     && check_mode
      && ((REG_P (xop0) && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p))
          || (allow_immediate_base && allow_extension
              && CONSTANT_P (xop0) && !CONSTANT_P (xop1)))){
@@ -2268,15 +2253,12 @@ qdsp6_legitimate_address_p(
     /* post increment/decrement address with the increment/decrement equal to
        the access size */
     if(GET_CODE (x) == POST_INC || GET_CODE (x) == POST_DEC){
-      return    (reg_ok_strict_p || check_mode) /* ??? Is this right? */
-             && REG_P (xop0)
-             && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p);
+      return REG_P (xop0) && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p);
     }
 
     /* post increment/decrement address */
     if(GET_CODE (x) == POST_MODIFY){
-      return    check_mode
-             && REG_P (xop0)
+      return    REG_P (xop0)
              && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p)
              && GET_CODE (xop1) == PLUS
              && REG_P (xop1op0)
