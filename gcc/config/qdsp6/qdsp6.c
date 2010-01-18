@@ -649,6 +649,7 @@ qdsp6_optimization_options(int level, int size)
   if(level >= 2){
     //target_flags |= MASK_PACKETS;
     target_flags |= MASK_PULLUP;
+    flag_optimize_memset = 1;
   }
 
   qdsp6_falign = QDSP6_NO_FALIGN;
