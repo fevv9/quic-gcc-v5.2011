@@ -3647,6 +3647,7 @@ process_command (int argc, const char **argv)
 	  fputs (_("This is free software; see the source for copying conditions.  There is NO\n\
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"),
 		 stdout);
+	  printf("%s\n", QC_COPYRT_MSG);
 	  exit (0);
 	}
       else if (strcmp (argv[i], "-fhelp") == 0)
