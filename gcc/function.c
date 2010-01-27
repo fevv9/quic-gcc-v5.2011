@@ -4804,7 +4804,7 @@ expand_function_end (void)
 
     start_sequence ();
     clobber_return_register ();
-    //expand_naked_return ();
+    /* expand_naked_return (); */
     seq = get_insns ();
     end_sequence ();
 
