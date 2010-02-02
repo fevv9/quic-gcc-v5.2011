@@ -1041,8 +1041,6 @@ combine_instructions (rtx f, unsigned int nregs)
 
   VEC_safe_grow_cleared (reg_stat_type, heap, reg_stat, nregs);
 
-  init_recog_no_volatile ();
-
   /* Allocate array for insn info.  */
   max_uid_known = get_max_uid ();
   uid_log_links = XCNEWVEC (rtx, max_uid_known + 1);
@@ -1301,9 +1299,6 @@ combine_instructions (rtx f, unsigned int nregs)
 
   nonzero_sign_valid = 0;
   rtl_hooks = general_rtl_hooks;
-
-  /* Make recognizer allow volatile MEMs again.  */
-  init_recog ();
 
   return new_direct_jump_p;
 }
@@ -12991,6 +12986,8 @@ rest_of_handle_combine (void)
 {
   int rebuild_jump_labels_after_combine;
 
+  crtl->combine_in_progress = 1;
+
   df_set_flags (DF_LR_RUN_DCE + DF_DEFER_INSN_RESCAN);
   df_note_add_problem ();
   df_analyze ();
@@ -13012,6 +13009,10 @@ rest_of_handle_combine (void)
     }
 
   regstat_free_n_sets_and_refs ();
+
+  crtl->combine_in_progress = 0;
+  crtl->combine_completed = 1;
+
   return 0;
 }
 

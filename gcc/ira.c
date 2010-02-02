@@ -2474,6 +2474,8 @@ update_equiv_regs (void)
 		     calls.  */
 
 		  if (REG_N_REFS (regno) == 2
+		      && (!flag_schedule_insns
+		          || REG_BASIC_BLOCK (regno) < NUM_FIXED_BLOCKS)
 		      && (rtx_equal_p (x, src)
 			  || ! equiv_init_varies_p (src))
 		      && NONJUMP_INSN_P (insn)

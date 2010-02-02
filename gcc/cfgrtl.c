@@ -2107,7 +2107,7 @@ rtl_verify_flow_info (void)
 	}
 
       if (JUMP_P (x)
-	  && returnjump_p (x) && ! condjump_p (x)
+	  && returnjump_p (x) && ! any_condjump_p (x)
 	  && ! (next_nonnote_insn (x) && BARRIER_P (next_nonnote_insn (x))))
 	    fatal_insn ("return not followed by barrier", x);
       if (curr_bb && x == BB_END (curr_bb))
