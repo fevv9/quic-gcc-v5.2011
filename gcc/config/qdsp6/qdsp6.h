@@ -1248,11 +1248,7 @@ struct qdsp6_arch_table_entry {
                                | QDSP6_FEAT_V4} \
   }
 
-#if GCC_3_4_6
-#define QDSP6_ARCH_DEFAULT_STRING "qdsp6v4"
-#else /* !GCC_3_4_6 */
-#define QDSP6_ARCH_TABLE_DEFAULT_INDEX QDSP6_ARCH_V4
-#endif /* !GCC_3_4_6 */
+#define QDSP6_ARCH_TABLE_DEFAULT_INDEX QDSP6_ARCH_V2
 
 enum qdsp6_abi {
   QDSP6_ABI_1,
