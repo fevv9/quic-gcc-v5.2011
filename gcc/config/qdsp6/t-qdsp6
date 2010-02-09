@@ -31,6 +31,6 @@ MULTILIB_OPTIONS    = march=qdsp6v3 mG0lib
 MULTILIB_DIRNAMES   = v3 G0
 MULTILIB_MATCHES    =
 MULTILIB_EXCEPTIONS =
-MULTILIB_EXTRA_OPTS =
+MULTILIB_EXTRA_OPTS = mbuilding-multilib
 
 gt-qdsp6.h: s-gtype ; @true
