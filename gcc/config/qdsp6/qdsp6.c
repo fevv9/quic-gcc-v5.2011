@@ -7066,14 +7066,14 @@ qdsp6_compute_dwarf_frame_information(void)
                         /* hard_frame_pointer_rtx */ : frame->lrfp_size)
            + frame->offset;
   /* Did we save any callee-save registers as pairs? */
-  for(i = frame->num_saved_pairs - 1; i >= 0; i--){
+  for(i = 0; i < frame->num_saved_pairs; i++){
     offset -= 2 * UNITS_PER_WORD;
     dwarf2out_reg_save(label, frame->saved_pairs[i], offset);
     dwarf2out_reg_save(label, frame->saved_pairs[i] + 1,
                               offset + UNITS_PER_WORD);
   }
   /* Did we save any other callee-save registers? */
-  for(i = frame->num_saved_singles - 1; i >= 0; i--){
+  for(i = 0; i < frame->num_saved_singles; i++){
     offset -= UNITS_PER_WORD;
     dwarf2out_reg_save(label, frame->saved_singles[i], offset);
   }
