@@ -300,6 +300,52 @@ Storage Layout
 /* No native data types have more than 8-byte alignment by default. */
 #define BIGGEST_ALIGNMENT 64
 
+/* GCC uses the following internal structure to represent a 
+   pointer-to-member-function:
+
+   struct {
+    union {
+        void (*fn)();
+        ptrdiff_t vtable_index;
+    };
+    ptrdiff_t delta;
+   };
+
+   Generally GCC must use one bit to indicate whether the function that will be
+   called through a pointer-to-member-function is virtual. 
+   Normally, we assume that the low-order bit of a function pointer must always
+   be zero (word aligned). Then, by ensuring that the vtable_index is odd, 
+   we can distinguish which variant of the union is in use. But, on some 
+   platforms function pointers can be odd, and so this doesn't work. In that 
+   case, we use the low-order bit of the delta field, and shift the remainder 
+   of the delta field to the left. 
+   On QDSP6 use of delta field is not _needed_ but produces a better code for 
+   several scenarios. Particularly for an empty class with function 
+   definitions:
+
+   (from bug 3711)
+
+   struct S {
+       int func(char)      { return 100; }
+   } s;
+
+   int main(void)
+   {
+      int (S::*pfc)(char)    = &S::func;
+      (s.*pfc)(0);
+   }
+
+   GCC will use default alignment of "char" for 's', but might use memw/mov_si
+   to access nonexistent vtable in "front" of s, resulting in potential conflict.
+
+   When delta field is used via TARGET_PTRMEMFUNC_VBIT_LOCATION, compiler is 
+   capable to determine that there is _no_ vtable to access in this case, and 
+   simply optimizes out the access code. If a vtable does exist, it will be word 
+   aligned by definition.
+   */  
+#define TARGET_PTRMEMFUNC_VBIT_LOCATION ptrmemfunc_vbit_in_delta
+
+
 /* This is only used for internal sorting during packetization
    and eventually need to be replaced with a linked list or any
    other scalable method of bookkeeping */ 
