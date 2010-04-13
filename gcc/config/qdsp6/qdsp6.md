@@ -9490,8 +9490,36 @@
   [(set (match_dup 0) (match_dup 1))
    (set (match_dup 2) (match_dup 3))]
   {
-    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[3])
-                 && REGNO (operands[0]) == REGNO (operands[3])));
+    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1]) 
+                    && REG_P (operands[2]) && REG_P (operands[3])  
+                    && REGNO (operands[0]) == REGNO (operands[3]) 
+                    && REGNO (operands[1]) == REGNO (operands[2]) ));
+
+    /* When this condition is true, it is likely that we have
+       a violation of parallel semantics. This pattern was likely
+       produced by a peephole, and later altered by reg rename
+       making it inappropriate for paired register usage. Also,
+       cprop might have propagated a register usage into the
+       parallel structure, resulting in this code.
+       If we do not have this king of assignment:
+       parallel [ r0=r2; r2=r0]
+       we can reverse the order of instructions in parallel
+       structure as we split it. 
+       See bug 3855 for details. */ 
+
+    if((REG_P (operands[0]) && REG_P (operands[3])
+        && REGNO (operands[0]) == REGNO (operands[3]))){
+
+        rtx tmp; 
+
+        tmp = operands[0];   
+        operands[0] = operands[2];
+        operands[2] = tmp; 
+
+        tmp = operands[1]; 
+        operands[1] = operands[3];
+        operands[3] = tmp; 
+    }
   }
   [(set_attr "type" "A,A,EA,EA,A,EA,A,EA,Load")]
 )
@@ -9551,8 +9579,36 @@
   [(set (match_dup 0) (match_dup 1))
    (set (match_dup 2) (match_dup 3))]
   {
-    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[3])
-                 && REGNO (operands[0]) == REGNO (operands[3])));
+    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1]) 
+                    && REG_P (operands[2]) && REG_P (operands[3])  
+                    && REGNO (operands[0]) == REGNO (operands[3]) 
+                    && REGNO (operands[1]) == REGNO (operands[2]) ));
+
+    /* When this condition is true, it is likely that we have
+       a violation of parallel semantics. This pattern was likely
+       produced by a peephole, and later altered by reg rename
+       making it inappropriate for paired register usage. Also,
+       cprop might have propagated a register usage into the
+       parallel structure, resulting in this code.
+       If we do not have this king of assignment:
+       parallel [ r0=r2; r2=r0]
+       we can reverse the order of instructions in parallel
+       structure as we split it. 
+       See bug 3855 for details. */ 
+
+    if((REG_P (operands[0]) && REG_P (operands[3])
+        && REGNO (operands[0]) == REGNO (operands[3]))){
+
+        rtx tmp; 
+
+        tmp = operands[0];   
+        operands[0] = operands[2];
+        operands[2] = tmp; 
+
+        tmp = operands[1]; 
+        operands[1] = operands[3];
+        operands[3] = tmp; 
+    }
   }
   [(set_attr "type" "A,A,Load")]
 )
@@ -9583,8 +9639,36 @@
   [(cond_exec (match_op_dup 4 [(match_dup 5) (const_int 0)]) (set (match_dup 0) (match_dup 1)))
    (cond_exec (match_op_dup 4 [(match_dup 5) (const_int 0)]) (set (match_dup 2) (match_dup 3)))]
   {
-    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[3])
-                 && REGNO (operands[0]) == REGNO (operands[3])));
+    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1]) 
+                    && REG_P (operands[2]) && REG_P (operands[3])  
+                    && REGNO (operands[0]) == REGNO (operands[3]) 
+                    && REGNO (operands[1]) == REGNO (operands[2]) ));
+
+    /* When this condition is true, it is likely that we have
+       a violation of parallel semantics. This pattern was likely
+       produced by a peephole, and later altered by reg rename
+       making it inappropriate for paired register usage. Also,
+       cprop might have propagated a register usage into the
+       parallel structure, resulting in this code.
+       If we do not have this king of assignment:
+       parallel [ r0=r2; r2=r0]
+       we can reverse the order of instructions in parallel
+       structure as we split it. 
+       See bug 3855 for details. */ 
+
+    if((REG_P (operands[0]) && REG_P (operands[3])
+        && REGNO (operands[0]) == REGNO (operands[3]))){
+
+        rtx tmp; 
+
+        tmp = operands[0];   
+        operands[0] = operands[2];
+        operands[2] = tmp; 
+
+        tmp = operands[1]; 
+        operands[1] = operands[3];
+        operands[3] = tmp; 
+    }
   }
   [(set_attr "type" "A")]
 )
