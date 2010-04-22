@@ -35,4 +35,5 @@ bash `dirname $0`/configure \
   --disable-sjlj-exceptions \
   --disable-nls \
   --disable-libssp \
+  ${EXP_FLAGS} \
   --with-dinkumware
