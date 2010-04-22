@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* params.def - Run-time parameters.
    Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
@@ -400,7 +405,7 @@ DEFPARAM(PARAM_MAX_CROSSJUMP_EDGES,
 DEFPARAM(PARAM_MIN_CROSSJUMP_INSNS,
      "min-crossjump-insns",
      "The minimum number of matching instructions to consider for crossjumping",
-     5, 0, 0)
+     2, 0, 0)
 
 /* The maximum number expansion factor when copying basic blocks.  */
 DEFPARAM(PARAM_MAX_GROW_COPY_BB_INSNS,

@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* Emit RTL for the GCC expander.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
@@ -1470,24 +1475,8 @@ mem_expr_equal_p (const_tree expr1, const_tree expr2)
 
   if (TREE_CODE (expr1) != TREE_CODE (expr2))
     return 0;
-
-  if (TREE_CODE (expr1) == COMPONENT_REF)
-    return 
-      mem_expr_equal_p (TREE_OPERAND (expr1, 0),
-			TREE_OPERAND (expr2, 0))
-      && mem_expr_equal_p (TREE_OPERAND (expr1, 1), /* field decl */
-			   TREE_OPERAND (expr2, 1));
-  
-  if (INDIRECT_REF_P (expr1))
-    return mem_expr_equal_p (TREE_OPERAND (expr1, 0),
-			     TREE_OPERAND (expr2, 0));
-
-  /* ARRAY_REFs, ARRAY_RANGE_REFs and BIT_FIELD_REFs should already
-	      have been resolved here.  */
-  gcc_assert (DECL_P (expr1));
-  
-  /* Decls with different pointers can't be equal.  */
-  return 0;
+ 
+  return operand_equal_p (expr1, expr2, 0);
 }
 
 /* Return OFFSET if XEXP (MEM, 0) - OFFSET is known to be ALIGN
@@ -1724,8 +1713,8 @@ set_mem_attributes_minus_bitpos (rtx ref, tree t, int objectp,
 	 But skip it for now.  */
       else if (TREE_CODE (t) == COMPONENT_REF
 	       && ! DECL_BIT_FIELD (TREE_OPERAND (t, 1)))
-	{
-	  expr = component_ref_for_mem_expr (t);
+	{ 
+	  expr = t;
 	  offset = const0_rtx;
 	  apply_bitpos = bitpos;
 	  /* ??? Any reason the field size would be different than
@@ -1781,8 +1770,9 @@ set_mem_attributes_minus_bitpos (rtx ref, tree t, int objectp,
 		}
 	    }
 	  else if (TREE_CODE (t2) == COMPONENT_REF)
-	    {
-	      expr = component_ref_for_mem_expr (t2);
+	    {			
+	      expr = t2;
+	      offset = NULL;
 	      if (host_integerp (off_tree, 1))
 		{
 		  offset = GEN_INT (tree_low_cst (off_tree, 1));

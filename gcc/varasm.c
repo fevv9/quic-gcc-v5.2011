@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* Output variables, constants and external declarations, for GNU compiler.
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997,
    1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
@@ -558,15 +563,15 @@ get_section (const char *name, unsigned int flags, tree decl)
 #if SUPPORT_DATA_SECTION_SORTING
   char *updated_name; 
 
-  /* LSY If section sorting is enabled, update the name */ 
+  /* LSY If section sorting is enabled, update the name
+     This should work even if the original name is an empty string */ 
   if(TARGET_SECTION_SORTING){ 
 	  if(decl != NULL_TREE){ 
 		unsigned int smallest_unit_size	= smallest_accessable_entity_in_declaration(decl); 
-		/* currently we do not seem to have double digit alignments, but let's be precise */ 
-		/* updated_name		= ggc_alloc_string(name,strlen(name) + 
-				((smallest_unit_size > 9) ? (int)(log10(smallest_unit_size)) + 1 : 1)+4); */ 
+		/* This is sanity check - smallest_unit_size rarely 
+		   exceeds 16 */
 		gcc_assert(smallest_unit_size < 1000); 
-		updated_name		= (char *) ggc_alloc_string(name,strlen(name) + 5);
+		updated_name    = GGC_NEWVAR (char, strlen(name) + 5);
 		sprintf(updated_name,"%s.%d\0",name,smallest_unit_size);  
 	  }
 	  else	updated_name = ggc_strdup (name);

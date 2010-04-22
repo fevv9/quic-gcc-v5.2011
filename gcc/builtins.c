@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* Expand builtin functions.
    Copyright (C) 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
    2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
@@ -6861,6 +6866,7 @@ expand_builtin (tree exp, rtx target, rtx subtarget, enum machine_mode mode,
       return expand_builtin_extend_pointer (CALL_EXPR_ARG (exp, 0));
 
     case BUILT_IN_VA_START:
+    case BUILT_IN_STDARG_START:
       return expand_builtin_va_start (exp);
     case BUILT_IN_VA_END:
       return expand_builtin_va_end (exp);

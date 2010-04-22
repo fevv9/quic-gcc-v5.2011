@@ -3949,6 +3949,15 @@ AC_SUBST(target_cpu_default)
 
 AC_SUBST_FILE(language_hooks)
 
+# Check whether --with-expiry was given.
+EXPLIBS=
+
+if test "x$with_expiry" != x; then 
+  EXPLIBS="-L$with_expiry -Wl,--wrap=main -lexpiry"
+fi
+
+AC_SUBST(EXPLIBS)
+
 # Echo link setup.
 if test x${build} = x${host} ; then
   if test x${host} = x${target} ; then

@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* Default initializers for a generic GCC target.
    Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
    Free Software Foundation, Inc.
@@ -824,6 +829,10 @@
     TARGET_OPTION_CAN_INLINE_P,			\
   }
 
+#ifndef TARGET_PRINT_RTL_PSEUDO_ASM
+#define TARGET_PRINT_RTL_PSEUDO_ASM 0
+#endif
+
 /* The whole shebang.  */
 #define TARGET_INITIALIZER			\
 {						\
@@ -923,6 +932,7 @@
   TARGET_EMUTLS,				\
   TARGET_OPTION_HOOKS,				\
   TARGET_EXTRA_LIVE_ON_ENTRY,			\
+  TARGET_PRINT_RTL_PSEUDO_ASM,			\
   TARGET_UNWIND_TABLES_DEFAULT,			\
   TARGET_HAVE_NAMED_SECTIONS,			\
   TARGET_HAVE_SWITCHABLE_BSS_SECTIONS,		\

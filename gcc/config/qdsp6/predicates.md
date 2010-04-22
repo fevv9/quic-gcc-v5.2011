@@ -1,3 +1,8 @@
+;; ##################################################################
+;; # Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+;; # All Rights Reserved.
+;; # Modified by Qualcomm Innovation Center, Inc. on $Date$
+;; ##################################################################
 ;;-----------;;
 ;; Registers ;;
 ;;-----------;;
@@ -79,6 +84,11 @@
 (define_predicate "indirect_memory_operand"
   (and (match_operand 0 "memory_operand")
        (match_test "REG_P (XEXP (op, 0))"))
+)
+
+;; absolute address
+(define_predicate "absolute_address_operand"
+  (match_code "symbol_ref,const,const_int")
 )
 
 ;; call target
@@ -269,7 +279,8 @@
                 (ior (and (match_operand 0 "memory_operand")
                           (match_test "qdsp6_legitimate_address_p(GET_MODE (op),
                                                                   XEXP (op, 0),
-                                                                  true, true)"))
+                                                                  true,
+                                                                  \"econd\")"))
                      (match_operand 0 "gr_register_operand")))
 )
 
@@ -278,12 +289,32 @@
 ;; Registers or Constants ;;
 ;;------------------------;;
 
+;; general purpose register or s16 constant
+(define_predicate "gr_or_s16_operand"
+  (ior (match_operand 0 "gr_register_operand")
+       (match_operand 0 "s16_const_int_operand"))
+)
+
+;; general purpose register or u6 constant
+(define_predicate "gr_or_u6_operand"
+  (ior (match_operand 0 "gr_register_operand")
+       (match_operand 0 "u6_const_int_operand"))
+)
+
+;; general purpose register or m9 constant
+(define_predicate "gr_or_m9_operand"
+  (ior (match_operand 0 "gr_register_operand")
+       (match_operand 0 "m9_const_int_operand"))
+)
+
 ;; conditional add operand
 (define_predicate "conditional_add_operand"
   (if_then_else (match_test "!reload_completed")
                 (match_operand 0 "nonmemory_operand")
                 (ior (match_operand 0 "gr_register_operand")
-                     (match_operand 0 "s8_const_int_operand")))
+                     (ior (and (match_test "TARGET_V4_FEATURES")
+                               (match_operand 0 "immediate_operand"))
+                          (match_operand 0 "s8_const_int_operand"))))
 )
 
 
@@ -298,9 +329,13 @@
                 (ior (and (match_operand 0 "memory_operand")
                           (match_test "qdsp6_legitimate_address_p(GET_MODE (op),
                                                                   XEXP (op, 0),
-                                                                  true, true)"))
+                                                                  true,
+                                                                  \"econd\")"))
                      (ior (match_operand 0 "gr_register_operand")
-                          (match_operand 0 "s12_const_int_operand"))))
+                          (and (match_test "GET_MODE (op) != DImode")
+                               (ior (and (match_test "TARGET_V4_FEATURES")
+                                         (match_operand 0 "immediate_operand"))
+                                    (match_operand 0 "s12_const_int_operand"))))))
 )
 
 
@@ -313,21 +348,25 @@
   (match_code "ne,eq")
 )
 
+(define_predicate "gpr_cond_jump_operator"
+  (match_code "ne,eq,ge,le")
+)
+
+
 ;;---------------;;
 ;; SDATA sorting ;;
 ;;---------------;;
 
-
-(define_predicate "qdsp6_GP_or_reg_operand"
+(define_predicate "GP_or_reg_operand"
   (match_operand 0 "general_operand")
-{
-  return qdsp6_GP_or_reg_operand_c(op, mode);
-})
+  {
+    return qdsp6_GP_or_reg_operand_c(op, mode);
+  }
+)
 
-(define_predicate "qdsp6_nonimmediate_operand_with_GP"
+(define_predicate "nonimmediate_operand_with_GP"
   (match_operand 0 "nonimmediate_operand")
-{
-  return qdsp6_nonimmediate_operand_with_GP_c(op, mode);
-})
-
-
+  {
+    return qdsp6_nonimmediate_operand_with_GP_c(op, mode);
+  }
+)

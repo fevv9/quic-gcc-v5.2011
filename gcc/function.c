@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* Expands front end tree to back end RTL for GCC.
    Copyright (C) 1987, 1988, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
    1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
@@ -4804,7 +4809,7 @@ expand_function_end (void)
 
     start_sequence ();
     clobber_return_register ();
-    expand_naked_return ();
+    /* expand_naked_return (); */
     seq = get_insns ();
     end_sequence ();
 
@@ -4812,7 +4817,8 @@ expand_function_end (void)
   }
 
   /* Output the label for the naked return from the function.  */
-  emit_label (naked_return_label);
+  if (naked_return_label)
+    emit_label (naked_return_label);
 
   /* @@@ This is a kludge.  We want to ensure that instructions that
      may trap are not moved into the epilogue by scheduling, because

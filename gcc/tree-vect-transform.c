@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* Transformation Utilities for Loop Vectorization.
    Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
@@ -6591,7 +6596,7 @@ vectorizable_load (gimple stmt, gimple_stmt_iterator *gsi, gimple *vec_stmt,
       if (alignment_support_scheme == dr_explicit_realign_optimized)
 	{
 	  phi = SSA_NAME_DEF_STMT (msq);
-	  offset = size_int (TYPE_VECTOR_SUBPARTS (vectype) - 1);
+ 	  offset = size_int (TYPE_VECTOR_SUBPARTS (vectype)); /* Fix _LSY_ - 1); */ 
 	}
     }
   else

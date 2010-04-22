@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* Control flow optimization code for GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
@@ -56,6 +61,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "df.h"
 #include "dce.h"
 #include "dbgcnt.h"
+
 
 #define FORWARDER_BLOCK_P(BB) ((BB)->flags & BB_FORWARDER_BLOCK)
 
@@ -1046,6 +1052,82 @@ old_insns_match_p (int mode ATTRIBUTE_UNUSED, rtx i1, rtx i2)
   return false;
 }
 
+
+
+/* Looks for previous real (non note) instruction in BB
+    every BB has BB_HEAD */ 
+static inline rtx
+get_previous_real_instruction(rtx i1,basic_block bb1){ 
+
+	rtx prev_i1;
+
+    gcc_assert(i1);
+
+	prev_i1 = PREV_INSN (i1);
+      	
+	/* Ignore notes.  */
+    while (prev_i1 && !INSN_P (prev_i1) && prev_i1 != BB_HEAD (bb1))
+        	prev_i1	= PREV_INSN (prev_i1);
+			
+    gcc_assert(prev_i1);
+	
+	return prev_i1; 
+}
+
+/* Looks for next real (non note) instruction in BB
+    every BB has BB_HEAD */ 
+static inline rtx
+get_next_real_instruction(rtx i1,basic_block bb){ 
+
+	rtx next_i1;
+
+    gcc_assert(i1);
+
+	next_i1 = NEXT_INSN (i1);
+      	
+	/* Ignore notes.  */
+    while (next_i1 && !INSN_P (next_i1) && next_i1 != BB_END (bb))
+        	next_i1	= NEXT_INSN (next_i1);
+			
+	gcc_assert(next_i1);
+			
+	return next_i1; 
+}
+
+/* Searches for an instruction matching i1 in BB  in_this_bb.
+    If one found, verify independence with all the intermediate instructions.
+   If independent, conduct reordering */ 
+static bool
+long_distance_search_and_reorder(int mode,rtx prev_i,rtx i1,rtx *i2,basic_block in_this_bb){
+	rtx current_search 	= prev_i; 
+	rtx current_intervening_instruction		= NULL; 
+	
+	while(current_search != BB_HEAD (in_this_bb)){
+		if(old_insns_match_p (mode, i1, current_search)){
+			/* Now go back and see if the switch is possible. No reordering unless we know it is possible */ 
+			current_intervening_instruction = get_next_real_instruction(current_search,in_this_bb); 
+			while(get_next_real_instruction(*i2,in_this_bb) != current_intervening_instruction){
+				if(!qdsp6_instructions_dependent(current_intervening_instruction, current_search))
+					current_intervening_instruction = get_next_real_instruction(current_intervening_instruction,in_this_bb); 
+				/* If there is a dependency bethween these two instructions, and reorder is impossible,
+				there is no point to continue searching upwards sice any other matching instruction by definition will 
+				also have dependency on current_intervening_instruction and would not reorder. Hence simply bail out */ 
+				else	return false; 
+			}
+			/* Ok, here I know that it is possible, so perform the actual reorder */ 
+			while(get_next_real_instruction(*i2,in_this_bb) != current_search)
+					reorder_insns(current_search,current_search,
+					   get_next_real_instruction(current_search,in_this_bb)); 
+			
+			*i2 = current_search; 
+			return true; 
+		}
+		/* continue searching untill we reach BB_HEAD */ 
+		current_search = get_previous_real_instruction(current_search,in_this_bb); 
+	}
+	return false; 
+}
+
 /* Look through the insns at the end of BB1 and BB2 and find the longest
    sequence that are equivalent.  Store the first insns for that sequence
    in *F1 and *F2 and return the sequence length.
@@ -1095,8 +1177,84 @@ flow_find_cross_jump (int mode ATTRIBUTE_UNUSED, basic_block bb1,
       if (i1 == BB_HEAD (bb1) || i2 == BB_HEAD (bb2))
 	break;
 
-      if (!old_insns_match_p (mode, i1, i2))
-	break;
+    if (!old_insns_match_p (mode, i1, i2)){
+	if(TARGET_EXTENDED_CROSSJUMPING)
+	{ 
+        /* _LSY_ From this point on we augment previous functionality
+          by allowing instruction reordering to increase matching opportunities.
+          First see if we can find a match with the next instruction 
+                          bb1                           bb2
+                           ______                       _____
+          BB_HEAD (bb1)-> |      |     BB_HEAD (bb2)-> |     |
+                          |z     |                     |x    |		
+                prev_i1-> |y     |           prev_i2-> |c    |		
+                     i1-> |x     |                i2-> |b    |
+                          |a     |                     |a    |
+                          |______|                     |_____|
+          
+           In bb2 we want to locate x, make sure that x is not dependent with 
+           c and b, and move x to the spot between a and b. */ 
+
+           rtx prev_i1 = get_previous_real_instruction(i1,bb1); 
+           rtx prev_i2 = get_previous_real_instruction(i2,bb2); 
+				
+           /*  Now these are real predecessors - see the diagram above. */ 
+           if(prev_i1 == BB_HEAD (bb1) && prev_i2 == BB_HEAD (bb2))	
+               break; 
+           /* Check for simple symmetric match */ 
+           if((prev_i1 != BB_HEAD (bb1)) && 
+              (prev_i2 != BB_HEAD (bb2)) && 
+               old_insns_match_p (mode, prev_i1, prev_i2))
+             {
+              if(!qdsp6_instructions_dependent(prev_i1, i1) && 
+                 !qdsp6_instructions_dependent(prev_i2, i2))
+                 { /* independent */ 
+                    reorder_insns(prev_i1,prev_i1,i1); 
+                    reorder_insns(prev_i2,prev_i2,i2); 
+                    i1 = prev_i1; 
+                    i2 = prev_i2; 
+                 }
+                 else   break; 
+             }
+           else if((prev_i2 != BB_HEAD (bb2)) && 
+                    old_insns_match_p (mode, i1, prev_i2))
+             { /* Simple asymmetric match */
+                if(!qdsp6_instructions_dependent(prev_i2, i2))
+                 { /* independent */
+                    reorder_insns(prev_i2,prev_i2,i2); 
+                    i2 = prev_i2; 
+                 }
+                 else   break; 
+             }
+           else if((prev_i1 != BB_HEAD (bb1)) && 
+                    old_insns_match_p (mode, i2, prev_i1))
+             { /* Simple asymmetric match */
+                if(!qdsp6_instructions_dependent(prev_i1, i1))
+                 { /* independent */
+                    reorder_insns(prev_i1,prev_i1,i1); 
+                    i1 = prev_i1; 
+                 }
+                 else   break; 
+             }
+           else
+             {
+              /* At this point we have checked for simple cases, now try to 
+                 search upwards to the top of the BB to find potential matches.
+                 If match found, try to check its independence, if succeded, 
+                 reorder.
+                 Note, that above cases can be folded in this step, but 
+                 exhibit different performance patterns, so let's keep them
+                 separate in case we want selectively disable some of them  
+                 in the future */ 
+               if(!long_distance_search_and_reorder(mode,prev_i2,i1,&i2,bb2))
+                 { 
+                   if(!long_distance_search_and_reorder(mode,prev_i1,i2,&i1,bb1))
+                      break; 
+                 } 
+             }
+        }
+        else break; 
+      }
 
       merge_memattrs (i1, i2);
 
@@ -1533,6 +1691,7 @@ try_crossjump_to_edge (int mode, edge e1, edge e2)
      of matching instructions or the 'from' block was totally matched
      (such that its predecessors will hopefully be redirected and the
      block removed).  */
+
   if ((nmatch < PARAM_VALUE (PARAM_MIN_CROSSJUMP_INSNS))
       && (newpos1 != BB_HEAD (src1)))
     return false;
@@ -1589,7 +1748,6 @@ try_crossjump_to_edge (int mode, edge e1, edge e2)
 	  if (NOTE_P (newpos2))
 	    newpos2 = NEXT_INSN (newpos2);
 	}
-
       if (dump_file)
 	fprintf (dump_file, "Splitting bb %i before %i insns\n",
 		 src2->index, nmatch);
@@ -2128,6 +2286,7 @@ cleanup_cfg (int mode)
     mode |= CLEANUP_CFGLAYOUT;
 
   timevar_push (TV_CLEANUP_CFG);
+
   if (delete_unreachable_blocks ())
     {
       changed = true;

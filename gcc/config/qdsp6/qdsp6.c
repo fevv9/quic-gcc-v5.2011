@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 
  /* QDSP6 specific functions
    Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
@@ -59,6 +64,8 @@
 #include "debug.h"
 #include "langhooks.h"
 #include "df.h"
+#include "sched-int.h"
+
 
 
 
@@ -141,15 +148,29 @@ static bool qdsp6_legit_addr_const_p(
 #if !GCC_3_4_6
 static bool qdsp6_reg_ok_for_base_p(rtx x, bool reg_ok_strict_p);
 #endif /* !GCC_3_4_6 */
+static bool qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p);
 #if !GCC_3_4_6
 static tree qdsp6_vectorize_builtin_mask_for_load(void);
 #endif /* !GCC_3_4_6 */
 
 static bool qdsp6_free_immediate(rtx x, int outer_code, int value);
-static bool qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total);
-static int qdsp6_address_cost(rtx address);
+static bool qdsp6_rtx_costs(
+              rtx x,
+              int code,
+              int outer_code,
+              int *total,
+              bool speed);
+static bool qdsp6_rtx_costs_debug(
+              rtx x,
+              int code,
+              int outer_code,
+              int *total,
+              bool speed);
+static int qdsp6_address_cost(rtx address, bool speed);
+static int qdsp6_address_cost_debug(rtx address, bool speed);
 
 static int qdsp6_sched_issue_rate(void);
+static void qdsp6_sched_dependencies_eval (rtx, rtx);
 #if GCC_3_4_6
 static int qdsp6_sched_use_dfa_pipeline_interface(void);
 #endif /* GCC_3_4_6 */
@@ -176,6 +197,7 @@ static void qdsp6_output_operand(FILE *f, rtx x, int code);
 static void qdsp6_fixup_cfg(void);
 static void qdsp6_fixup_doloops(void);
 static void qdsp6_machine_dependent_reorg(void);
+static void qdsp6_local_combine_pass(void);
 
 static void qdsp6_init_builtins(void);
 static rtx expand_one_builtin(
@@ -190,15 +212,38 @@ static rtx qdsp6_expand_builtin(
              enum machine_mode mode,
              int ignore);
 static const char *qdsp6_invalid_within_doloop(const_rtx insn);
+static void qdsp6_print_jump(FILE *file, rtx x);
+static void qdsp6_print_transfer(FILE *file, rtx x);
+static void qdsp6_print_condition(FILE *file, rtx x, bool non_inverted);
+static void qdsp6_print_address(FILE *file, rtx x);
+static void qdsp6_print_unary_op(FILE *file, const char *op, rtx x);
+static void qdsp6_print_binary_op(FILE *file, const char *op, rtx x);
+static void qdsp6_print_swapped_binary_op(FILE *file, const char *op, rtx x);
+static void qdsp6_print_binary_op_with_option(FILE *file, const char *op, const char *option, rtx x);
+static void qdsp6_print_trinary_op(FILE *file, const char *op, rtx x);
+static void qdsp6_print_vecexp(FILE *file, const char *open, const char *separator, const char *close, rtx x);
+static void qdsp6_print_rtx(FILE *file, rtx x);
+static void qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x);
 
 static void qdsp6_compute_dwarf_frame_information(void);
-static void qdsp6_allocate_stack(unsigned HOST_WIDE_INT size);
+static void qdsp6_allocate_stack(
+              unsigned HOST_WIDE_INT size,
+              int allocate_stack_insn);
 static void qdsp6_deallocate_stack(unsigned HOST_WIDE_INT size);
+static tree qdsp6_special_case_memcpy_fn(const char *name);
+static void qdsp6_emit_special_case_memcpy_fn(
+              tree *fn,
+              const char *name,
+              rtx dst,
+              rtx src,
+              rtx size,
+              bool tailcall);
+static void qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p);
 
 static void qdsp6_packet_optimizations(void);
 static void qdsp6_final_pack_insns(void);
 
-
+static unsigned HOST_WIDE_INT  sdata_symbolic_operand_smallest_accessable_size(rtx);
 
 
 /* Initialize the GCC target structure. */
@@ -206,13 +251,13 @@ static void qdsp6_final_pack_insns(void);
 /*---------------------------
 Run-time Target Specification
 ---------------------------*/
-/* _LSY_ Added MASK_PULLUP as default back again */ 
 
 #if !GCC_3_4_6
 #undef TARGET_DEFAULT_TARGET_FLAGS
 #define TARGET_DEFAULT_TARGET_FLAGS \
   (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
-   | MASK_DOT_NEW | MASK_SECTION_SORTING | MASK_PULLUP |  MASK_SECTION_SORTING_CODE_SUPPORT )
+   | MASK_DOT_NEW | MASK_BASE_PLUS_INDEX | MASK_MEMOPS | MASK_SECTION_SORTING \
+   | MASK_SECTION_SORTING_CODE_SUPPORT)
 #endif /* !GCC_3_4_6 */
 
 #if !GCC_3_4_6
@@ -372,6 +417,9 @@ Adjusting the Instruction Scheduler
 #define TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD \
   qdsp6_sched_first_cycle_multipass_dfa_lookahead
 
+#undef TARGET_SCHED_DEPENDENCIES_EVALUATION_HOOK
+#define TARGET_SCHED_DEPENDENCIES_EVALUATION_HOOK \
+  qdsp6_sched_dependencies_eval
 
 /*--------------------------------------------------
 Dividing the Output into Sections (Texts, Data, ...)
@@ -429,18 +477,20 @@ Miscellaneous Parameters
 /* ??? Should this be GENERAL_REGS? */
 /*int TARGET_BRANCH_TARGET_REGISTER_CLASS (void)*/
 
+#undef TARGET_PRINT_RTL_PSEUDO_ASM
+#define TARGET_PRINT_RTL_PSEUDO_ASM qdsp6_print_rtl_pseudo_asm
+
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 static enum section_category	qdsp6_categorize_decl_for_section (const_tree decl, int reloc); 
-void				default_unique_section_2 (tree decl, int reloc); 
-unsigned int		smallest_accessable_entity_in_declaration(tree decl); 
-int					sdata_symbolic_operand_size(rtx op); 
-bool				has_this_tree_been_visited(tree node); 
-void				remember_this_tree(tree node); 
-unsigned int		descent_smallest(const char *prefix, tree node, unsigned int smallest); 
-int					qdsp6_named_section_sbss (tree decl, const char *name, int reloc); 
-extern 				section * get_named_section (tree decl, const char *name, int reloc); 
+void default_unique_section_2 (tree decl, int reloc); 
+unsigned HOST_WIDE_INT  smallest_accessable_entity_in_declaration(tree decl); 
+bool has_this_tree_been_visited(tree node); 
+void remember_this_tree(tree node); 
+unsigned int descent_smallest(const char *prefix, tree node, unsigned int smallest); 
+int qdsp6_named_section_sbss (tree decl, const char *name, int reloc); 
+extern section * get_named_section (tree decl, const char *name, int reloc); 
 /*---------------------------
 Run-time Target Specification
 ---------------------------*/
@@ -563,14 +613,6 @@ qdsp6_override_options(void)
   }
 #endif /* GCC_3_4_6 */
 
-  if(TARGET_INTERIM_ABI){
-#if GCC_3_4_6
-    warning("Ignoring the deprecated -minterim-abi option.");
-#else /* !GCC_3_4_6 */
-    warning(0, "Ignoring the deprecated -minterim-abi option.");
-#endif /* !GCC_3_4_6 */
-  }
-
   if(TARGET_UNCACHED_DATA){
     if(qdsp6_arch == QDSP6_ARCH_V1 || qdsp6_arch == QDSP6_ARCH_V2){
       qdsp6_dual_memory_accesses = false;
@@ -585,12 +627,17 @@ qdsp6_override_options(void)
   }
 
   if(!g_switch_set){
-    if(TARGET_G0_LIB && TARGET_BUILDING_MULTILIB){
-      g_switch_value = 0;
-    }
-    else {
-      g_switch_value = 2 * UNITS_PER_WORD;
-    }
+    g_switch_value = 2 * UNITS_PER_WORD;
+  }
+
+  if(TARGET_COMPRESSED){
+    flag_schedule_insns = 0;
+    flag_schedule_insns_after_reload = 0;
+    target_flags &= ~MASK_PACKETS;
+  }
+
+  if(!TARGET_PACKETS){
+    target_flags &= ~MASK_PULLUP;
   }
 
   /* Align functions to 16-byte boundaries to prevent
@@ -616,7 +663,23 @@ qdsp6_override_options(void)
 void
 qdsp6_optimization_options(int level, int size)
 {
+  if(level >= 2){
+    target_flags |= MASK_PACKETS;
+    target_flags |= MASK_PULLUP;
+    flag_optimize_memset = 1;
+  }
+
   qdsp6_falign = QDSP6_NO_FALIGN;
+
+  if (level >= 1)
+    {
+      target_flags |= MASK_PRED_MUX;
+    }
+
+  if(size){
+    target_flags |= MASK_EXTENDED_CROSSJUMPING; 
+    target_flags |= MASK_LOCAL_COMBINE;
+  }
 
   if(level >= 3 && !size){
     qdsp6_falign = QDSP6_FALIGN_LABELS;
@@ -656,7 +719,9 @@ qdsp6_init_expanders(void)
 static struct machine_function *
 qdsp6_init_machine_status(void)
 {
-  return ggc_alloc_cleared(sizeof(struct machine_function));
+  struct machine_function *mf;
+  mf = ggc_alloc_cleared(sizeof(struct machine_function));
+  return mf;
 }
 
 
@@ -679,6 +744,8 @@ get_inner_array_type (const_tree array)
 
   return type;
 }
+
+
 
 
 /* Helper function for the alignment routines
@@ -715,6 +782,25 @@ qdsp6_data_alignment(tree type, int align)
 {
   if(TREE_CODE (type) == ARRAY_TYPE){
     return qdsp6_array_alignment(type, align);
+  }
+
+  return align;
+}
+
+
+
+
+/* Implements macro CONSTANT_ALIGNMENT
+
+   Doubleword align constant strings. */
+
+int
+qdsp6_constant_alignment(tree constant, int align)
+{
+  if(!optimize_size && TREE_CODE (constant) == STRING_CST
+     && TREE_STRING_LENGTH (constant) >= BIGGEST_ALIGNMENT
+     && (align) < BIGGEST_ALIGNMENT){
+    return BIGGEST_ALIGNMENT;
   }
 
   return align;
@@ -763,14 +849,14 @@ Layout of Source Language Data Types
 #if !GCC_3_4_6
 /* Implements hook TARGET_DEFAULT_SHORT_ENUMS
 
-   As specified by the ABI, enumerated types behave like the smallest integer
-   type that can hold all of the enumerated constants associated with the
-   enumerated type. */
+   The default ABI specifies that enumerated types behave like the smallest
+   integer type that can hold all of the enumerated constants associated with
+   the enumerated type.  Linux requires its ABI to specify non-short enums. */
 
 static bool
 qdsp6_default_short_enums(void)
 {
-  return true;
+  return qdsp6_abi != QDSP6_ABI_LINUX;
 }
 #endif /* !GCC_3_4_6 */
 
@@ -788,15 +874,13 @@ Basic Characteristics of Registers
 void
 qdsp6_conditional_register_usage(void)
 {
-  if(qdsp6_abi == QDSP6_ABI_2){
-    call_used_regs[16] = 0;
-    call_used_regs[17] = 0;
-    call_used_regs[18] = 0;
-    call_used_regs[19] = 0;
-    call_used_regs[20] = 0;
-    call_used_regs[21] = 0;
-    call_used_regs[22] = 0;
-    call_used_regs[23] = 0;
+  int i;
+  if(qdsp6_abi != QDSP6_ABI_1){
+    for(i = 16; i < 24; i++){
+      if(!fixed_regs[i]){
+        call_used_regs[i] = 0;
+      }
+    }
   }
 }
 
@@ -807,6 +891,35 @@ qdsp6_conditional_register_usage(void)
 Register Classes
 --------------*/
 
+/* Implements macro CANNOT_CHANGE_MODE_CLASS
+
+   Prevent predicates from being represented as QImode SUBREGs of SImode. */
+
+bool
+qdsp6_cannot_change_mode_class(
+  enum machine_mode from,
+  enum machine_mode to,
+  enum reg_class rclass
+)
+{
+  if(from == to){
+    return false;
+  }
+
+  if((   rclass == PREDICATE_DOT_OLD_REGS
+      || rclass == PREDICATE_DOT_NEW_REGS
+      || rclass == PREDICATE_REGS)
+     && from == SImode
+     && to == QImode){
+    return true;
+  }
+
+  return false;
+}
+
+
+
+
 /* Implements macro CONST_OK_FOR_CONSTRAINT_P
 
    IsN means signed, two's complement integers in [-2^(N-1), 2^(N-1) - 1]
@@ -814,8 +927,14 @@ Register Classes
    InN means negative integers in [-(2^N - 1), 0]
    ImN means signed magnitude integers in [-(2^(N-1) - 1), 2^(N-1) - 1]
 
+   J[sunm]N_M means I[sunm]N shifted left M bits
+
    K16 means 16
    K32 means 32
+   Ku7p1 integers in [1, 128]
+   Ks8p1 integers in [-127, 128]
+   Ku9p1 integers in [1, 512]
+   Ks10p1 integers in [-511, 512]
    Ks8s8 means integers that can be formed using combine(#s8,#s8)
    Konehot32 means power of 2 integers that can be represented in 32 bits
    Konenot32 means one's complements of Konehot32 constants */
@@ -827,15 +946,23 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
   HOST_WIDE_INT bits;
   HOST_WIDE_INT low;
   HOST_WIDE_INT high;
+  HOST_WIDE_INT scale;
+  HOST_WIDE_INT scale_bits;
 
   switch(c){
     case 'I':
+    case 'J':
       if(!((str[1] == 's' || str[1] == 'u' || str[1] == 'n' || str[1] == 'm')
            && ISDIGIT (str[2]))){
         return false;
       }
 
       bits = 0;
+      low = 0;
+      high = 0;
+      scale = 0;
+      scale_bits = 0;
+
       p = &str[2];
       do {
         bits = (10 * bits) + (*p++ - '0');
@@ -863,26 +990,53 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
         low = -high;
       }
 
-      return low <= value && value <= high;
+      if(c == 'J'){
+        if(!(p[0] == '_' && ISDIGIT (p[1]))){
+          return false;
+        }
+
+        p++;
+        do {
+          scale = (10 * scale) + (*p++ - '0');
+        }while(ISDIGIT (*p));
+
+        high <<= scale;
+        low <<= scale;
+        scale_bits = value & ((1 << scale) - 1);
+      }
+
+      return low <= value && value <= high && scale_bits == 0;
 
     case 'K':
-      if(QDSP6_KOOKY_KONSTANT_P(str, 16)){
+      if(QDSP6_CONSTRAINT_P(str, 16)){
         return value == 16;
       }
-      else if(QDSP6_KOOKY_KONSTANT_P(str, 32)){
+      else if(QDSP6_CONSTRAINT_P(str, 32)){
         return value == 32;
       }
-      else if(QDSP6_KOOKY_KONSTANT_P(str, s8s8)){
+      else if(QDSP6_CONSTRAINT_P(str, u7p1)){
+        return IN_RANGE (value, 1, 128);
+      }
+      else if(QDSP6_CONSTRAINT_P(str, s8p1)){
+        return IN_RANGE (value, -127, 128);
+      }
+      else if(QDSP6_CONSTRAINT_P(str, u9p1)){
+        return IN_RANGE (value, 1, 512);
+      }
+      else if(QDSP6_CONSTRAINT_P(str, s10p1)){
+        return IN_RANGE (value, -511, 512);
+      }
+      else if(QDSP6_CONSTRAINT_P(str, s8s8)){
         high = value >> 32ULL;
         low = value & 0xFFFFFFFFULL;
         return ((high & 0xFFFFFF00) == (high & 0x80 ? 0xFFFFFF00 : 0))
             && ((low  & 0xFFFFFF00) == (low  & 0x80 ? 0xFFFFFF00 : 0));
       }
-      else if(QDSP6_KOOKY_KONSTANT_P(str, onehot32)){
+      else if(QDSP6_CONSTRAINT_P(str, onehot32)){
         value &= 0xFFFFFFFFULL;
         return value == (value & -value);
       }
-      else if(QDSP6_KOOKY_KONSTANT_P(str, onenot32)){
+      else if(QDSP6_CONSTRAINT_P(str, onenot32)){
         value = ~value & 0xFFFFFFFFULL;
         return value == (value & -value);
       }
@@ -945,11 +1099,15 @@ Basic Stack Layout
    the address of the stack frame COUNT frames above the current one. */
 
 rtx
-qdsp6_return_addr_rtx(int count ATTRIBUTE_UNUSED, rtx frame)
+qdsp6_return_addr_rtx(int count, rtx frame)
 {
   rtx return_addr;
 
   cfun->machine->calls_builtin_return_address = true;
+
+  if(count == 0){
+    frame = gen_rtx_REG(Pmode, HARD_FRAME_POINTER_REGNUM);
+  }
 
   return_addr = memory_address(Pmode,
                                plus_constant(frame, GET_MODE_SIZE (Pmode)));
@@ -990,12 +1148,12 @@ Eliminating Frame Pointer and Arg Pointer
                                         | (8 bytes total)       |
                                   FP+0->+-----------------------+
                                         |                       |
-                                        |  local variables      |
+                                        |  register save area   |
+                                        |  (callee saved)       |
                                         |                       |
                                         +-----------------------+
                                         |                       |
-                                        |  register save area   |
-                                        |  (callee saved)       |
+                                        |  local variables      |
                                         |                       |
                                         +-----------------------+
                                         |                       |
@@ -1076,57 +1234,120 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
     enum insn_code sibcall_epilogue_function;
     unsigned int num_sibcall_function_restored_pairs;
   }
-  const prologue_epilogue_functions[] =
-    {
+    prologue_epilogue_functions_abi1[] =
       {
-        CODE_FOR_nothing, 0,
-        CODE_FOR_deallocframe_function, 0,
-        CODE_FOR_nothing, 0
+        {
+          CODE_FOR_nothing, 0,
+          CODE_FOR_deallocframe_function, 0,
+          CODE_FOR_nothing, 0
+        },
+        {
+          CODE_FOR_nothing, 0,
+          CODE_FOR_restore_r24_through_r25_and_deallocframe, 1,
+          CODE_FOR_restore_r24_through_r25_and_deallocframe_before_sibcall, 1
+        },
+        {
+          CODE_FOR_save_r24_through_r27, 2,
+          CODE_FOR_restore_r24_through_r27_and_deallocframe, 2,
+          CODE_FOR_restore_r24_through_r27_and_deallocframe_before_sibcall, 2
+        }
       },
+    prologue_epilogue_functions_abi2[] =
       {
-        CODE_FOR_nothing, 0,
-        CODE_FOR_restore_r27_through_r26_and_deallocframe, 1,
-        CODE_FOR_restore_r27_through_r26_and_deallocframe_before_sibcall, 1
+        {
+          CODE_FOR_nothing, 0,
+          CODE_FOR_deallocframe_function, 0,
+          CODE_FOR_nothing, 0
+        },
+        {
+          CODE_FOR_nothing, 0,
+          CODE_FOR_restore_r16_through_r17_and_deallocframe, 1,
+          CODE_FOR_restore_r16_through_r17_and_deallocframe_before_sibcall, 1
+        },
+        {
+          CODE_FOR_save_r16_through_r19, 2,
+          CODE_FOR_restore_r16_through_r19_and_deallocframe, 2,
+          CODE_FOR_restore_r16_through_r19_and_deallocframe_before_sibcall, 2
+        },
+        {
+          CODE_FOR_save_r16_through_r21, 3,
+          CODE_FOR_restore_r16_through_r21_and_deallocframe, 3,
+          CODE_FOR_restore_r16_through_r21_and_deallocframe_before_sibcall, 3
+        },
+        {
+          CODE_FOR_save_r16_through_r23, 4,
+          CODE_FOR_restore_r16_through_r23_and_deallocframe, 4,
+          CODE_FOR_restore_r16_through_r23_and_deallocframe_before_sibcall, 4
+        },
+        {
+          CODE_FOR_save_r16_through_r25, 5,
+          CODE_FOR_restore_r16_through_r25_and_deallocframe, 5,
+          CODE_FOR_restore_r16_through_r25_and_deallocframe_before_sibcall, 5
+        },
+        {
+          CODE_FOR_save_r16_through_r27, 6,
+          CODE_FOR_restore_r16_through_r27_and_deallocframe, 6,
+          CODE_FOR_restore_r16_through_r27_and_deallocframe_before_sibcall, 6
+        }
       },
-      {
-        CODE_FOR_save_r27_through_r24, 2,
-        CODE_FOR_restore_r27_through_r24_and_deallocframe, 2,
-        CODE_FOR_restore_r27_through_r24_and_deallocframe_before_sibcall, 2
-      },
-      {
-        CODE_FOR_save_r27_through_r22, 3,
-        CODE_FOR_restore_r27_through_r22_and_deallocframe, 3,
-        CODE_FOR_restore_r27_through_r22_and_deallocframe_before_sibcall, 3
-      },
-      {
-        CODE_FOR_save_r27_through_r20, 4,
-        CODE_FOR_restore_r27_through_r20_and_deallocframe, 4,
-        CODE_FOR_restore_r27_through_r20_and_deallocframe_before_sibcall, 4
-      },
-      {
-        CODE_FOR_save_r27_through_r18, 5,
-        CODE_FOR_restore_r27_through_r18_and_deallocframe, 5,
-        CODE_FOR_restore_r27_through_r18_and_deallocframe_before_sibcall, 5
-      },
-      {
-        CODE_FOR_save_r27_through_r16, 6,
-        CODE_FOR_restore_r27_through_r16_and_deallocframe, 6,
-        CODE_FOR_restore_r27_through_r16_and_deallocframe_before_sibcall, 6
-      }
+    *prologue_epilogue_functions;
+
+  static const enum insn_code
+    allocframe_insn[] = {
+      CODE_FOR_allocframe,
+      CODE_FOR_allocframe_and_save_r16,
+      CODE_FOR_allocframe_and_save_r16_and_r17
+    },
+    allocate_stack_insn[] = {
+      CODE_FOR_increment_stack_pointer,
+      CODE_FOR_allocate_stack_and_save_r16,
+      CODE_FOR_allocate_stack_and_save_r16_and_r17,
+      CODE_FOR_allocate_stack_and_save_r16_through_r18,
+      CODE_FOR_allocate_stack_and_save_r16_through_r19
     };
+
+  bool use_common_functions;
+  unsigned int max_function_saved_pairs = 0;
+  unsigned int first_callee_save_regno = 0;
+  unsigned int num_regs_to_save_while_allocating = 0;
   unsigned int regno;
-  unsigned int i;
+  unsigned int i = 0;
   unsigned int j;
 
+  /* Select the set of prologue and epilogue functions for the target ABI. */
+  if(qdsp6_abi == QDSP6_ABI_2){
+    prologue_epilogue_functions = prologue_epilogue_functions_abi2;
+    max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi2)
+                               - 1;
+    first_callee_save_regno = 16;
+  }
+  else {
+    prologue_epilogue_functions = prologue_epilogue_functions_abi1;
+    max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi1)
+                               - 1;
+    first_callee_save_regno = 24;
+  }
+
+  /* For V4, don't call the __deallocframe function, since we have the
+     dealloc_return instruction. */
+  if(TARGET_V4_FEATURES){
+    prologue_epilogue_functions[0].epilogue_function
+      = CODE_FOR_nothing;
+  }
+  else {
+    prologue_epilogue_functions[0].epilogue_function
+      = CODE_FOR_deallocframe_function;
+  }
+
   /* Can we omit the allocframe and deallocframe instructions? */
-  if(info->lrfp_size == 0){
+  if(!info->use_allocframe){
     info->allocframe_size = 0;
     info->sp_adjustment = info->frame_size;
     info->base_reg = stack_pointer_rtx;
     info->offset = info->frame_size;
   }
   else {
-    /* Can we allocate the entire stack frame with one allocfame
+    /* Can we allocate the entire stack frame with one allocframe
        instruction? */
     if(info->frame_size <= MAX_ALLOCFRAME_IMMED){
       info->allocframe_size = info->frame_size;
@@ -1136,8 +1357,60 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
       info->allocframe_size = MAX_ALLOCFRAME_IMMED;
       info->sp_adjustment = info->frame_size - MAX_ALLOCFRAME_IMMED;
     }
-    info->base_reg = hard_frame_pointer_rtx;
-    info->offset = 0;
+    /* Use SP as the base if the offset would be small, making the loads and
+       stores candidates for duplexes. */
+    if(!TARGET_COMPRESSED && info->frame_size <= 256){
+      info->base_reg = stack_pointer_rtx;
+      info->offset = info->frame_size;
+    }
+    else {
+      info->base_reg = hard_frame_pointer_rtx;
+      info->offset = 0;
+    }
+  }
+
+  use_common_functions = (optimize_size || optimize == 2)
+                         && info->use_allocframe && !crtl->calls_eh_return;
+
+  /* If we are using a function to save or restore callee-save registers or we
+     are forming packets, then maximize the number of registers saved as pairs,
+     since the common prologue and epilogue functions only save registers as
+     pairs and doubleword store subinstructions have larger offsets than word
+     store subinstructions. */
+  if((use_common_functions || (optimize && TARGET_PACKETS))
+     && info->num_saved_singles % 2 == 1){
+
+    /* Count the number of contiguous callee-save register pairs being saved. */
+    for(i = 0, regno = first_callee_save_regno;
+        i < info->num_saved_pairs && info->saved_pairs[i] == regno;
+        i++, regno += 2);
+
+    /* If the first single callee-save register is part of the next pair that
+       could be saved, then remove it from the list of single callee-save
+       registers and insert it into the list of paired callee-save
+       registers. */
+    if((   info->saved_singles[0] == regno
+        || info->saved_singles[0] == regno + 1)
+       && !call_used_regs[regno]
+       && !call_used_regs[regno + 1]){
+
+      for(j = 0; j < info->num_saved_singles - 1; j++){
+        info->saved_singles[j] = info->saved_singles[j + 1];
+      }
+      for(j = info->num_saved_pairs; j > i; j--){
+        info->saved_pairs[j] = info->saved_pairs[j - 1];
+      }
+      info->saved_pairs[i] = regno;
+      info->num_saved_pairs++;
+      info->num_saved_singles--;
+
+      /* The callee-save registers being saved must still fit in the space
+         allocated. */
+      gcc_assert(info->reg_size >= 2 * UNITS_PER_WORD
+                                     * info->num_saved_pairs
+                                   + UNITS_PER_WORD
+                                     * info->num_saved_singles);
+    }
   }
 
   info->prologue_function = CODE_FOR_nothing;
@@ -1146,55 +1419,91 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
 
   /* Determine whether we can save code size by using functions to implement
      common prologue or epilogue sequences. */
-  if(optimize_size && !crtl->calls_eh_return
-     && info->lrfp_size != 0){
-
-    /* If saving and restoring one of the single callee-save registers as a pair
-       allows it to be saved and/or restored via a function call, then do so. */
-    if(info->num_saved_singles % 2 == 1){
-
-      for(i = info->num_saved_pairs, regno = 26;
-          i > 0 && info->saved_pairs[i - 1] == regno;
-          i--, regno -= 2);
-
-      if(info->num_saved_pairs - i < ARRAY_SIZE (prologue_epilogue_functions)
-         && (info->saved_singles[info->num_saved_singles - 1] == regno + 1
-             || info->saved_singles[info->num_saved_singles - 1] == regno)){
-
-        for(j = info->num_saved_pairs; j > i; j--){
-          info->saved_pairs[j] = info->saved_pairs[j - 1];
-        }
-        info->saved_pairs[i] = regno;
-        info->num_saved_pairs++;
-        info->num_saved_singles--;
-
-        /* The callee-save registers being saved must still fit in the space
-           allocated. */
-        gcc_assert(info->reg_size >= 2 * UNITS_PER_WORD
-                                       * info->num_saved_pairs
-                                     + UNITS_PER_WORD
-                                       * info->num_saved_singles);
-      }
-    }
+  if(use_common_functions){
 
     /* Count the number of callee-save register pairs that can be saved or
        restored by function calls in the prologue and epilogue. */
-    for(i = info->num_saved_pairs, regno = 26;
-        i > 0 && info->saved_pairs[i - 1] == regno;
-        i--, regno -= 2);
-    i = info->num_saved_pairs - i;
-    if(i > ARRAY_SIZE (prologue_epilogue_functions) - 1){
-      i = ARRAY_SIZE (prologue_epilogue_functions) - 1;
+    for(i = 0, regno = first_callee_save_regno;
+        i < info->num_saved_pairs && info->saved_pairs[i] == regno;
+        i++, regno += 2);
+    if(i > max_function_saved_pairs){
+      i = max_function_saved_pairs;
     }
 
-    #define SET_PROLOGUE_EPILOGUE_FUNCTION_INFO(FIELD) \
-      info->FIELD = prologue_epilogue_functions[i].FIELD
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (prologue_function);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_saved_pairs);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (epilogue_function);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_restored_pairs);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (sibcall_epilogue_function);
-    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_sibcall_function_restored_pairs);
+    /* At -O2, use the common prologe and epilogue functions only if they save
+       and restore 3 or more pairs of callee-save registers. */
+    if(optimize_size || i >= 3){
+      #define SET_PROLOGUE_EPILOGUE_FUNCTION_INFO(FIELD) \
+        info->FIELD = prologue_epilogue_functions[i].FIELD
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (prologue_function);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_saved_pairs);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (epilogue_function);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_restored_pairs);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (sibcall_epilogue_function);
+      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_sibcall_function_restored_pairs);
+    }
+    info->num_specially_saved_pairs = info->num_function_saved_pairs;
+  }
+
+  info->allocframe_insn = CODE_FOR_allocframe;
+  info->allocate_stack_insn = CODE_FOR_increment_stack_pointer;
+
+  /* If possible, save one or more callee-save registers while allocating
+     stack. */
+  if(optimize && TARGET_PACKETS
+     && (info->use_allocframe || info->sp_adjustment != 0)
+     && info->num_function_saved_pairs == 0){
+
+    if(TARGET_V4_FEATURES && !info->use_allocframe){
+      switch(info->num_saved_pairs){
+        case 0:
+          if(info->num_saved_singles == 1 && info->saved_singles[0] == 16){
+            num_regs_to_save_while_allocating = 1;
+          }
+          break;
+        case 1:
+          if(info->saved_pairs[0] == 16){
+            if(info->num_saved_singles == 1 && info->saved_singles[0] == 18){
+              num_regs_to_save_while_allocating = 3;
+            }
+            else {
+              num_regs_to_save_while_allocating = 2;
+            }
+          }
+          break;
+        default:
+          if(info->saved_pairs[0] == 16){
+            if(info->saved_pairs[1] == 18){
+              num_regs_to_save_while_allocating = 4;
+            }
+            else {
+              num_regs_to_save_while_allocating = 2;
+            }
+          }
+          break;
+      }
+    }
+    else if(TARGET_V4_FEATURES || !info->use_allocframe){
+      if(info->num_saved_pairs == 0){
+        if(info->num_saved_singles == 1 && info->saved_singles[0] == 16){
+          num_regs_to_save_while_allocating = 1;
+        }
+      }
+      else if(info->saved_pairs[0] == 16){
+        num_regs_to_save_while_allocating = 2;
+      }
+    }
+
+    if(info->use_allocframe){
+      info->allocframe_insn
+        = allocframe_insn[num_regs_to_save_while_allocating];
+    }
+    else {
+      info->allocate_stack_insn
+        = allocate_stack_insn[num_regs_to_save_while_allocating];
+    }
+    info->num_specially_saved_pairs = num_regs_to_save_while_allocating / 2;
+    info->num_specially_saved_singles = num_regs_to_save_while_allocating % 2;
   }
 }
 
@@ -1275,6 +1584,7 @@ qdsp6_frame_info(void)
   else {
     info->lrfp_size = 2 * UNITS_PER_WORD;
   }
+  info->use_allocframe = info->lrfp_size != 0;
 
   info->total_size = info->frame_size + info->lrfp_size;
 
@@ -1518,12 +1828,7 @@ qdsp6_return_in_memory(const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
     byte_size = int_size_in_bytes(type);
   }
 
-  if(byte_size < 0 || 2 * UNITS_PER_WORD < byte_size){
-    return true;
-  }
-  else {
-    return false;
-  }
+  return !IN_RANGE (byte_size, 0, 2 * UNITS_PER_WORD);
 }
 
 
@@ -1755,107 +2060,236 @@ static bool
 qdsp6_reg_ok_for_base_p(rtx x, bool reg_ok_strict_p)
 {
   if(reg_ok_strict_p){
-    return REGNO (x) < 32 || REGNO (x) == FRAME_POINTER_REGNUM
-                          || REGNO (x) == ARG_POINTER_REGNUM;
+    return G_REG_P (x) || REGNO (x) == FRAME_POINTER_REGNUM
+                       || REGNO (x) == ARG_POINTER_REGNUM;
   }
   else {
-    return REGNO (x) < 32 || REGNO (x) == FRAME_POINTER_REGNUM
-                          || REGNO (x) == ARG_POINTER_REGNUM
-                          || REGNO (x) >= FIRST_PSEUDO_REGISTER;
+    return G_REG_P (x) || REGNO (x) == FRAME_POINTER_REGNUM
+                       || REGNO (x) == ARG_POINTER_REGNUM
+                       || REGNO (x) >= FIRST_PSEUDO_REGISTER;
   }
 }
 
 
 
 
-/* Used by macro GO_IF_LEGITIMATE_ADDRESS */
+/* Helper function for qdsp6_legitimate_address_p */
+
+static bool
+qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p)
+{
+  if(reg_ok_strict_p){
+    return G_REG_P (x);
+  }
+  else {
+    return G_REG_P (x) || REGNO (x) >= FIRST_PSEUDO_REGISTER;
+  }
+}
+
+
+
+
+/* Used by macro GO_IF_LEGITIMATE_ADDRESS
+
+   The CONSTRAINT argument is the constraint string excluding any initial 'A'.
+   The different constraints correspond to differnt types of instuctions, each
+   of which can utilize a different set of addressing modes.  The possible
+   values for the constraint string are:
+
+   m       basic loads and stores, allowing an immediate extender
+   noext   basic loads and stores
+   cond    conditional loads and stores
+   econd   conditional loads and stores, allowing an immediate extender
+   si      store immediate
+   csi     conditional store immediate
+   memop   load-op-stores
+   ememop  load-op-stores, allowing an immediate extender */
 
 bool
 qdsp6_legitimate_address_p(
   enum machine_mode mode,
   rtx x,
   bool reg_ok_strict_p,
-  bool conditional
+  const char *constraint
 )
 {
-  bool check_mode;
-  int offset_bits;
+  rtx xop0 = NULL_RTX;
+  rtx xop1 = NULL_RTX;
+  rtx xop1op0 = NULL_RTX;
+  rtx xop1op1 = NULL_RTX;
+  bool allow_extension = false;
+  bool allow_gp = false;
+  bool allow_absolute = false;
+  bool allow_immediate_base = false;
+  bool allow_base_plus_index = false;
+  bool allow_post_inc = false;
+  int offset_bits = 6;
 
-  if(TARGET_V2_FEATURES && sdata_symbolic_operand(x, Pmode) && !conditional){
-    /* Will be GP relative */
+  if(TARGET_V4_FEATURES
+     && (crtl->combine_in_progress || crtl->combine_completed)
+     && (   !strcmp(constraint, "m")
+         || !strcmp(constraint, "econd")
+         || !strcmp(constraint, "ememop"))){
+    allow_extension = true;
+  }
+
+  if(!strcmp(constraint, "m") || !strcmp(constraint, "noext")){
+    if(TARGET_V4_FEATURES){
+      allow_absolute = true;
+      allow_immediate_base = true;
+      allow_base_plus_index = true;
+    }
+    allow_gp = true;
+    allow_post_inc = true;
+    offset_bits = -11;
+  }
+  else if(!strcmp(constraint, "cond") || !strcmp(constraint, "econd")){
+    if(TARGET_V4_FEATURES){
+      allow_absolute = true;
+      allow_base_plus_index = true;
+    }
+    allow_post_inc = true;
+  }
+  else if(!TARGET_V4_FEATURES){
+    return false;
+  }
+  else if(!strcmp(constraint, "si")){
+  }
+  else if(!strcmp(constraint, "csi")){
+  }
+  else if(!strcmp(constraint, "memop") || !strcmp(constraint, "ememop")){
+    if(!TARGET_MEMOPS){
+      return false;
+    }
+  }
+  else {
+    gcc_unreachable();
+  }
+
+  if(!TARGET_BASE_PLUS_INDEX){
+    allow_base_plus_index = false;
+  }
+
+  /* Extract operands and canonicalize commutitive operators. */
+  if(GET_CODE (x) == PLUS || GET_CODE (x) == POST_MODIFY){
+    xop0 = XEXP (x, 0);
+    xop1 = XEXP (x, 1);
+    if(GET_CODE (x) == PLUS && GET_CODE (x) != POST_MODIFY
+       && ((REG_P (xop1) || CONSTANT_P (xop1)) && !REG_P (xop0))){
+      xop0 = XEXP (x, 1);
+      xop1 = XEXP (x, 0);
+    }
+    if(   GET_CODE (xop1) == PLUS
+       || GET_CODE (xop1) == MULT
+       || GET_CODE (xop1) == ASHIFT){
+      xop1op0 = XEXP (xop1, 0);
+      xop1op1 = XEXP (xop1, 1);
+      if(GET_CODE (xop1) != ASHIFT && !REG_P (xop1op0)){
+        xop1op0 = XEXP (xop1, 1);
+        xop1op1 = XEXP (xop1, 0);
+      }
+    }
+  }
+  else if(GET_CODE (x) == POST_INC || GET_CODE (x) == POST_DEC){
+    xop0 = XEXP (x, 0);
+  }
+
+  /* GP-relative address */
+  if(allow_gp){
+    if(sdata_symbolic_operand(x, Pmode)){
+      return true;
+    }
+  }
+
+  /* absolute address */
+  if(allow_absolute && allow_extension && CONSTANT_P (x)){
     return true;
   }
 
-  if(GET_CODE (x) == REG && qdsp6_reg_ok_for_base_p(x, reg_ok_strict_p))
-    return true;
-
-  /* ??? DFmode? BImode? Why do we check the mode anyway? */
-  check_mode =    mode == DImode
-               || mode == SImode
-               || mode == SFmode
-               || mode == HImode
-               || mode == QImode
-               || mode == V2SImode
-               || mode == V4HImode
-               || mode == V8QImode
-               || mode == V2HImode
-               || mode == V4QImode;
+  /* register-indirect address */
+  if(REG_P (x)){
+    return qdsp6_reg_ok_for_base_p(x, reg_ok_strict_p);
+  }
 
   /* We allow FP+offset addresses here because that is necessary for SP+offset
      addresses later.  Note that we don't check the range of the constant. */
   if(!reg_ok_strict_p
      && GET_CODE (x) == PLUS
-     && check_mode
-     && GET_CODE (XEXP (x, 0)) == REG
-     && REGNO (XEXP (x, 0)) == FRAME_POINTER_REGNUM
-     && GET_CODE (XEXP (x, 1)) == CONST_INT){
+     && REG_P (xop0)
+     && REGNO (xop0) == FRAME_POINTER_REGNUM
+     && GET_CODE (xop1) == CONST_INT){
     return true;
   }
 
-  offset_bits = conditional ? 6 : -11;
-
-  /* base+offset address */
+  /* base+offset/index address */
   if(   GET_CODE (x) == PLUS
-     && check_mode
-     && GET_CODE (XEXP (x, 0)) == REG
-     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)
-     && GET_CODE (XEXP (x, 1)) == CONST_INT
-     && qdsp6_legit_addr_const_p(INTVAL (XEXP (x, 1)), mode, offset_bits)){
-    return true;
+     && ((REG_P (xop0) && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p))
+         || (allow_immediate_base && allow_extension
+             && CONSTANT_P (xop0) && !CONSTANT_P (xop1)))){
+    rtx offset = xop1;
+    rtx index = xop1op0;
+    rtx scale = xop1op1;
+
+    /* base+extended offset address */
+    if(allow_extension && CONSTANT_P (offset)){
+      if(GET_CODE (offset) == CONST_INT){
+        return (INTVAL (offset) & (GET_MODE_SIZE (mode) - 1)) == 0;
+      }
+      return allow_immediate_base;
+    }
+
+    /* base+offset address */
+    if(GET_CODE (offset) == CONST_INT){
+      return qdsp6_legit_addr_const_p(INTVAL (offset), mode, offset_bits);
+    }
+
+    /* base+index address */
+    if(allow_base_plus_index){
+      if(REG_P (offset)){
+        return qdsp6_reg_ok_for_base_p(offset, reg_ok_strict_p);
+      }
+      if(GET_CODE (offset) == MULT){
+        return    REG_P (index)
+               && qdsp6_reg_ok_for_index_p(index, reg_ok_strict_p)
+               && GET_CODE (scale) == CONST_INT
+               && (   INTVAL (scale) == 1
+                   || INTVAL (scale) == 2
+                   || INTVAL (scale) == 4
+                   || INTVAL (scale) == 8);
+      }
+      if(GET_CODE (offset) == ASHIFT){
+        return    REG_P (index)
+               && qdsp6_reg_ok_for_index_p(index, reg_ok_strict_p)
+               && GET_CODE (scale) == CONST_INT
+               && IN_RANGE (INTVAL (scale), 0, 3);
+      }
+    }
   }
 
-  /* We don't check the constant for post inc/dec because it */
-  /* is always the size of the element */
-  if(   GET_CODE (x) == POST_INC
-     && (reg_ok_strict_p || check_mode) /* ??? Is this right? */
-     && GET_CODE (XEXP (x, 0)) == REG
-     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
-    return true;
-  }
+  if(allow_post_inc){
+    /* post increment/decrement address with the increment/decrement equal to
+       the access size */
+    if(GET_CODE (x) == POST_INC || GET_CODE (x) == POST_DEC){
+      return REG_P (xop0) && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p);
+    }
 
-  if(   GET_CODE (x) == POST_DEC
-     && (reg_ok_strict_p || check_mode) /* ??? Is this right? */
-     && GET_CODE (XEXP (x, 0)) == REG
-     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
-    return true;
-  }
-
-  if(   GET_CODE (x) == POST_MODIFY
-     && check_mode
-     && GET_CODE (XEXP (x, 0)) == REG
-     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
-    rtx mod = XEXP (x, 1);
-    if(   GET_CODE (mod) == PLUS
-       && GET_CODE (XEXP (mod, 0)) == REG
-       && REGNO (XEXP (mod, 0)) == REGNO (XEXP (x, 0))
-       && GET_CODE (XEXP (mod, 1)) == CONST_INT
-       && qdsp6_legit_addr_const_p(INTVAL (XEXP (mod, 1)), mode, -4)){
-      return true;
+    /* post increment/decrement address */
+    if(GET_CODE (x) == POST_MODIFY){
+      return    REG_P (xop0)
+             && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p)
+             && GET_CODE (xop1) == PLUS
+             && REG_P (xop1op0)
+             && REGNO (xop1op0) == REGNO (xop0)
+             && GET_CODE (xop1op1) == CONST_INT
+             && qdsp6_legit_addr_const_p(INTVAL (xop1op1), mode, -4);
     }
   }
 
   return false;
 }
+
+
+
 
 /* Construct a unique section name based on the decl name and the
    categorization performed above.  Original in gcc/varasm.c  */
@@ -1941,7 +2375,6 @@ default_unique_section_2 (tree decl, int reloc)
   plen = strlen (prefix);
 
   name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
-  
   name = targetm.strip_name_encoding (name);
   nlen = strlen (name);
 
@@ -1952,26 +2385,34 @@ default_unique_section_2 (tree decl, int reloc)
   DECL_SECTION_NAME (decl) = build_string (nlen + plen, string);
 }
 
+
+
+
 static void
 qdsp6_unique_section (tree decl, int reloc)
 {
   default_unique_section_2 (decl, reloc);
 }
 
-int
-sdata_symbolic_operand_size(rtx op)
+
+
+
+/* _LSY_ Loks for smallest addressable entity in
+   a declaration, not overall declaration size. */  
+static unsigned HOST_WIDE_INT 
+sdata_symbolic_operand_smallest_accessable_size(rtx op)
 {
-  HOST_WIDE_INT offset = 0, size = 0;
+  unsigned HOST_WIDE_INT size = 16;
   tree t;
+
   switch(GET_CODE (op)){
     case CONST:
       op = XEXP (op, 0);
       if(!(GET_CODE (op) == PLUS
            && GET_CODE (XEXP (op, 0)) == SYMBOL_REF
            && GET_CODE (XEXP (op, 1)) == CONST_INT)){
-        return -1;
+        return size;
       }
-      offset = INTVAL (XEXP (op, 1));
       op = XEXP (op, 0);
       /* FALL THROUGH */
     case SYMBOL_REF:
@@ -1979,20 +2420,26 @@ sdata_symbolic_operand_size(rtx op)
         size = GET_MODE_SIZE (get_pool_mode(op));
       }
       else {
-        if(!SYMBOL_REF_SMALL_P (op))	return -1; 
+        if(!SYMBOL_REF_SMALL_P (op))    size;
         t = SYMBOL_REF_DECL (op);
-        if(DECL_P (t))	t = DECL_SIZE_UNIT (t);	
-        else 		t = TYPE_SIZE_UNIT (TREE_TYPE (t)); 
-        if(t && host_integerp(t, 0)){
-          size = tree_low_cst(t, 0);
-          if(size < 0)	size = -1; 
-        }
+	/* if we want to take overall declaration size
+	   the following code will work just fine:
+	   if(DECL_P (t))  t = DECL_SIZE_UNIT (t);
+           else            t = TYPE_SIZE_UNIT (TREE_TYPE (t));
+           if(t && host_integerp(t, 0)){
+             size = tree_low_cst(t, 0);
+             if(size < 0)  size = -1;
+           }
+ 	*/ 
+ 	if(t)
+          size = smallest_accessable_entity_in_declaration(t);
       }
-      return size;
     default:
-      return -1;
+      return size;
   }
 }
+
+
 
 
 /* copy of general_operand() rtl predicate plus memory sorting */  
@@ -2064,7 +2511,7 @@ qdsp6_GP_or_reg_operand_c (rtx op, enum machine_mode mode)
       rtx y = XEXP (op, 0);
 
       if (! volatile_ok && MEM_VOLATILE_P (op))	return 0; 
-      // _LSY_ if (GET_CODE (y) == ADDRESSOF)		return 1; 
+      /* _LSY_ if (GET_CODE (y) == ADDRESSOF)		return 1; */  
 
       /* Use the mem's mode, since it will be reloaded thus.  */
       mode = GET_MODE (op);
@@ -2072,32 +2519,48 @@ qdsp6_GP_or_reg_operand_c (rtx op, enum machine_mode mode)
       /* Catch GP relative MEM accesses */  
       if(sdata_symbolic_operand(y, Pmode)){
     	/* Will be GP relative */
-		int mem_size = 0; 
+	unsigned HOST_WIDE_INT mem_size = 0; 
 
-		if((GET_CODE (op) == MEM) && MEM_SIZE (op))	
-			mem_size	= INTVAL (MEM_SIZE (op)); 
-		// Dev warning. if(GET_MODE_SIZE(mode) != mem_size)	
-		//	fprintf(stderr,"Warning. GET_MODE_SIZE(%d) != mem_size(%d)\n",GET_MODE_SIZE(mode),mem_size); 
+	if((GET_CODE (op) == MEM) && MEM_SIZE (op))	
+		mem_size = INTVAL (MEM_SIZE (op)); 
+	/* Dev warning. if(GET_MODE_SIZE(mode) != mem_size)	
+           fprintf(stderr,"Warning. GET_MODE_SIZE(%d) != mem_size(%d)\n",
+	   GET_MODE_SIZE(mode),mem_size); 
+        */
 
-		/* This makes this predicate to reject GP relative 
-		addressing if access unit is smaller than declaration unit*/ 
-		if(TARGET_SECTION_SORTING_CODE_SUPPORT 
-		&& TARGET_SECTION_SORTING && (mem_size < sdata_symbolic_operand_size(y))){
-			if(reload_completed)	; // Dev warning. fprintf(stderr,"Warning. Skip late section sorting match\n"); 
-			else	return 0;
-		}
+	/* This makes this predicate to reject GP relative 
+	   addressing if access unit is smaller than declaration unit*/ 
+	if(TARGET_SECTION_SORTING_CODE_SUPPORT 
+	&& TARGET_SECTION_SORTING 
+	/* There is a difference in approach possible here: In case of a struct
+           we can consider overal struct size as grounds for rejection, on the other
+           hand we can see what is the smallest accessable member of the struct is, and 
+           use that instead. Currently it makes no significant difference in performance
+           or size, but we can easily think of a theoretical example where it might.
+           Alternative code:
+           mem_size < sdata_symbolic_operand_size(y)
+        */
+	&& (mem_size < sdata_symbolic_operand_smallest_accessable_size(y))){ 
+	   if(reload_completed)	; /* Dev warning. fprintf(stderr,
+                                     "Warning. Skip late section sorting match\n"); */ 
+	   else	return 0;
+	}
       }
       if (memory_address_p (mode, y))	return 1;
    }
-
   return 0;
 }
+
+
+
 
 int
 qdsp6_nonimmediate_operand_with_GP_c (rtx op, enum machine_mode mode)
 {
-  return (! CONSTANT_P (op) && qdsp6_GP_or_reg_operand (op, mode));
+  return (! CONSTANT_P (op) && GP_or_reg_operand (op, mode));
 }
+
+
 
 
 static GTY(()) tree qdsp6_builtin_mask_for_load;
@@ -2119,6 +2582,32 @@ qdsp6_vectorize_builtin_mask_for_load(void)
 Describing Relative Costs of Operations
 -------------------------------------*/
 
+/* Implements hook STORE_BY_PIECES_P */
+
+bool
+qdsp6_store_by_pieces_p(unsigned HOST_WIDE_INT size, unsigned int alignment)
+{
+  unsigned HOST_WIDE_INT ninsns;
+  unsigned int store_width = MIN (MAX (alignment, 1), 4);
+
+  ninsns = size / store_width * (TARGET_V4_FEATURES ? 2 : 3);
+  size %= store_width;   
+  if(optimize_size){
+    while(size){
+      store_width /= 2;
+      ninsns += size / store_width * 2;
+      size %= store_width;   
+    }
+    return ninsns <= 3;
+  }
+  else {
+    return ninsns <= 16;
+  }
+}
+
+
+
+
 /* Helper function for qdsp6_rtx_costs */
 
 static bool
@@ -2133,7 +2622,7 @@ qdsp6_free_immediate(rtx x, int outer_code, int value)
 /* Implements hook TARGET_RTX_COSTS */
 
 static bool
-qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total)
+qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed)
 {
   enum machine_mode mode = GET_MODE (x);
 
@@ -2333,47 +2822,121 @@ qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total)
 
 
 
+static bool
+qdsp6_rtx_costs_debug(rtx x, int code, int outer_code, int *total, bool speed)
+{
+  bool retval;
+
+  debug_rtx(x);
+  retval = qdsp6_rtx_costs(x, code, outer_code, total, speed);
+  fprintf(stderr, "rtx_cost:  %d, %s\n\n", *total, retval ? "true" : "false");
+
+  return retval;
+}
+
+
+
+
 /* Implements hook TARGET_ADDRESS_COST */
 
 static int
-qdsp6_address_cost(rtx address)
+qdsp6_address_cost(rtx address, bool speed)
 {
   enum rtx_code code = GET_CODE(address);
   rtx mod;
 
   switch(code){
+    case SYMBOL_REF:
+    case CONST:
+      if(g_switch_value > 0){
+        return COSTS_N_INSNS (1) - 2;
+      }
+      if(TARGET_V4_FEATURES){
+        return COSTS_N_INSNS (1) + 1;
+      }
+      return COSTS_N_INSNS (3);
     case PRE_INC:
     case PRE_DEC:
-      fprintf(stderr, "Cost requested for unsupported PRE_{INC,DEC}\n");
-      return COSTS_N_INSNS (10);
+      return COSTS_N_INSNS (3);
     case POST_INC:
     case POST_DEC:
-      return 0;
+      return COSTS_N_INSNS (1) - 3;
     case POST_MODIFY:
       mod = XEXP (address, 1);
       if(GET_CODE (mod) == PLUS
-         && GET_CODE (XEXP (mod, 0)) == REG
+         && REG_P (XEXP (mod, 0))
          && GET_CODE (XEXP (mod, 1)) == CONST_INT){
-        return 0;
+        return COSTS_N_INSNS (1) - 3;
       }
-      fprintf(stderr, "Unknown POST_MODIFY address type:\n");
-      debug_rtx(address);
-      return COSTS_N_INSNS (2);
+      return COSTS_N_INSNS (3);
     case REG:
-      /* Not doing anything! */
-      return COSTS_N_INSNS (2);
+      return COSTS_N_INSNS (1);
     case PLUS:
-    case MINUS:
-      if(GET_CODE (XEXP (address, 0)) == REG
-         && GET_CODE (XEXP (address, 1)) == CONST_INT){
-        return COSTS_N_INSNS (1);
+      {
+        rtx base = XEXP (address, 0);
+        rtx offset = XEXP (address, 1);
+        if((REG_P (offset) || CONSTANT_P (offset)) && !REG_P (base)){
+          base = XEXP (address, 1);
+          offset = XEXP (address, 0);
+        }
+        if(REG_P (base)
+           || (TARGET_V4_FEATURES && CONSTANT_P (base))){
+          if(GET_CODE (offset) == CONST_INT
+             && IN_RANGE (INTVAL (offset), -(1 << 12), (1 << 12) - 4)){
+            return COSTS_N_INSNS (1);
+          }
+          if(TARGET_V4_FEATURES && CONSTANT_P (offset)){
+            return COSTS_N_INSNS (1) + 2;
+          }
+          if(TARGET_V4_FEATURES && TARGET_BASE_PLUS_INDEX){
+            if(REG_P (offset)){
+              return COSTS_N_INSNS (1) - 1;
+            }
+            if(GET_CODE (offset) == MULT || GET_CODE (offset) == ASHIFT){
+              rtx index = XEXP (offset, 0);
+              rtx scale = XEXP (offset, 1);
+              if(GET_CODE (offset) == MULT && !REG_P (index)){
+                index = XEXP (offset, 1);
+                scale = XEXP (offset, 0);
+              }
+              if(REG_P (index)
+                 && GET_CODE (scale) == CONST_INT){
+                if(REG_P (base)){
+                  return COSTS_N_INSNS (1) - 2;
+                }
+                return COSTS_N_INSNS (1) + 1;
+              }
+            }
+          }
+        }
       }
-      return COSTS_N_INSNS (2);
-    default: /* ?? Label and such */
-      return COSTS_N_INSNS (10);
+      return COSTS_N_INSNS (3);
+    case CONST_INT:
+    case LABEL_REF:
+      if(TARGET_V4_FEATURES){
+        return COSTS_N_INSNS (1) + 1;
+      }
+      /* FALL THROUGH */
+    default:
+      return COSTS_N_INSNS (3);
   }
   /* Should never get here */
-  return COSTS_N_INSNS (30);
+  gcc_unreachable();
+}
+
+
+
+
+static int
+qdsp6_address_cost_debug(rtx address, bool speed)
+{
+  int retval;
+
+  debug_rtx(address);
+  retval = qdsp6_address_cost(address, speed);
+  fprintf(stderr, "address_cost:  %d\n\n", retval);
+
+  return retval;
 }
 
 
@@ -2391,6 +2954,643 @@ qdsp6_sched_issue_rate(void)
   return 6; /* ??? 4 or 6? */
 }
 
+static tree
+get_mem_expr_from_mem_rtx (rtx mem)
+{
+  tree mem_expr;
+  mem_expr = MEM_EXPR (mem);
+  if (!mem_expr)
+    {
+      rtx addr, reg;
+      reg = NULL_RTX;
+      addr = XEXP (mem, 0);
+      if (GET_CODE (addr) == PLUS)
+        reg = XEXP (addr, 0);
+      else if (GET_CODE (addr) == REG)
+        reg = addr;
+      
+      if (reg)
+        mem_expr = REG_EXPR (reg);
+   }
+  return mem_expr;
+}
+
+/*
+  --------------------------------------------------------------- 
+ | * - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - * | 
+ | |  -------------------------------------------------------  | |
+ | / |    The Instruction Scheduler calculates Instruction   | \ |
+ | - |        Dependencies.  Evaluate the dependencies       | - |
+ | \ |      calculated by the Scheduler. Specifically,       | / |
+ | | |     remove dependencies between stores to addresses   | | |
+ | / |    based on __restrict qualified pointers and loads   | \ |
+ | - |                    from addresses.                    | - |
+ | \ |                       --==*==--                       | / |
+ | |  -------------------------------------------------------  | |
+ | * - / | \ - / | \ - / | \ - / | \ - / | \ - / | \ - / | \ - * |
+  --------------------------------------------------------------- 
+*/ 
+
+static inline unsigned int 
+get_pair_comp_reg (unsigned int reg)  
+{ 
+    return (reg & 0x1) ? reg - 1 : reg + 1; 
+} 
+
+static inline bool
+pair_match (unsigned int x_reg,int x_pair,unsigned int y_reg,int y_pair)
+{
+     /*  x) r0     y) r0   */
+    if (x_reg == y_reg)  return true; 
+    
+    if (y_pair)
+      {
+        if (x_pair)
+          { /*   x) r1:0    y) r0:1    */ 
+            if (get_pair_comp_reg(x_reg) == get_pair_comp_reg(y_reg)
+                || get_pair_comp_reg(x_reg) == y_reg
+                || get_pair_comp_reg(y_reg) == x_reg)   return true;  
+          }
+        else
+          { /*   x) r1      y) r0:1    */
+            if (get_pair_comp_reg(y_reg) == x_reg)   return true;  
+          }
+    }
+    else
+      {
+        if (x_pair)
+          { /*   x) r1:0    y) r1    */
+            if (get_pair_comp_reg(x_reg) == y_reg)   return true;  
+          }
+      }
+    
+    return false; 
+}
+     
+static bool
+get_usable_reg_num
+(rtx dst_0,unsigned int *reg_number, int *updated, int *reg_pair)
+{
+    if (!dst_0)  return false; 
+       
+    switch (GET_CODE (dst_0))
+      {
+        case REG:
+            if (GET_MODE(dst_0) == DImode)   (*reg_pair)++; 
+            *reg_number = REGNO(dst_0);
+            return true; 
+        break; 
+        case POST_INC: 
+        case POST_DEC:
+        case PRE_INC:
+        case PRE_DEC:
+        case POST_MODIFY:
+        case PLUS:
+        case MINUS: 
+            (*updated)++;            
+            return get_usable_reg_num(XEXP (dst_0 ,0), reg_number,
+                                      updated, reg_pair); 
+        break;
+        default:
+            return false; 
+        break;
+    }
+    return false; 
+}
+
+static void
+qdsp6_sched_dependencies_eval (rtx head, rtx tail)
+{
+  rtx insn, next_tail;
+
+  if (!flag_resolve_restrict_aliasing)
+    return;
+
+  next_tail = NEXT_INSN (tail);
+  for (insn = head; insn != next_tail; insn = NEXT_INSN (insn))
+    {
+
+      if (!INSN_P (insn))    
+        continue;
+      rtx x = PATTERN (insn);
+
+      /* We are interested if the insn is a store insn. */
+      if (GET_CODE (x) == SET)
+        {
+          rtx x_dst  = SET_DEST(x);
+          rtx x_src  = SET_SRC(x); 
+
+          if (MEM_P (x_dst)) 
+            {
+              tree base1, base2;
+              unsigned int    y_dst_regno   = 0;
+              unsigned int    y_src_regno   = 0;
+              unsigned int    x_dst_regno   = 0;
+              unsigned int    x_src_regno   = 0;
+              int             y_updates_reg = 0; 
+              int             x_updates_reg = 0; 
+              int             x_src_pair    = 0; 
+              int             y_src_pair    = 0; 
+              int             x_dst_pair    = 0; 
+              int             y_dst_pair    = 0; 
+
+              base1 = get_mem_expr_from_mem_rtx (x_dst);
+              /* If mem_expr is still NULL or source of the mem op is 
+                 not a register, then give up. */
+              if (!base1 || !REG_P(x_src))
+                continue;
+              while (handled_component_p (base1))
+                base1 = TREE_OPERAND (base1, 0);
+
+              /* Things become intesting only if this is an 
+                 access via a restrict pointer. 
+               */
+              if (is_restrict_qualified (base1))
+                { 
+                  sd_iterator_def sd_it;
+                  dep_t dep;
+                  /*  Go through all the dependent ops, 
+                      and delete qualified
+                      memory accesses 
+                   */ 
+
+                  for (sd_it = sd_iterator_start (insn, SD_LIST_FORW); 
+                       sd_iterator_cond (&sd_it, &dep);)  
+                    {
+                      rtx y = PATTERN (DEP_CON (dep));
+
+                      /* Naming convention:
+                         x) x_dst = x_src
+                         y) y_dst = y_src
+                       */ 
+
+                      if (GET_CODE (y) == SET)
+                        {
+                          rtx y_dst = SET_DEST (y);
+                          rtx y_src = SET_SRC (y);
+
+                          if (MEM_P (y_dst))
+                            {
+                              tree mem_expr_dep = 
+                                get_mem_expr_from_mem_rtx (y_dst);
+
+                              if (!mem_expr_dep)  
+                                {
+                                  /*  If no info exist, nothing else 
+                                      we can do here 
+                                      if mem() operand list is empty, 
+                                      I also should 
+                                      not reason about it.*/ 
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                              /* This is the case of store-to-store  
+                                 dependency 
+                                 x) mem(r0) = r0;
+                                 y) mem(r0++) = r3;
+                                 or
+                                 x) mem(r0++) = r0;
+                                 y) mem(r0) = r3;
+                                 Here we might have an update of some sort 
+                                 in XY making it more interdependent
+                                 then simple memory dependency would suggest 
+                               */
+
+                              /* Try to obtain register information 
+                                 including potential 
+                                 pair register updates/uses 
+                               */ 
+
+                              if (!get_usable_reg_num (y_src, &y_src_regno,
+                                                       &y_updates_reg, 
+                                                       &y_src_pair)
+                                  || !get_usable_reg_num (XEXP ((x_dst),0),
+                                                          &x_dst_regno, 
+                                                          &x_updates_reg,
+                                                          &x_dst_pair)
+                                  || !get_usable_reg_num (XEXP ((y_dst),0),
+                                                          &y_dst_regno, 
+                                                          &y_updates_reg,
+                                                          &y_dst_pair)
+                                  || !get_usable_reg_num (x_src, &x_src_regno,
+                                                          &x_updates_reg,
+                                                          &x_src_pair))
+                                {
+                                  /*  At any failure we simply move on 
+                                      without modifying existent dependency
+                                   */ 
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                              /* Here I know the reg numbers. 
+                                 Analyze all combinations */ 
+                              if (((x_updates_reg || y_updates_reg) 
+                                    && pair_match (y_dst_regno, y_dst_pair,
+                                                   x_dst_regno, x_dst_pair))
+                                  /*  x) mem(r0) = r1;       <-- Use r0 
+                                      y) mem(r0++) = r2;     <-- Update/Use r0
+                                      or
+                                      x) mem(r0++) = r1;     <-- Update/Use r0 
+                                      y) mem(r0) = r2;       <--  Use r0
+                                   */
+                                ||  (y_updates_reg 
+                                     && pair_match (y_dst_regno, y_dst_pair,
+                                                    x_src_regno, x_src_pair))
+                                  /*  x) mem(r1) = r0;       <-- Use r0 
+                                      y) mem(r0++) = r2;     <-- Update/Use r0
+                                   */
+                                ||  (x_updates_reg 
+                                     && pair_match (y_src_regno, y_src_pair,
+                                                    x_dst_regno, x_dst_pair)))
+                                  /*  x) mem(r0++) = r1;     <-- Update/Use r0 
+                                      y) mem(r2) = r0;       <-- Use r0
+
+                                      The following case: 
+                                      pair_match (y_src_regno, y_src_pair,
+                                      x_src_regno, x_src_pair)
+                                      x) mem(r1) = r0;       <-- Use r0 
+                                      y) mem(r2) = r0;       <-- Use r0 
+                                      Without a possibility of an update 
+                                      presents no interest 
+                                  */ 
+                                {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                                /* Now once register dependencies are rooled 
+                                   out, carry on 
+                                   with memory dependency analysis 
+                                */ 
+                                base2 = mem_expr_dep;
+                                while (handled_component_p (base2))
+                                    base2 = TREE_OPERAND (base2, 0);
+
+                                if (operand_equal_p (base1, base2, 0))
+                                  {
+                                    sd_iterator_next (&sd_it);
+                                    continue;
+                                  }
+                                else
+                                  {
+                                    /* If base1 is restrict qualified and 
+                                       base1 != base2 then remove this 
+                                       dependency */
+                                    sd_delete_dep (sd_it);
+                                    continue; 
+                                  }
+                            }
+                          else if (MEM_P (y_src))
+                            {
+                              tree mem_expr_dep = 
+                                get_mem_expr_from_mem_rtx (y_src);
+
+                              if (!mem_expr_dep)
+                                {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                              /* This is the case of a load-to-store dependency:
+                                 x) mem(r0) = r0;     <-- Use r0 
+                                 y) r0 = mem(r2);     <-- Update/Use r0
+                                 or
+                                 x) mem(r0) = r0;    <-- Use r0 
+                                 y) r2 = mem(r0++);  <-- Update/Use r0
+
+                                 In this case y_dst cannot be a memory location
+                                 Similarly to the previous case, 
+                                 extract reg info 
+                               */ 
+
+                              if (!get_usable_reg_num (XEXP ((y_src),0),
+                                                       &y_src_regno,
+                                                       &y_updates_reg,
+                                                       &y_src_pair)
+                                  || !get_usable_reg_num (XEXP ((x_dst),0),
+                                                          &x_dst_regno,
+                                                          &x_updates_reg,
+                                                          &x_dst_pair)
+                                  || !get_usable_reg_num (y_dst, &y_dst_regno,
+                                                          &y_updates_reg,
+                                                          &y_dst_pair)
+                                  || !get_usable_reg_num (x_src, &x_src_regno,
+                                                          &x_updates_reg,
+                                                          &x_src_pair))
+                                {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                              if (pair_match (y_dst_regno, y_dst_pair,
+                                              x_dst_regno, x_dst_pair)
+                                 /*  x) mem(r0) = r1;    <-- Use r0 
+                                     y) r0 = mem(r2);    <-- Update r0
+                                  */
+                                  || pair_match (y_dst_regno, y_dst_pair,
+                                                 x_src_regno, x_src_pair)
+                                  /*  x) mem(r1) = r0;    <-- Use r0 
+                                      y) r0 = mem(r2);    <-- Update r0
+                                   */
+                                  || ((y_updates_reg || x_updates_reg) 
+                                      && pair_match (y_src_regno, y_src_pair,
+                                                     x_dst_regno, x_dst_pair))
+                                  /*  x) mem(r0) = r1;    <-- Use r0 
+                                      y) r2 = mem(r0++);  <-- Update/Use r0
+                                      or
+                                      x) mem(r0++) = r1;  <-- Update/Use r0
+                                      y) r2 = mem(r0);    <-- Use r0
+                                   */
+                                  || (y_updates_reg 
+                                      && pair_match (y_src_regno, y_src_pair, 
+                                                     x_src_regno, x_src_pair)))
+                                  /*  x) mem(r1) = r0;    <-- Use r0 
+                                      y) r2 = mem(r0++);  <-- Update/Use r0
+                                   */
+                                  {
+                                    sd_iterator_next (&sd_it);
+                                    continue;
+                                  }
+
+                                /* Ok, now we have ruled out register 
+                                   dependency, 
+                                   proceed with 
+                                   memory dependency analysis */ 
+
+                                base2 = mem_expr_dep;
+                                while (handled_component_p (base2))
+                                    base2 = TREE_OPERAND (base2, 0);
+
+                                if (operand_equal_p (base1, base2, 0))
+                                  {
+                                    sd_iterator_next (&sd_it);
+                                    continue; 
+                                  }
+                                else
+                                  {
+                                /*  If base1 is restrict qualified and 
+                                    base1 != base2 then remove this 
+                                    dependency 
+                                 */                      
+                                    sd_delete_dep (sd_it);
+                                    continue; 
+                                  }
+                            }
+                          else  /* !MEM_P (SET_DEST (y)) & 
+                                   !MEM_P (SET_SRC (y)) */
+                            sd_iterator_next (&sd_it);
+                        }
+                      else  /* GET_CODE (y) != SET */
+                        sd_iterator_next (&sd_it);
+                    } /* End FOR LOOP */
+                } /* is_restrict_qualified (base1) */
+            } /* MEM_P (SET_DEST (x)) */
+          else if (MEM_P (x_src))
+            {
+              /* X is a load */ 
+
+              tree base1, base2;
+              unsigned int    y_dst_regno   = 0;
+              unsigned int    y_src_regno   = 0;
+              unsigned int    x_dst_regno   = 0;
+              unsigned int    x_src_regno   = 0;
+              int             y_updates_reg = 0; 
+              int             x_updates_reg = 0; 
+              int             x_src_pair    = 0; 
+              int             y_src_pair    = 0; 
+              int             x_dst_pair    = 0; 
+              int             y_dst_pair    = 0; 
+
+              base1 = get_mem_expr_from_mem_rtx (x_src);
+              /* If mem_expr is still NULL or source of the mem op is 
+                 not a register, then give up. */
+              if (!base1 || !REG_P(x_dst))
+                continue;
+              while (handled_component_p (base1))
+                base1 = TREE_OPERAND (base1, 0);
+
+              /* Things become intesting only if this is an 
+                 access via a restrict pointer. */
+              if (is_restrict_qualified (base1))
+                { 
+                  sd_iterator_def sd_it;
+                  dep_t dep;
+                  /* Go through all the dependent ops, 
+                     and delete qualified
+                     memory accesses */ 
+
+                  for (sd_it = sd_iterator_start (insn, SD_LIST_FORW); 
+                       sd_iterator_cond (&sd_it, &dep);)  
+                    {
+                      rtx y = PATTERN (DEP_CON (dep));
+
+                      if (GET_CODE (y) == SET)
+                        {
+                          rtx y_dst = SET_DEST (y);
+                          rtx y_src = SET_SRC (y);
+
+                          if (MEM_P (y_dst))
+                            {
+                              tree mem_expr_dep = 
+                                get_mem_expr_from_mem_rtx (y_dst);
+
+                              if (!mem_expr_dep)  
+                                {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                              /*  This is the case of load-to-store  
+                                  dependency 
+                                  x) r0 = mem(r0) ;
+                                  y) mem(r0++) = r3;
+                                  or
+                                  x) r0 = mem(r0++) ;
+                                  y) mem(r0) = r3;
+                                  Here again we might have an 
+                                  update of some sort 
+                                  X or Y 
+                               */
+
+
+                              if (!get_usable_reg_num (y_src, &y_src_regno,
+                                                       &y_updates_reg, 
+                                                       &y_src_pair)
+                                  || !get_usable_reg_num (x_dst, &x_dst_regno,
+                                                          &x_updates_reg, 
+                                                          &x_dst_pair)
+                                  || !get_usable_reg_num (XEXP ((y_dst),0),
+                                                          &y_dst_regno, &y_updates_reg,
+                                                          &y_dst_pair)
+                                  || !get_usable_reg_num (XEXP ((x_src),0),
+                                                          &x_src_regno, &x_updates_reg,
+                                                          &x_src_pair))
+                                {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                              /* I know the reg numbers that X/Y  updates */ 
+                              if (pair_match (y_dst_regno, y_dst_pair,
+                                              x_dst_regno, x_dst_pair)
+                                 /*  x) r0 = mem(r1);    <-- Update r0 
+                                     y) mem(r0++) = r2;  <-- Update/Use r0
+                                  */
+                                  || ((y_updates_reg || x_updates_reg) 
+                                  && pair_match (y_dst_regno, y_dst_pair,
+                                                 x_src_regno, x_src_pair))
+                                  /*  x) r1 = mem(r0);    <-- Use r0 
+                                      y) mem(r0++) = r2;  <-- Update r0
+                                      or
+                                      x) r1 = mem(r0++);  <-- Update r0 
+                                      y) mem(r0) = r2;    <-- Use r0
+                                   */
+                                  || pair_match (y_src_regno, y_src_pair,
+                                                 x_dst_regno, x_dst_pair)
+                                  /*  x) r0 = mem(r1) ;   <-- Update r0 
+                                      y) mem(r2) = r0;    <-- Use r0
+                                   */
+                                  || (x_updates_reg 
+                                  && pair_match (y_src_regno, y_src_pair,
+                                                 x_src_regno, x_src_pair)))
+                                  /*  x) r1 = mem(r0++);  <-- Update/Use r0  
+                                      y) mem(r2) = r0;    <-- Use r0 
+                                  */
+                                  {           
+                                    sd_iterator_next (&sd_it);
+                                    continue;
+                                  }
+
+                                base2 = mem_expr_dep;
+                                while (handled_component_p (base2))        
+                                    base2 = TREE_OPERAND (base2, 0);
+
+                                if (operand_equal_p (base1, base2, 0))
+                                  {
+                                    sd_iterator_next (&sd_it);
+                                    continue;
+                                  }
+                                else
+                                  {
+                                    /* If base1 is restrict qualified and 
+                                       base1 != base2 then remove this 
+                                       dependency 
+                                     */
+                                    sd_delete_dep (sd_it);
+                                    continue; 
+                                  }
+                            }
+                          else if (MEM_P (y_src))
+                            {                
+                              tree mem_expr_dep = 
+                                get_mem_expr_from_mem_rtx (y_src);
+
+                              if (!mem_expr_dep)
+                                {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                              /*  This is the case of a load-to-load 
+                                  dependency:
+                                  x) r0 = mem(r0) ;   <-- Use r0 
+                                  y) r0 = mem(r2);    <-- Update r0
+                                  or
+                                  x) r0 = mem(r0) ;   <-- Use r0 
+                                  y) r2 = mem(r0++);  <-- Update/Use r0
+                               */          
+
+                              if(!get_usable_reg_num (XEXP ((y_src),0),
+                                                      &y_src_regno,
+                                                      &y_updates_reg,
+                                                      &y_src_pair)
+                                 || !get_usable_reg_num (x_dst, &x_dst_regno, 
+                                                         &x_updates_reg,
+                                                         &x_dst_pair)
+                                 || !get_usable_reg_num (y_dst, &y_dst_regno,
+                                                         &y_updates_reg,
+                                                         &y_dst_pair)
+                                 || !get_usable_reg_num (XEXP ((x_src),0),
+                                                         &x_src_regno,
+                                                         &x_updates_reg,
+                                                         &x_src_pair))
+                                {
+                                  sd_iterator_next (&sd_it);
+                                  continue;
+                                }
+
+                              /* Analyze potential register deps:
+                                 First combination: 
+                                 pair_match (y_dst_regno, y_dst_pair, 
+                                 x_dst_regno, x_dst_pair)
+                                 x) r0 = mem(r1);    <-- Update r0 
+                                 y) r0 = mem(r2);    <-- Update r0
+
+                                 We do not really care about this case 
+                                 Output dep with no update possible
+                               */
+                                if(pair_match (y_dst_regno, y_dst_pair,
+                                               x_src_regno, x_src_pair)
+                                 /*  x) r1 = mem(r0) ;   <-- Uses r0 
+                                     y) r0 = mem(r2);    <-- Update r0
+                                  */
+                                   || pair_match (y_src_regno, y_src_pair,
+                                                  x_dst_regno, x_dst_pair)
+                                 /*  x) r0 = mem(r1) ;   <-- Update r0 
+                                     y) r2 = mem(r0);    <-- Uses r0
+                                  */
+                                   || ((y_updates_reg || x_updates_reg) 
+                                      && pair_match (y_src_regno, y_src_pair,
+                                                     x_src_regno, x_src_pair)))
+                                 /*  x) r1 = mem(r0);    <-- Use r0 
+                                     y) r2 = mem(r0++);  <-- Update/Use r0
+                                     or
+                                     x) r1 = mem(r0++);  <-- Update/Use r0 
+                                     y) r2 = mem(r0);    <-- Use r0
+                                  */        
+                                  {            
+                                    sd_iterator_next (&sd_it);
+                                    continue;
+                                  }
+
+                                /*  Ok, now we have ruled out register 
+                                    dependency, 
+                                    proceed with 
+                                    memory dependency analysis */ 
+
+                                base2 = mem_expr_dep;
+                                while (handled_component_p (base2))        
+                                    base2 = TREE_OPERAND (base2, 0);
+
+                                if (operand_equal_p (base1, base2, 0))
+                                  {
+                                    sd_iterator_next (&sd_it);
+                                    continue; 
+                                  }
+                                else
+                                  {
+                                    /*  If base1 is restrict qualified and 
+                                        base1 != base2 then remove this 
+                                        dependency 
+                                    */    
+                                    sd_delete_dep (sd_it);
+                                    continue; 
+                                  }
+                            }
+                          else  /* !MEM_P (SET_DEST (y)) & 
+                                   !MEM_P (SET_SRC (y))  */
+                            sd_iterator_next (&sd_it);
+                        }
+                      else    /* GET_CODE (y) != SET */
+                        sd_iterator_next (&sd_it);
+                    } /* End FOR LOOP */
+                } /* is_restrict_qualified (base1) */
+            }             
+        } /* GET_CODE (x) == SET */
+    } /* END MAIN FOR LOOP */
+}
 
 
 
@@ -2459,6 +3659,9 @@ qdsp6_asm_select_rtx_section(
 }
 #endif /* !GCC_3_4_6 */
 
+
+
+
 extern void switch_to_section (section *);                 
 
 #define MAX_DECLARE_RECURSION   1024
@@ -2475,6 +3678,9 @@ has_this_tree_been_visited(tree node){
    return 0;
 }
 
+
+
+
 void
 remember_this_tree(tree node){
    int i;
@@ -2490,6 +3696,9 @@ remember_this_tree(tree node){
    }
    return;
 }
+
+
+
 
 /* descent_smallest designed to identify the smallest addressable entity
    in a declaration. Used for sdata elements sorting */ 
@@ -2562,15 +3771,6 @@ descent_smallest(const char *prefix, tree node, unsigned int smallest){
       }
       new_smallest	= descent_smallest ("chain", TREE_CHAIN (node), new_smallest);
       break;
-/* _LSY_  
-   case tcc_gimple_stmt:
-      {
-		int i; 
-		for (i = 0; i < TREE_CODE_LENGTH (TREE_CODE (node)); i++)
-          new_smallest	= descent_smallest ("arg",GIMPLE_STMT_OPERAND (node, i),new_smallest); 
-      }  
-      break;
-*/ 
     case tcc_constant:  	/* a constant */
     case tcc_exceptional: 	/* something random, like an identifier.  */
       switch (TREE_CODE (node)){ 
@@ -2630,15 +3830,21 @@ descent_smallest(const char *prefix, tree node, unsigned int smallest){
     return new_smallest;  
 }
 
+
+
+
 /* smallest_accessable_entity_in_declaration designed to identify the smallest addressable entity
 in a declaration. Used for sdata elements sorting */ 
-unsigned int
+unsigned HOST_WIDE_INT
 smallest_accessable_entity_in_declaration(tree decl)
 {
    list_of_visited_declaration_counter  = 0;
    /* Here I assume there are no atomic data types larger than 128 bytes in this machine */ 
    return descent_smallest(" top ", decl, DEFAULT_LARGEST_ALIGNMENT); 
 }
+
+
+
 
 static bool
 bss_initializer_p (const_tree decl)
@@ -2652,12 +3858,14 @@ bss_initializer_p (const_tree decl)
 }
 
 
+
+
 /* Copycat from similar internal declaration */ 
 enum section_category
 qdsp6_categorize_decl_for_section (const_tree decl, int reloc)
 {
   enum section_category ret;
-	  
+
   if (TREE_CODE (decl) == FUNCTION_DECL)    return SECCAT_TEXT;
   else if (TREE_CODE (decl) == STRING_CST)
     {
@@ -2725,6 +3933,9 @@ qdsp6_categorize_decl_for_section (const_tree decl, int reloc)
   return ret;
 }
 
+
+
+
 /* Similar to default_elf_select_section from varasm.c  but is capable of sorting sdata 
    into subsections. sbss is also handled in a similar way, but not in this 
    function */ 
@@ -2736,7 +3947,7 @@ qdsp6_select_section (tree decl, int reloc,
                         unsigned HOST_WIDE_INT align)
 {
   const char *sname;
-  
+
   switch (qdsp6_categorize_decl_for_section (decl, reloc)){ 
     case SECCAT_TEXT:
       /* We're not supposed to be called on FUNCTION_DECLs.  */
@@ -2802,12 +4013,15 @@ qdsp6_select_section (tree decl, int reloc,
   return get_named_section (decl, sname, reloc);
 }
 
+
+
+
 void
 qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
 			       tree decl ATTRIBUTE_UNUSED)
 {
   char flagchars[10], *f = flagchars;
-  
+
   /* _LSY_ Note, unique section name does not matter for .comm declarations - it will be managed by linker, 
          so here we do not construct unique section name even if flag_data_sections is specified */ 
 
@@ -2819,6 +4033,12 @@ qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
       && (flags & SECTION_DECLARED))
     {
       fprintf (asm_out_file, "\t.section\t%s\n", name);
+      /* But we still need to output subsection information
+         or we can end up with same section split and
+         sorted in different subsections of the same section */
+      if(TARGET_SECTION_SORTING && decl && (smallest_accessable_entity_in_declaration(decl) > 1))
+        fprintf (asm_out_file, "\t.subsection\t-%d\n",
+                 floor_log2(smallest_accessable_entity_in_declaration(decl)));
       return;
     }
 
@@ -2871,9 +4091,12 @@ qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
   putc ('\n', asm_out_file);
   
   /* _LSY_ Also put subsection for better sorting */ 
-  if(TARGET_SECTION_SORTING && decl)
-		fprintf (asm_out_file, "\t.subsection\t-%d\n",smallest_accessable_entity_in_declaration(decl));
+  if(TARGET_SECTION_SORTING && decl && (smallest_accessable_entity_in_declaration(decl) > 1))
+     fprintf (asm_out_file, "\t.subsection\t-%d\n",floor_log2(smallest_accessable_entity_in_declaration(decl)));
 }
+
+
+
 
 /* Implements hook TARGET_IN_SMALL_DATA_P */
 
@@ -2916,6 +4139,8 @@ qdsp6_in_small_data_p(const_tree exp)
 }
 
 
+
+
 /*-------------------------------
 Output of Uninitialized Variables
 -------------------------------*/
@@ -2931,7 +4156,7 @@ qdsp6_asm_output_aligned_decl_common(
   unsigned HOST_WIDE_INT alignment
 ){
     unsigned int flags = SECTION_WRITE | SECTION_BSS | SECTION_NAMED; 
-	
+
 	if(decl && sdata_symbolic_operand(XEXP (DECL_RTL (decl), 0), Pmode))
 			switch_to_section(get_section(".sbss",flags,decl)); 
 	else 	switch_to_section(get_section(".bss",flags,decl)); 
@@ -2941,7 +4166,7 @@ qdsp6_asm_output_aligned_decl_common(
     	assemble_name(stream, name);
     	fprintf(stream, "," HOST_WIDE_INT_PRINT_UNSIGNED
                 "," HOST_WIDE_INT_PRINT_UNSIGNED
-				"," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
+		"," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
                   size, alignment / BITS_PER_UNIT, smallest_accessable_entity_in_declaration(decl)); 
 	}
 	else{ 
@@ -2952,6 +4177,9 @@ qdsp6_asm_output_aligned_decl_common(
                   size, alignment / BITS_PER_UNIT);
 	}
 }
+
+
+
 
 /* Implements macro ASM_OUTPUT_ALIGNED_DECL_LOCAL
 
@@ -2978,22 +4206,25 @@ qdsp6_asm_output_aligned_decl_local(
 		switch_to_section(get_section(".sbss",flags,decl));
   else 	switch_to_section(get_section(".bss",flags,decl));
 
-	if(TARGET_SECTION_SORTING && decl){ 
+  if(TARGET_SECTION_SORTING && decl){ 
     	fprintf(stream, "\t.lcomm\t");
     	assemble_name(stream, name);
     	fprintf(stream, "," HOST_WIDE_INT_PRINT_UNSIGNED
                 "," HOST_WIDE_INT_PRINT_UNSIGNED
-				"," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
+		"," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
                   size, alignment / BITS_PER_UNIT, smallest_accessable_entity_in_declaration(decl)); 
-	}
-	else{
-		fprintf(stream, "\t.lcomm\t");
-		assemble_name(stream, name);
-		fprintf(stream, "," HOST_WIDE_INT_PRINT_UNSIGNED
+   }
+   else{
+	fprintf(stream, "\t.lcomm\t");
+	assemble_name(stream, name);
+	fprintf(stream, "," HOST_WIDE_INT_PRINT_UNSIGNED
                   "," HOST_WIDE_INT_PRINT_UNSIGNED "\n",
                   size, alignment / BITS_PER_UNIT);
-	}
+   }
 }
+
+
+
 
 /*------------------------------
 Output of Assembler Instructions
@@ -3014,32 +4245,6 @@ qdsp6_output_operand(FILE *f, rtx x, int code ATTRIBUTE_UNUSED)
   PRINT_OPERAND (f, x, code);
 }
 
-/* globals used to pass information from qdsp6_prescan_insn
-   to qdsp6_asm_output_opcode */
-
-/* ??? Put these in the machine_function struct? */
-
-/* the operands of the current instruction */
-static rtx *qdsp6_insn_ops;
-
-/* whether the current insn starts a packet */
-static int qdsp6_start_packet;
-
-/* whether the current insn ends a packet */
-static int qdsp6_end_packet;
-
-/* whether the current packet ends a hardware loop */
-static int qdsp6_endloop;
-
-/* the label at the start of an inner hardware loop */
-static rtx qdsp6_endloop0_label;
-
-/* whether the current insn should be printed */
-static int qdsp6_do_not_print_insn;
-
-/* whether the current insn should be indented */
-static int qdsp6_indent_insn;
-
 /* Used by macro ASM_OUTPUT_OPCODE
 
    Outputs the assembly corresponding to the current insn
@@ -3048,26 +4253,28 @@ static int qdsp6_indent_insn;
 const char *
 qdsp6_asm_output_opcode(FILE *f, const char *ptr)
 {
+  struct qdsp6_final_info *final_info;
   int c;
-  int ended_packet = 0;
   int oporder[MAX_RECOG_OPERANDS];
   char opoutput[MAX_RECOG_OPERANDS];
   int ops = 0;
 
-  if(!(optimize && flag_schedule_insns_after_reload)){
+  if(!(TARGET_PACKETS && optimize)){
     return ptr;
   }
 
+  final_info = &cfun->machine->final_info;
+
   /* Ignore the output template for this insn. */
-  if(qdsp6_do_not_print_insn){
+  if(!final_info->print_insn){
     for(; *ptr; ptr++);
   }
 
   /* Begin packet. */
-  if(qdsp6_start_packet){
-    fputs("{\n\t\t", f);
+  if(final_info->start_packet){
+    fputs("{\n\t", f);
   }
-  else if(qdsp6_indent_insn){
+  if(final_info->indent_insn){
     fputc('\t', f);
   }
 
@@ -3081,7 +4288,7 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
         memset(opoutput, 0, sizeof(opoutput));
 
         putc(c, f);
-        if(qdsp6_indent_insn){
+        if(final_info->indent_insn){
           putc('\t', f);
         }
         break;
@@ -3108,31 +4315,31 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
             output_operand_lossage("operand number missing after %%-letter");
           }
           else if(letter == 'l'){
-            output_asm_label(qdsp6_insn_ops[opnum]);
+            output_asm_label(final_info->insn_ops[opnum]);
           }
           else if(letter == 'a'){
-            output_address(qdsp6_insn_ops[opnum]);
+            output_address(final_info->insn_ops[opnum]);
           }
           else if(letter == 'c'){
-            if(CONSTANT_ADDRESS_P (qdsp6_insn_ops[opnum])){
-              output_addr_const(f, qdsp6_insn_ops[opnum]);
+            if(CONSTANT_ADDRESS_P (final_info->insn_ops[opnum])){
+              output_addr_const(f, final_info->insn_ops[opnum]);
             }
             else {
-              qdsp6_output_operand(f, qdsp6_insn_ops[opnum], 'c');
+              qdsp6_output_operand(f, final_info->insn_ops[opnum], 'c');
             }
           }
           else if(letter == 'n'){
-            if(GET_CODE (qdsp6_insn_ops[opnum]) == CONST_INT){
+            if(GET_CODE (final_info->insn_ops[opnum]) == CONST_INT){
               fprintf(f, HOST_WIDE_INT_PRINT_DEC,
-                      -INTVAL (qdsp6_insn_ops[opnum]));
+                      -INTVAL (final_info->insn_ops[opnum]));
             }
             else {
               putc('-', f);
-              output_addr_const(f, qdsp6_insn_ops[opnum]);
+              output_addr_const(f, final_info->insn_ops[opnum]);
             }
           }
           else {
-            qdsp6_output_operand(f, qdsp6_insn_ops[opnum], letter);
+            qdsp6_output_operand(f, final_info->insn_ops[opnum], letter);
           }
 
           if(!opoutput[opnum]){
@@ -3149,7 +4356,7 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
           char *endptr;
 
           opnum = strtoul(ptr, &endptr, 10);
-          qdsp6_output_operand(f, qdsp6_insn_ops[opnum], 0);
+          qdsp6_output_operand(f, final_info->insn_ops[opnum], 0);
 
           if(!opoutput[opnum]){
             oporder[ops++] = opnum;
@@ -3170,27 +4377,22 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
   }
 
   /* End packet. */
-  if(qdsp6_end_packet && !ended_packet){
-    if(qdsp6_endloop){
-      fputc('}', f);
-      /* Print endloops specially. */
-      if(qdsp6_endloop & (1 << 0)){
-        fputs(":endloop0 // start=", f);
-        output_asm_label(qdsp6_endloop0_label);
-        if(qdsp6_endloop & (1 << 1)){
-          fputs("\n\t :endloop1 // start=", f);
-          output_asm_label(qdsp6_insn_ops[0]);
-        }
-      }
-      else if(qdsp6_endloop & (1 << 1)){
-        fputs(":endloop1 // start=", f);
-        output_asm_label(qdsp6_insn_ops[0]);
-      }
+  if(final_info->print_endloop0){
+    fputs("}:endloop0 // start=", f);
+    output_asm_label(final_info->endloop_label);
+  }
+  else if(final_info->print_endloop1){
+    if(final_info->endloop0){
+      fputc(' ', f);
     }
     else {
-      fputs("\n\t}", f);
+      fputc('}', f);
     }
-    ended_packet = 1;
+    fputs(":endloop1 // start=", f);
+    output_asm_label(final_info->endloop_label);
+  }
+  else if(final_info->end_packet){
+    fputs("\n\t}", f);
   }
 
   return ptr;
@@ -3199,14 +4401,11 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
 
 
 
-#define ENDLOOP_INSN(INSN) (   INSN_CODE (INSN) == CODE_FOR_endloop0 \
-                            || INSN_CODE (INSN) == CODE_FOR_endloop1)
-
 /* Implements macro FINAL_PRESCAN_INSN
 
-   Looks ahead of the current insn and uses the marks made by qdsp6_pack_insns
-   to determine whether the current insn should begin or end a packet and
-   whether the current packet ends a hardware loop. */
+   Looks at the current and next insns to determine how to format the next insn
+   to be printed and whether or not to print open or close curly brackets in
+   order to begin or end a packet. */
 
 void
 qdsp6_final_prescan_insn(
@@ -3215,102 +4414,98 @@ qdsp6_final_prescan_insn(
   int numops ATTRIBUTE_UNUSED
 )
 {
-  /* ??? Put these in the machine_function struct? */
-  static int insns_left_in_packet = 1;
-  static int form_packet;
+  struct qdsp6_final_info *final_info;
+  rtx next_insn;
 
-  if(!(optimize && flag_schedule_insns_after_reload)){
+  if(!(TARGET_PACKETS && optimize)){
     return;
   }
 
-  qdsp6_insn_ops = ops;
-  qdsp6_start_packet = 0;
-  qdsp6_end_packet = 0;
-  qdsp6_do_not_print_insn = 0;
-  qdsp6_indent_insn = 1;
+  final_info = &cfun->machine->final_info;
+
+  final_info->insn_ops = ops;
+  final_info->start_packet = false;
+  final_info->end_packet = false;
+  final_info->indent_insn = true;
+  final_info->print_insn = true;
+  final_info->print_endloop0 = false;
+  final_info->print_endloop1 = false;
 
   if(!INSN_P (insn) || INSN_CODE (insn) == -1){
     return;
   }
 
-  /* Don't indent .faligns. */
-  if(INSN_CODE (insn) == CODE_FOR_falign){
-    qdsp6_indent_insn = 0;
+  /* Check whether this insn starts a new packet. */
+  if(GET_MODE (insn) == TImode){
+    final_info->endloop0 = false;
+
+    /* If this is not actually a packet but a sequence of serial instructions,
+       then it should not be grouped with any other insns, and it should not
+       have curly brackets printed around it. */
+    if(get_attr_type(insn) == TYPE_MULTIPLE){
+      final_info->indent_insn = false;
+      return;
+    }
+
+    final_info->start_packet = true;
   }
 
-  /* If any instructions in the curent packet have not been printed, then they
-     have already been scanned. */
-  if(--insns_left_in_packet > 0){
-    /* Print endloops specially instead of using the template in the machine
-       description. */
-    if(qdsp6_endloop && ENDLOOP_INSN (insn)){
-      qdsp6_do_not_print_insn = 1;
-    }
-    /* If we intend to output an endloop0 specially, then save its label. */
-    if(qdsp6_endloop & (1 << 0) && INSN_CODE (insn) == CODE_FOR_endloop0){
-      qdsp6_endloop0_label = ops[0];
-    }
-    /* If this is the last insn in a packet, then end the packet. */
-    if(insns_left_in_packet == 1 && form_packet){
-      qdsp6_end_packet = 1;
-      /* Don't indent endloops. */
-      if(qdsp6_endloop){
-        qdsp6_indent_insn = 0;
-      }
-    }
-    return;
+  /* Insns that are actually sequences of serial instructions should always
+     start a packet. */
+  gcc_assert(get_attr_type(insn) != TYPE_MULTIPLE);
+
+  /* Print endloops specially instead of using the template in the machine
+     description. */
+  if(INSN_CODE (insn) == CODE_FOR_endloop0){
+    /* Record that this packet ends an inner hardware loop. */
+    final_info->endloop0 = true;
+    final_info->indent_insn = false;
+    final_info->print_insn = false;
+    final_info->print_endloop0 = true;
+    final_info->endloop_label = ops[0];
+  }
+  if(INSN_CODE (insn) == CODE_FOR_endloop1){
+    final_info->indent_insn = false;
+    final_info->print_insn = false;
+    final_info->print_endloop1 = true;
+    final_info->endloop_label = ops[0];
   }
 
-  qdsp6_endloop = 0;
-
-  /* Scan all of the insns for the next packet. */
-  do {
-    /* Record whether this packet ends a hardware loop. */
-    if(ENDLOOP_INSN (insn) && insns_left_in_packet){
-      if(INSN_CODE (insn) == CODE_FOR_endloop0){
-        qdsp6_endloop |= 1 << 0;
-      }
-      else {
-        qdsp6_endloop |= 1 << 1;
-      }
-    }
-    /* Count the insns in this packet. */
-    if(INSN_CODE (insn) != -1){
-      insns_left_in_packet++;
-    }
-    /* Advance and skip notes. */
-    for(insn = NEXT_INSN (insn);
-        insn && NOTE_P (insn);
-        insn = NEXT_INSN (insn));
-  }while(insn && INSN_P (insn) && GET_MODE (insn) != TImode);
-
-  /* If we counted more than one insn, then form a packet. */
-  if(insns_left_in_packet > 1){
-    form_packet = 1;
-    qdsp6_start_packet = 1;
-  }
-  else {
-    form_packet = 0;
+  /* Advance and skip notes. */
+  for(next_insn = NEXT_INSN (insn);
+      next_insn && (!INSN_P (next_insn) || INSN_CODE (next_insn) == -1);
+      next_insn = NEXT_INSN (next_insn));
+  /* If this is the last insn in a packet, then end the packet. */
+  if(!next_insn || GET_MODE (next_insn) == TImode){
+    final_info->end_packet = true;
   }
 }
 
 
 
 
+/* globals used to pass information from qdsp6_print_operand to
+   qdsp6_print_operand_address */
+
+/* whether the current operand contains an extended constant */
+static bool qdsp6_extended_constant;
+
+/* the mode of the current address being printed */
+static enum machine_mode qdsp6_address_mode;
+
 /* Implements macro PRINT_OPERAND */
 
 void
-qdsp6_print_operand(FILE *file, rtx x, int code)
+qdsp6_print_operand(FILE *stream, rtx x, int code)
 {
-  rtx x0;
+  qdsp6_extended_constant = false;
 
   switch(code){
     case 'P':
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fprintf(file, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
+        fprintf(stream, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
       }
       else {
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%P");
       }
       return;
@@ -3318,7 +4513,7 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
     case 'H':
       /* Output the second register of a 64 bit register pair. */
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fputs(reg_names[REGNO (x) + 1], file);
+        fputs(reg_names[REGNO (x) + 1], stream);
       }
       else {
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%H");
@@ -3328,7 +4523,7 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
     case 'L':
       /* Output the first register of a 64 bit register pair. */
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fputs(reg_names[REGNO (x)], file);
+        fputs(reg_names[REGNO (x)], stream);
       }
       else {
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%L");
@@ -3340,9 +4535,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
       if((GET_CODE (x) == NE || GET_CODE (x) == EQ)
          && P_REG_P (XEXP (x, 0)) && XEXP (x, 1) == const0_rtx){
         if((GET_CODE (x) == EQ) ^ (code == 'I')){
-          fputc('!', file);
+          fputc('!', stream);
         }
-        fputs(reg_names[REGNO (XEXP (x, 0))], file);
+        fputs(reg_names[REGNO (XEXP (x, 0))], stream);
       }
       else {
         if(code == 'C'){
@@ -3360,11 +4555,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHH = (bits & 0xffff0000UL) >> 16;
-        fprintf(file, "%u", immValueHH);
+        fprintf(stream, "%u", immValueHH);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%S");
       }
       return;
@@ -3373,11 +4566,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHL = bits & 0x0000ffffUL;
-        fprintf(file, "%u", immValueHL);
+        fprintf(stream, "%u", immValueHL);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%T");
       }
       return;
@@ -3386,11 +4577,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLH = (bits & 0xffff0000UL) >> 16;
-        fprintf(file, "%u", immValueLH);
+        fprintf(stream, "%u", immValueLH);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%U");
       }
       return;
@@ -3399,11 +4588,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLL = bits & 0x0000ffffUL;
-        fprintf(file, "%u", immValueLL);
+        fprintf(stream, "%u", immValueLL);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%V");
       }
       return;
@@ -3414,11 +4601,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHH = (bits & 0xffff0000UL) >> 16;
-        fprintf(file, "%u", immValueHH);
+        fprintf(stream, "%u", immValueHH);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%W");
       }
       return;
@@ -3427,11 +4612,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHL = bits & 0x0000ffffUL;
-        fprintf(file, "%u", immValueHL);
+        fprintf(stream, "%u", immValueHL);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%X");
       }
       return;
@@ -3440,11 +4623,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLH = (bits & 0xffff0000UL) >> 16;
-        fprintf(file, "%u", immValueLH);
+        fprintf(stream, "%u", immValueLH);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%Y");
       }
       return;
@@ -3453,11 +4634,9 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLL = bits & 0x0000ffffUL;
-        fprintf(file, "%u", immValueLL);
+        fprintf(stream, "%u", immValueLL);
       }
       else {
-        fputs("\n\n", stderr);
-        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%Z");
       }
       return;
@@ -3469,7 +4648,7 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
           output_operand_lossage("qdsp6_print_operand: invalid operand for %%J");
         }
         else {
-          fprintf(file, "%d", log);
+          fprintf(stream, "%d", log);
         }
       }
       return;
@@ -3481,10 +4660,16 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
           output_operand_lossage("qdsp6_print_operand: invalid operand for %%K");
         }
         else {
-          fprintf(file, "%d", log);
+          fprintf(stream, "%d", log);
         }
       }
       return;
+
+    case 'E':
+      gcc_assert(TARGET_V4_FEATURES);
+      qdsp6_extended_constant = true;
+      /* handled below */
+      break;
 
     case 0:
       /* handled below */
@@ -3500,10 +4685,10 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
       {
         if(REGNO (x) < FIRST_PSEUDO_REGISTER){
           if(G_REG_P (x) && GET_MODE_SIZE (GET_MODE (x)) > UNITS_PER_WORD){
-            fprintf(file, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
+            fprintf(stream, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
           }
           else {
-            fputs(reg_names[REGNO (x)], file);
+            fputs(reg_names[REGNO (x)], stream);
           }
         }
         else {
@@ -3513,85 +4698,17 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
       break;
 
     case MEM:
-      x0 = XEXP (x,0);
+      qdsp6_address_mode = GET_MODE (x);
+      output_address(XEXP (x, 0));
 
-      switch(GET_CODE (x0)){
-        case REG:
-          if(G_REG_P (x0)){
-            fputs(reg_names[REGNO (x0)], file);
-          }
-          else {
-            output_operand_lossage("qdsp6_print_operand: invalid base register");
-          }
-          break;
-
-        case PLUS:
-          if(   G_REG_P (XEXP (x0, 0))
-             && GET_CODE (XEXP (x0, 1)) == CONST_INT){
-            fprintf(file, "%s+#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (XEXP (x0, 0))], INTVAL (XEXP (x0, 1)));
-          }
-          else {
-            output_operand_lossage("qdsp6_print_operand: invalid base+offset");
-          }
-          break;
-
-        case POST_INC:
-          if(G_REG_P (XEXP (x0, 0))){
-            fprintf(file, "%s++#%d", reg_names[REGNO (XEXP (x0, 0))], GET_MODE_SIZE (GET_MODE (x)));
-          }
-          else {
-            output_operand_lossage("qdsp6_print_operand: invalid post increment base register");
-          }
-          break;
-
-        case POST_DEC:
-          if(G_REG_P (XEXP (x0, 0))){
-            fprintf(file, "%s++#-%d", reg_names[REGNO (XEXP (x0, 0))], GET_MODE_SIZE (GET_MODE (x)));
-          }
-          else {
-            output_operand_lossage("qdsp6_print_operand: invalid post decrement base register");
-          }
-          break;
-
-        case POST_MODIFY:
-          {
-            rtx basereg = XEXP (x0, 0);
-            rtx mod = XEXP (x0, 1);
-            if(G_REG_P (XEXP (x0, 0))){
-              fprintf(file, "%s++#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (basereg)], INTVAL (XEXP (mod, 1)));
-            }
-            else {
-              output_operand_lossage("qdsp6_print_operand: invalid post modify base register");
-            }
-          }
-          break;
-
-        case SYMBOL_REF:
-          if(TARGET_V2_FEATURES && sdata_symbolic_operand(x0, Pmode)){
-            fputc('#', file);
-          }
-          output_address(x0);
-          break;
-
-        case CONST:
-          if(TARGET_V2_FEATURES && sdata_symbolic_operand(x0, Pmode)){
-            fputc('#', file);
-          }
-          output_address(x0);
-          break;
-
-        default:
-          output_operand_lossage("qdsp6_print_operand: invalid address code 0x%x", GET_CODE (x0));
-          break;
-      }
       break;
 
     case CONST_INT:
       if(INTVAL (x) < -0xFFFFFFFFLL){
-        fprintf(file, HOST_WIDE_INT_PRINT_HEX, INTVAL (x));
+        fprintf(stream, HOST_WIDE_INT_PRINT_HEX, INTVAL (x));
       }
       else {
-        fprintf(file, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
+        fprintf(stream, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
       }
       break;
 
@@ -3605,7 +4722,7 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         REAL_VALUE_FROM_CONST_DOUBLE (rv, x);
         REAL_VALUE_TO_TARGET_SINGLE (rv, l);
         l &= 0xFFFFFFFFUL;
-        fprintf(file, "0x%08lx", l);
+        fprintf(stream, "0x%08lx", l);
         break;
       }
       else if(GET_MODE (x) == DFmode){
@@ -3616,13 +4733,13 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
         REAL_VALUE_TO_TARGET_DOUBLE (rv, l);
         l[0] &= 0xFFFFFFFFUL;
         l[1] &= 0xFFFFFFFFUL;
-        fprintf(file, "0x%08lx%08lx", l[1], l[0]);
+        fprintf(stream, "0x%08lx%08lx", l[1], l[0]);
         break;
       }
       /* FALL THROUGH.  Let output_addr_const deal with it. */
 
     default:
-      output_addr_const(file, x);
+      output_addr_const(stream, x);
       break;
   }
 
@@ -3637,19 +4754,137 @@ qdsp6_print_operand(FILE *file, rtx x, int code)
    Print a memory address as an operand to reference that memory location. */
 
 void
-qdsp6_print_operand_address(FILE *stream, rtx address)
+qdsp6_print_operand_address(FILE *stream, rtx x)
 {
-  switch(GET_CODE (address)){
-    case SYMBOL_REF:
-      output_addr_const(stream, address);
+  switch(GET_CODE (x)){
+    case REG:
+      if(G_REG_P (x)){
+        fputs(reg_names[REGNO (x)], stream);
+        fputs("+#0", stream);
+      }
+      else {
+        output_operand_lossage("qdsp6_print_operand_address: invalid base register");
+      }
       break;
 
+    case PLUS:
+      {
+        rtx base = XEXP (x, 0);
+        rtx offset = XEXP (x, 1);
+        rtx index = NULL_RTX;
+        rtx scale = NULL_RTX;
+
+        if(!(REG_P (base)
+             || (CONSTANT_P (base) && GET_CODE (base) != CONST_INT))
+           || (CONSTANT_P (offset) && GET_CODE (offset) != CONST_INT)){
+          base = XEXP (x, 1);
+          offset = XEXP (x, 0);
+        }
+        if(GET_CODE (offset) == MULT || GET_CODE (offset) == ASHIFT){
+          index = XEXP (offset, 0);
+          scale = XEXP (offset, 1);
+          if(!REG_P (index)){
+            index = XEXP (offset, 1);
+            scale = XEXP (offset, 0);
+          }
+        }
+
+        if(G_REG_P (base)){
+          fprintf(stream, "%s", reg_names[REGNO (base)]);
+          fputc('+', stream);
+        }
+        else if(!CONSTANT_P (base)){
+          output_operand_lossage("qdsp6_print_operand_address: invalid base+index base");
+          break;
+        }
+
+        if(CONSTANT_P (offset)){
+          fputc('#', stream);
+          if(qdsp6_extended_constant){
+            fputc('#', stream);
+          }
+          output_addr_const(stream, offset);
+        }
+        else if(REG_P (offset)){
+          fprintf(stream, "%s<<#0", reg_names[REGNO (offset)]);
+        }
+        else if(   GET_CODE (offset) == MULT
+                && REG_P (index)
+                && GET_CODE (scale) == CONST_INT){
+          int log = exact_log2(INTVAL (scale) & 0xFFFFFFFFULL);
+          if(log == -1){
+            output_operand_lossage("qdsp6_print_operand_address: invalid base+index scale amount");
+          }
+          else {
+            fprintf(stream, "%s<<#%d", reg_names[REGNO (index)], log);
+          }
+        }
+        else if(   GET_CODE (offset) == ASHIFT
+                && REG_P (index)
+                && GET_CODE (scale) == CONST_INT){
+          fprintf(stream, "%s<<#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (index)], INTVAL (scale));
+        }
+        else {
+          output_operand_lossage("qdsp6_print_operand_address: invalid base+index index");
+        }
+
+        if(CONSTANT_P (base)){
+          fputc('+', stream);
+          fputc('#', stream);
+          if(qdsp6_extended_constant){
+            fputc('#', stream);
+          }
+          output_addr_const(stream, base);
+        }
+        break;
+      }
+
+    case POST_INC:
+      if(G_REG_P (XEXP (x, 0))){
+        fprintf(stream, "%s++#%d", reg_names[REGNO (XEXP (x, 0))], GET_MODE_SIZE (qdsp6_address_mode));
+      }
+      else {
+        output_operand_lossage("qdsp6_print_operand_address: invalid post increment base register");
+      }
+      break;
+
+    case POST_DEC:
+      if(G_REG_P (XEXP (x, 0))){
+        fprintf(stream, "%s++#-%d", reg_names[REGNO (XEXP (x, 0))], GET_MODE_SIZE (qdsp6_address_mode));
+      }
+      else {
+        output_operand_lossage("qdsp6_print_operand_address: invalid post decrement base register");
+      }
+      break;
+
+    case POST_MODIFY:
+      {
+        rtx basereg = XEXP (x, 0);
+        rtx mod = XEXP (x, 1);
+        if(G_REG_P (XEXP (x, 0))){
+          fprintf(stream, "%s++#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (basereg)], INTVAL (XEXP (mod, 1)));
+        }
+        else {
+          output_operand_lossage("qdsp6_print_operand_address: invalid post modify base register");
+        }
+      }
+      break;
+
+    case SYMBOL_REF:
     case CONST:
-      output_addr_const(stream, address);
+    case CONST_INT:
+    case LABEL_REF:
+      if(sdata_symbolic_operand(x, Pmode) && !qdsp6_extended_constant){
+        fputc('#', stream);
+      }
+      else if(CONSTANT_P (x)){
+        fputs("##", stream);
+      }
+      output_addr_const(stream, x);
       break;
 
     default:
-      output_operand_lossage("qdsp6_print_operand_address: invalid address operand");
+      output_operand_lossage("qdsp6_print_operand_address: invalid address code 0x%x", GET_CODE (x));
       break;
   }
 }
@@ -3790,8 +5025,6 @@ qdsp6_fixup_doloops(void)
 }
 
 
-
-
 /* Implements hook TARGET_MACHINE_DEPENDENT_REORG */
 
 static void
@@ -3807,7 +5040,7 @@ qdsp6_machine_dependent_reorg(void)
 #endif /* 0 */
 
   if(cfun->machine->has_hardware_loops
-     || (TARGET_PULLUP && optimize && flag_schedule_insns_after_reload)){
+     || (TARGET_PULLUP && optimize)){
     qdsp6_fixup_cfg();
   }
 
@@ -3815,8 +5048,13 @@ qdsp6_machine_dependent_reorg(void)
   if(cfun->machine->has_hardware_loops){
     qdsp6_fixup_doloops();
   }
+  
+  if (TARGET_LOCAL_COMBINE) 
+    {
+      qdsp6_local_combine_pass();
+    }
 
-  if(TARGET_PULLUP && optimize && flag_schedule_insns_after_reload){
+  if(TARGET_PULLUP && optimize){
     qdsp6_packet_optimizations();
   }
 
@@ -3843,9 +5081,7 @@ qdsp6_machine_dependent_reorg(void)
     }
   }
   else if(qdsp6_falign == QDSP6_FALIGN_LOOPS){
-    rtx prev	= NULL;  
     rtx label; 
-    int	insn_code = 0,tag;
 
     /* _LSY_ Go backwards and falign only labels that are targets
        for backward jumps */ 
@@ -3920,12 +5156,12 @@ qdsp6_init_builtins(void)
   tree DI_ftype_SI       ATTRIBUTE_UNUSED;
   tree DI_ftype_SISI     ATTRIBUTE_UNUSED;
   tree UDI_ftype_SISI    ATTRIBUTE_UNUSED;
+  tree DI_ftype_SIDI     ATTRIBUTE_UNUSED;
   tree DI_ftype_SISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_DI       ATTRIBUTE_UNUSED;
   tree SI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree SI_ftype_DISISI   ATTRIBUTE_UNUSED;
   tree DI_ftype_DI       ATTRIBUTE_UNUSED;
-  tree DI_ftype_SIDI     ATTRIBUTE_UNUSED;
   tree DI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree DI_ftype_DISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_SIDI     ATTRIBUTE_UNUSED;
@@ -3941,10 +5177,14 @@ qdsp6_init_builtins(void)
   tree SI_ftype_SISIDI   ATTRIBUTE_UNUSED;
 
   tree QI_ftype_SISI     ATTRIBUTE_UNUSED;
+  tree QI_ftype_SIDI     ATTRIBUTE_UNUSED;
+  tree QI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree QI_ftype_DIDI     ATTRIBUTE_UNUSED;
   tree QI_ftype_QI       ATTRIBUTE_UNUSED;
   tree QI_ftype_SI       ATTRIBUTE_UNUSED;
+  tree QI_ftype_DI       ATTRIBUTE_UNUSED;
   tree QI_ftype_QIQI     ATTRIBUTE_UNUSED;
+  tree QI_ftype_QIQIQI   ATTRIBUTE_UNUSED;
   tree SI_ftype_QIQI     ATTRIBUTE_UNUSED;
   tree SI_ftype_QISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_QISI     ATTRIBUTE_UNUSED;
@@ -4009,6 +5249,10 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink))));
+  DI_ftype_SIDI =     build_function_type(   DI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        endlink)));
   SI_ftype_DI =       build_function_type(   SI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         endlink));
@@ -4024,10 +5268,6 @@ qdsp6_init_builtins(void)
   DI_ftype_DI =       build_function_type(   DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         endlink));
-  DI_ftype_SIDI =     build_function_type(   DI_type_node,
-                        tree_cons(NULL_TREE, SI_type_node,
-                        tree_cons(NULL_TREE, DI_type_node,
-                        endlink)));
   DI_ftype_DISI =     build_function_type(   DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         tree_cons(NULL_TREE, SI_type_node,
@@ -4096,6 +5336,16 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink)));
 
+  QI_ftype_SIDI   =   build_function_type(   QI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        endlink)));
+
+  QI_ftype_DISI   =   build_function_type(   QI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink)));
+
   QI_ftype_DIDI   =   build_function_type(   QI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
@@ -4109,10 +5359,20 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink));
 
+  QI_ftype_DI     =   build_function_type(   QI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        endlink));
+
   QI_ftype_QIQI   =   build_function_type(   QI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
                         endlink)));
+
+  QI_ftype_QIQIQI =   build_function_type(   QI_type_node,
+                        tree_cons(NULL_TREE, QI_type_node,
+                        tree_cons(NULL_TREE, QI_type_node,
+                        tree_cons(NULL_TREE, QI_type_node,
+                        endlink))));
 
   SI_ftype_QISISI =   build_function_type(   SI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
@@ -4322,7 +5582,7 @@ qdsp6_invalid_within_doloop(const_rtx insn)
       /* FALL THROUGH */
     case SET:
           reg = SET_DEST (side_effect);
-          if(GET_CODE (reg) == REG){
+          if(REG_P (reg)){
             switch(REGNO (reg)){
               case LC0_REGNUM:
                 return "lc0 is set in the loop.";
@@ -4345,7 +5605,7 @@ qdsp6_invalid_within_doloop(const_rtx insn)
       /* FALL THROUGH */
     case CLOBBER:
           reg = XEXP (side_effect, 0);
-          if(GET_CODE (reg) == REG){
+          if(REG_P (reg)){
             switch(REGNO (reg)){
               case LC0_REGNUM:
                 return "lc0 is clobbered in the loop.";
@@ -4368,6 +5628,932 @@ qdsp6_invalid_within_doloop(const_rtx insn)
       /* FALL THROUGH */
     default:
       return NULL;
+  }
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (set (pc) (...)) */
+
+static void
+qdsp6_print_jump(FILE *stream, rtx x)
+{
+  /* (set (pc) (if_then_else (...) (...) (...))) */
+  if(x && GET_CODE (x) == SET
+     && SET_SRC (x) && GET_CODE (SET_SRC (x)) == IF_THEN_ELSE){
+    /* (set (pc) (if_then_else (...) (pc) (...))) */
+    if(XEXP (SET_SRC (x), 1) && XEXP (SET_SRC (x), 1) == pc_rtx){
+      qdsp6_print_condition(stream, XEXP (SET_SRC (x), 0), false);
+      /* (set (pc) (if_then_else (...) (pc) (label))) */
+      if(GET_CODE (XEXP (SET_SRC (x), 2)) == LABEL_REF){
+        fputs("jump", stream);
+      }
+      else {
+        fputs("jump ", stream);
+        qdsp6_print_rtx(stream, XEXP (SET_SRC (x), 2));
+      }
+    }
+    /* (set (pc) (if_then_else (...) (...) (pc))) */
+    else if(XEXP (SET_SRC (x), 2) && XEXP (SET_SRC (x), 2) == pc_rtx){
+      qdsp6_print_condition(stream, XEXP (SET_SRC (x), 0), true);
+      /* (set (pc) (if_then_else (...) (label) (pc))) */
+      if(GET_CODE (XEXP (SET_SRC (x), 1)) == LABEL_REF){
+        fputs("jump", stream);
+      }
+      else {
+        fputs("jump ", stream);
+        qdsp6_print_rtx(stream, XEXP (SET_SRC (x), 1));
+      }
+    }
+    else {
+      fputs("jump ", stream);
+      qdsp6_print_rtx(stream, SET_SRC (x));
+    }
+  }
+  /* (set (pc) (reg)) */
+  else if(x && GET_CODE (x) == SET
+          && SET_DEST (x) == pc_rtx
+          && SET_SRC (x) && REG_P (SET_SRC (x))){
+    fputs("jump ", stream);
+    qdsp6_print_rtx(stream, SET_SRC (x));
+  }
+  else {
+    fputs("jump", stream);
+  }
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (set (...) (...)) */
+
+static void
+qdsp6_print_transfer(FILE *stream, rtx x)
+{
+  if(!x){
+    qdsp6_print_rtx(stream, x);
+  }
+  /* (set (pc) (...)) */
+  else if(XEXP (x, 0) == pc_rtx){
+    qdsp6_print_jump(stream, x);
+  }
+  /* (set (reg) (call)) */
+  else if(XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == CALL){
+    fputs("call", stream);
+  }
+  /* (set (zero_extract (...) (...) (...)) (...)) */
+  else if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == ZERO_EXTRACT){
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 0));
+    fputs(" = insert(", stream);
+    qdsp6_print_rtx(stream, XEXP (x, 1));
+    fputc(',', stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 1));
+    fputc(',', stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 2));
+    fputc(')', stream);
+  }
+  /* (set (...) (high (...))) */
+  else if(XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == HIGH){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputs(".h = ", stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 0));
+  }
+  /* (set (reg X) (lo_sum (reg X) (...))) */
+  else if(XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == LO_SUM
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && XEXP (XEXP (x, 1), 0) && REG_P (XEXP (XEXP (x, 1), 0))
+          && REGNO (XEXP (x, 0)) == REGNO (XEXP (XEXP (x, 1), 0))){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputs(".l = ", stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 1));
+  }
+/*
+  else if(XEXP (x, 1) && (   GET_CODE (XEXP (x, 1)) == PLUS
+                          || GET_CODE (XEXP (x, 1)) == MINUS
+                          || GET_CODE (XEXP (x, 1)) == MULT
+                          || GET_CODE (XEXP (x, 1)) == AND
+                          || GET_CODE (XEXP (x, 1)) == IOR
+                          || GET_CODE (XEXP (x, 1)) == XOR)
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && XEXP (XEXP (x, 1), 0) && REG_P (XEXP (XEXP (x, 1), 0))){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputc(' ', stream);
+    switch(GET_CODE (XEXP (x, 1))){
+      case PLUS:
+        fputc('+', stream);
+        break;
+      case MINUS:
+        fputc('-', stream);
+        break;
+      case MULT:
+        fputc('*', stream);
+        break;
+      case AND:
+        fputc('&', stream);
+        break;
+      case IOR:
+        fputc('|', stream);
+        break;
+      case XOR:
+        fputc('^', stream);
+        break;
+      default:
+        break;
+    }
+    fputs("= ", stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 1));
+  }
+  else if(XEXP (x, 1) && (   GET_CODE (XEXP (x, 1)) == PLUS
+                          || GET_CODE (XEXP (x, 1)) == MULT
+                          || GET_CODE (XEXP (x, 1)) == AND
+                          || GET_CODE (XEXP (x, 1)) == IOR
+                          || GET_CODE (XEXP (x, 1)) == XOR)
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && XEXP (XEXP (x, 1), 1) && REG_P (XEXP (XEXP (x, 1), 1))){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputc(' ', stream);
+    switch(GET_CODE (XEXP (x, 1))){
+      case PLUS:
+        fputc('+', stream);
+        break;
+      case MULT:
+        fputc('*', stream);
+        break;
+      case AND:
+        fputc('&', stream);
+        break;
+      case IOR:
+        fputc('|', stream);
+        break;
+      case XOR:
+        fputc('^', stream);
+        break;
+      default:
+        break;
+    }
+    fputs("= ", stream);
+    qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 0));
+  }
+*/
+  else {
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputs(" = ", stream);
+    qdsp6_print_rtx(stream, XEXP (x, 1));
+  }
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm */
+
+static void
+qdsp6_print_condition(FILE *stream, rtx x, bool non_inverted)
+{
+  fputs("if (", stream);
+  if(!x){
+    qdsp6_print_rtx(stream, x);
+  }
+  /* (reg) */
+  else if(REG_P (x)){
+    if(GET_MODE (x) == BImode && !non_inverted){
+      fputc('!', stream);
+    }
+    qdsp6_print_rtx(stream, x);
+    if(GET_MODE (x) != BImode){
+      fputs(non_inverted ? "!=#0" : "==#0", stream);
+    }
+  }
+  /* (ne (reg) (const_int 0)) */
+  else if(GET_CODE (x) == NE && XEXP (x, 1) == const0_rtx
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))){
+    if(GET_MODE (XEXP (x, 0)) == BImode && !non_inverted){
+      fputc('!', stream);
+    }
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(GET_MODE (XEXP (x, 0)) != BImode){
+      fputs(non_inverted ? "!=#0" : "==#0", stream);
+    }
+  }
+  /* (eq (reg) (const_int 0)) */
+  else if(GET_CODE (x) == EQ && XEXP (x, 1) == const0_rtx
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))){
+    if(GET_MODE (XEXP (x, 0)) == BImode && non_inverted){
+      fputc('!', stream);
+    }
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(GET_MODE (XEXP (x, 0)) != BImode){
+      fputs(non_inverted ? "==#0" : "!=#0", stream);
+    }
+  }
+  /* (gt (reg) (const_int 0/-1)) */
+  else if(GET_CODE (x) == GT
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && GET_MODE (XEXP (x, 0)) != BImode
+          && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == constm1_rtx)){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(XEXP (x, 1) == const0_rtx){
+      fputs(non_inverted ? ">#0" : "<=#0", stream);
+    }
+    else {
+      fputs(non_inverted ? ">=#0" : "<#0", stream);
+    }
+  }
+  /* (ge (reg) (const_int 0/1)) */
+  else if(GET_CODE (x) == GE
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && GET_MODE (XEXP (x, 0)) != BImode
+          && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == const1_rtx)){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(XEXP (x, 1) == const0_rtx){
+      fputs(non_inverted ? ">=#0" : "<#0", stream);
+    }
+    else {
+      fputs(non_inverted ? ">#0" : "<=#0", stream);
+    }
+  }
+  /* (lt (reg) (const_int 0/1)) */
+  else if(GET_CODE (x) == LT
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && GET_MODE (XEXP (x, 0)) != BImode
+          && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == const1_rtx)){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(XEXP (x, 1) == const0_rtx){
+      fputs(non_inverted ? "<#0" : ">=#0", stream);
+    }
+    else {
+      fputs(non_inverted ? "<=#0" : ">#0", stream);
+    }
+  }
+  /* (le (reg) (const_int 0/-1)) */
+  else if(GET_CODE (x) == LE
+          && XEXP (x, 0) && REG_P (XEXP (x, 0))
+          && GET_MODE (XEXP (x, 0)) != BImode
+          && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == constm1_rtx)){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    if(XEXP (x, 1) == const0_rtx){
+      fputs(non_inverted ? "<=#0" : ">#0", stream);
+    }
+    else {
+      fputs(non_inverted ? "<#0" : ">=#0", stream);
+    }
+  }
+  else {
+    qdsp6_print_rtx(stream, x);
+  }
+  fputs(") ", stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm */
+
+static void
+qdsp6_print_address(FILE *stream, rtx x)
+{
+  /* (plus (...) (...)) */
+  if(x && GET_CODE (x) == PLUS){
+    qdsp6_print_rtx(stream, XEXP (x, 0));
+    fputc('+', stream);
+    qdsp6_print_rtx(stream, XEXP (x, 1));
+  }
+  else {
+    qdsp6_print_rtx(stream, x);
+  }
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...)) */
+
+static void
+qdsp6_print_unary_op(FILE *stream, const char *op, rtx x)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(')', stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...) (...)) */
+
+static void
+qdsp6_print_binary_op(FILE *stream, const char *op, rtx x)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 1));
+  fputc(')', stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...) (...)) */
+
+static void
+qdsp6_print_swapped_binary_op(FILE *stream, const char *op, rtx x)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 1));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(')', stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...) (...)) */
+
+static void
+qdsp6_print_binary_op_with_option(
+  FILE *stream,
+  const char *op,
+  const char *option,
+  rtx x
+)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 1));
+  fputs("):", stream);
+  fputs(option, stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (op (...) (...) (...)) */
+
+static void
+qdsp6_print_trinary_op(FILE *stream, const char *op, rtx x)
+{
+  fputs(op, stream);
+  fputc('(', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 0));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 1));
+  fputc(',', stream);
+  qdsp6_print_rtx(stream, XEXP (x, 2));
+  fputc(')', stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm
+
+   (parallel/unspec/unspec_volatile [...]) */
+
+static void
+qdsp6_print_vecexp(
+  FILE *stream,
+  const char *open,
+  const char *separator,
+  const char *close,
+  rtx x
+)
+{
+  int i;
+  fputs(open, stream);
+  for(i = 0; i < XVECLEN (x, 0); i++){
+    if(i > 0){
+      fputs(separator, stream);
+    }
+    qdsp6_print_rtx(stream, XVECEXP (x, 0, i));
+  }
+  fputs(close, stream);
+}
+
+
+
+
+/* Helper function for qdsp6_print_rtl_pseudo_asm */
+
+static void
+qdsp6_print_rtx(FILE *stream, rtx x)
+{
+  const char *op;
+  int size_in_bytes;
+  int i;
+
+  if(!x){
+    fputs("[nil]", stream);
+    return;
+  }
+  else if(GET_CODE (x) > NUM_RTX_CODE){
+    fprintf(stream, "[??? bade code %d]", GET_CODE (x));
+    return;
+  }
+
+  switch(GET_CODE (x)){
+    case SET:
+      qdsp6_print_transfer(stream, x);
+      break;
+    case COND_EXEC:
+      qdsp6_print_condition(stream, XEXP (x, 0), true);
+      qdsp6_print_rtx(stream, XEXP (x, 1));
+      break;
+    case PARALLEL:
+      for(i = XVECLEN (x, 0) - 1; i >= 0; i--){
+        if(XVECEXP (x, 0, i) && GET_CODE (XVECEXP (x, 0, i)) == CLOBBER
+           && i > 0 && XVECEXP (x, 0, i - 1)
+           && (GET_CODE (XVECEXP (x, 0, i - 1)) == CALL
+               || (GET_CODE (XVECEXP (x, 0, i - 1)) == SET
+                   && XEXP (XVECEXP (x, 0, i - 1), 0)
+                   && REG_P (XEXP (XVECEXP (x, 0, i - 1), 0))
+                   && XEXP (XVECEXP (x, 0, i - 1), 1)
+                   && GET_CODE (XEXP (XVECEXP (x, 0, i - 1), 1)) == CALL))){
+        }
+      }
+      qdsp6_print_vecexp(stream, "{ ", "; ", " }", x);
+      break;
+    case UNSPEC:
+      fprintf(stream, "unspec" HOST_WIDE_INT_PRINT_DEC, XINT (x, 1));
+      qdsp6_print_vecexp(stream, "(", ",", ")", x);
+      break;
+    case UNSPEC_VOLATILE:
+      fprintf(stream, "unspec_volatile" HOST_WIDE_INT_PRINT_DEC, XINT (x, 1));
+      qdsp6_print_vecexp(stream, "(", ",", ")", x);
+      break;
+    case PREFETCH:
+      qdsp6_print_unary_op(stream, "dcfetch", x);
+      break;
+    case USE:
+      qdsp6_print_unary_op(stream, "use", x);
+      break;
+    case CLOBBER:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputs(" = clobber()", stream);
+      break;
+    case CALL:
+      fputs("call", stream);
+      break;
+    case RETURN:
+      fputs("jumpr r31", stream);
+      break;
+    case CONST_INT:
+      fputc('#', stream);
+      PRINT_OPERAND (stream, x, 0);
+      break;
+    case CONST_DOUBLE:
+      if(reload_completed){
+        fputc('#', stream);
+        PRINT_OPERAND (stream, x, 0);
+      }
+      else {
+        fputs("#float", stream);
+      }
+      break;
+    case CONST:
+      if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == PLUS
+         && XEXP (XEXP (x, 0), 0)
+         && GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF
+         && XEXP (XEXP (x, 0), 1)
+         && GET_CODE (XEXP (XEXP (x, 0), 1)) == CONST_INT){
+        fputs("#symbol", stream);
+      }
+      else {
+        fputc('#', stream);
+      }
+      break;
+    case PC:
+      fputs("pc", stream);
+      break;
+    case REG:
+      if(reload_completed){
+        PRINT_OPERAND (stream, x, 0);
+      }
+      else {
+        if(C_REG_P (x)){
+          fputs(reg_names[REGNO (x)], stream);
+        }
+        else {
+          switch(GET_MODE (x)){
+            case DFmode:
+              fputs("R:Rf", stream);
+              break;
+            case DImode:
+              fputs("R:R", stream);
+              break;
+            case SFmode:
+              fputs("Rf", stream);
+              break;
+            case BImode:
+              fputc('p', stream);
+              break;
+            default:
+              fputc('R', stream);
+          }
+        }
+      }
+      break;
+    case SCRATCH:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      break;
+    case SUBREG:
+      if(reload_completed){
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+      }
+      else {
+        if(GET_MODE (x) == SImode
+           && XEXP (x, 0) && REG_P (XEXP (x, 0))
+           && GET_MODE (XEXP (x, 0)) == DImode
+           && (XINT (x, 1) == 0 || XINT (x, 1) == 4)){
+          fputc('R', stream);
+        }
+        else {
+          qdsp6_print_rtx(stream, XEXP (x, 0));
+/*
+          fputc('.', stream);
+          size_in_bytes = 1;
+          switch(GET_MODE (x)){
+            case DImode:
+            case DFmode:
+              fputc('d', stream);
+              size_in_bytes = 8;
+              break;
+            case SImode:
+            case SFmode:
+              fputc('w', stream);
+              size_in_bytes = 4;
+              break;
+            case HImode:
+              fputc('h', stream);
+              size_in_bytes = 2;
+              break;
+            case QImode:
+              fputc('b', stream);
+              size_in_bytes = 1;
+              break;
+            default:
+              fputc('?', stream);
+              return;
+          }
+          fputc('[', stream);
+          fprintf(stream, "%d", XINT (x, 1) / size_in_bytes);
+          fputc(']', stream);
+*/
+        }
+      }
+      break;
+    case MEM:
+      fputs("mem", stream);
+      switch(GET_MODE (x)){
+        case DImode:
+          fputc('d', stream);
+          break;
+        case HImode:
+          fputc('h', stream);
+          break;
+        case QImode:
+          fputc('b', stream);
+          break;
+        default:
+          fputc('w', stream);
+      }
+      fputc('(', stream);
+      qdsp6_print_address(stream, XEXP (x, 0));
+      fputc(')', stream);
+      break;
+    case LABEL_REF:
+      fputs(".L", stream);
+      break;
+    case SYMBOL_REF:
+      fputs("#symbol", stream);
+      break;
+    case IF_THEN_ELSE:
+      if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == NE
+         && XEXP (XEXP (x, 0), 1) == const0_rtx){
+        fputs("mux(", stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 0));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (x, 1));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (x, 2));
+        fputc(')', stream);
+      }
+      else if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == EQ
+              && XEXP (XEXP (x, 0), 1) == const0_rtx){
+        fputs("mux(", stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 0));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (x, 2));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (x, 1));
+        fputc(')', stream);
+      }
+      else {
+        qdsp6_print_trinary_op(stream, "mux", x);
+      }
+      break;
+    case PLUS:
+      qdsp6_print_binary_op(stream, "add", x);
+      break;
+    case MINUS:
+      qdsp6_print_binary_op(stream, "sub", x);
+      break;
+    case NEG:
+      qdsp6_print_unary_op(stream, "neg", x);
+      break;
+    case MULT:
+      qdsp6_print_binary_op(stream, "mpyi", x);
+      break;
+    case AND:
+      qdsp6_print_binary_op(stream, "and", x);
+      break;
+    case IOR:
+      qdsp6_print_binary_op(stream, "or", x);
+      break;
+    case XOR:
+      qdsp6_print_binary_op(stream, "xor", x);
+      break;
+    case NOT:
+      qdsp6_print_unary_op(stream, "not", x);
+      break;
+    case ASHIFT:
+      qdsp6_print_binary_op(stream, "asl", x);
+      break;
+    case ROTATE:
+      if(XEXP (x, 0) && REG_P (XEXP (x, 0)) && GET_MODE (XEXP (x, 0)) == SImode
+         && XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == CONST_INT
+         && INTVAL (XEXP (x, 1)) == 16){
+        fputs("combine(", stream);
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(".l,", stream);
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(".h)", stream);
+      }
+      else {
+        qdsp6_print_binary_op(stream, "rotate_left", x);
+      }
+      break;
+    case ASHIFTRT:
+      qdsp6_print_binary_op(stream, "asr", x);
+      break;
+    case LSHIFTRT:
+      qdsp6_print_binary_op(stream, "lsr", x);
+      break;
+    case ROTATERT:
+      if(XEXP (x, 0) && REG_P (XEXP (x, 0)) && GET_MODE (XEXP (x, 0)) == SImode
+         && XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == CONST_INT
+         && INTVAL (XEXP (x, 1)) == 16){
+        fputs("combine(", stream);
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(".l,", stream);
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(".h)", stream);
+      }
+      else {
+        qdsp6_print_binary_op(stream, "rotate_right", x);
+      }
+      break;
+    case SMIN:
+      qdsp6_print_binary_op(stream, "min", x);
+      break;
+    case SMAX:
+      qdsp6_print_binary_op(stream, "max", x);
+      break;
+    case UMIN:
+      qdsp6_print_binary_op(stream, "minu", x);
+      break;
+    case UMAX:
+      qdsp6_print_binary_op(stream, "maxu", x);
+      break;
+    case POST_DEC:
+    case POST_INC:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputs("++#", stream);
+      break;
+    case POST_MODIFY:
+      if(XEXP (x, 0) && REG_P (XEXP (x, 0))
+         && XEXP (x, 1) && GET_CODE (XEXP (x, 1)) == PLUS
+         && XEXP (XEXP (x, 1), 0) && REG_P (XEXP (XEXP (x, 1), 0))
+         && REGNO (XEXP (x, 0)) == REGNO (XEXP (XEXP (x, 1), 0))){
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs("++", stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 1), 1));
+      }
+      else {
+        qdsp6_print_rtx(stream, XEXP (x, 0));
+        fputs(", ", stream);
+        qdsp6_print_transfer(stream, x);
+      }
+      break;
+    case NE:
+    case EQ:
+      if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == ZERO_EXTRACT
+         && XEXP (XEXP (x, 0), 1) == const1_rtx
+         && (XEXP (x, 1) == const0_rtx || XEXP (x, 1) == const1_rtx)){
+        if(XEXP (x, 1) == (GET_CODE (x) == NE ? const1_rtx : const0_rtx)){
+          fputc('!', stream);
+        }
+        fputs("tstbit(", stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 0));
+        fputc(',', stream);
+        qdsp6_print_rtx(stream, XEXP (XEXP (x, 0), 2));
+        fputc(')', stream);
+      }
+      else {
+        qdsp6_print_binary_op(stream, GET_CODE (x) == NE ? "cmp.ne" : "cmp.eq",
+                              x);
+      }
+      break;
+    case GE:
+      qdsp6_print_binary_op(stream, "cmp.ge", x);
+      break;
+    case GT:
+      qdsp6_print_binary_op(stream, "cmp.gt", x);
+      break;
+    case LE:
+      qdsp6_print_swapped_binary_op(stream, "cmp.gt", x);
+      break;
+    case LT:
+      qdsp6_print_swapped_binary_op(stream, "cmp.ge", x);
+      break;
+    case GEU:
+      qdsp6_print_binary_op(stream, "cmp.geu", x);
+      break;
+    case GTU:
+      qdsp6_print_binary_op(stream, "cmp.gtu", x);
+      break;
+    case LEU:
+      qdsp6_print_swapped_binary_op(stream, "cmp.gtu", x);
+      break;
+    case LTU:
+      qdsp6_print_swapped_binary_op(stream, "cmp.geu", x);
+      break;
+    case SIGN_EXTEND:
+    case ZERO_EXTEND:
+      op = GET_CODE (x) == SIGN_EXTEND ? "sxt" : "zxt";
+      if(!XEXP (x, 0)){
+        qdsp6_print_unary_op(stream, op, XEXP (x, 0));
+      }
+      else {
+        if(GET_CODE (XEXP (x, 0)) == MEM){
+          op = GET_CODE (x) == SIGN_EXTEND ? "mem" : "memu";
+        }
+        fputs(op, stream);
+        switch(GET_MODE (XEXP (x, 0))){
+          case DImode:
+            fputc('d', stream);
+            break;
+          case HImode:
+            fputc('h', stream);
+            break;
+          case QImode:
+            fputc('b', stream);
+            break;
+          default:
+            fputc('w', stream);
+        }
+        if(GET_CODE (XEXP (x, 0)) == MEM){
+          fputc('(', stream);
+          qdsp6_print_address(stream, XEXP (XEXP (x, 0), 0));
+          fputc(')', stream);
+        }
+        else {
+          qdsp6_print_unary_op(stream, "", x);
+        }
+      }
+      break;
+    case TRUNCATE:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputc('.', stream);
+      switch(GET_MODE (x)){
+        case DImode:
+        case DFmode:
+          fputc('d', stream);
+          break;
+        case SImode:
+        case SFmode:
+          fputc('w', stream);
+          break;
+        case HImode:
+          fputc('h', stream);
+          break;
+        case QImode:
+          fputc('b', stream);
+          break;
+        default:
+          fputc('?', stream);
+          return;
+      }
+      fputs("[0]", stream);
+      break;
+    case ABS:
+      qdsp6_print_unary_op(stream, "abs", x);
+      break;
+    case CLZ:
+      qdsp6_print_unary_op(stream, "cl0", x);
+      break;
+    case CTZ:
+      qdsp6_print_unary_op(stream, "ct0", x);
+      break;
+    case POPCOUNT:
+      qdsp6_print_unary_op(stream, "count_ones", x);
+      break;
+    case PARITY:
+      qdsp6_print_unary_op(stream, "parity", x);
+      break;
+    case SIGN_EXTRACT:
+      qdsp6_print_trinary_op(stream, "extract", x);
+      break;
+    case ZERO_EXTRACT:
+      qdsp6_print_trinary_op(stream, "extractu", x);
+      break;
+    case HIGH:
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputs(".h", stream);
+      break;
+    case LO_SUM:
+      fputs("add(", stream);
+      qdsp6_print_rtx(stream, XEXP (x, 0));
+      fputc(',', stream);
+      qdsp6_print_rtx(stream, XEXP (x, 1));
+      fputs(".l)", stream);
+      break;
+    case SS_PLUS:
+      qdsp6_print_binary_op_with_option(stream, "add", "sat", x);
+      break;
+    case US_PLUS:
+      qdsp6_print_binary_op_with_option(stream, "add", "satu", x);
+      break;
+    case SS_MINUS:
+      qdsp6_print_binary_op_with_option(stream, "sub", "sat", x);
+      break;
+    case US_MINUS:
+      qdsp6_print_binary_op_with_option(stream, "sub", "satu", x);
+      break;
+    case SS_TRUNCATE:
+      switch(GET_MODE (x)){
+        case HImode:
+          qdsp6_print_unary_op(stream, "sath", x);
+          break;
+        case QImode:
+          qdsp6_print_unary_op(stream, "satb", x);
+          break;
+        default:
+          qdsp6_print_unary_op(stream, "sat", x);
+      }
+      break;
+    case US_TRUNCATE:
+      switch(GET_MODE (x)){
+        case HImode:
+          qdsp6_print_unary_op(stream, "satuh", x);
+          break;
+        case QImode:
+          qdsp6_print_unary_op(stream, "satub", x);
+          break;
+        default:
+          qdsp6_print_unary_op(stream, "satu", x);
+      }
+      break;
+    default:
+      fprintf(stream, "[%s]", GET_RTX_NAME (GET_CODE (x)));
+  }
+}
+
+
+
+
+/* Implements hook TARGET_PRINT_RTL_PSEUDO_ASM */
+
+void
+qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x)
+{
+  if(x && INSN_P (x)){
+    qdsp6_print_rtx(stream, PATTERN (x));
+  }
+  else {
+    qdsp6_print_rtx(stream, x);
   }
 }
 
@@ -4785,7 +6971,7 @@ conditional_dest_operand(rtx op, enum machine_mode mode)
                            : (memory_operand(op, mode)
                               && qdsp6_legitimate_address_p(GET_MODE (op),
                                                             XEXP (op, 0),
-                                                            true, true))
+                                                            true, "cond"))
                              || gr_register_operand(op, mode);
 }
 
@@ -4822,7 +7008,7 @@ conditional_src_operand(rtx op, enum machine_mode mode)
                            : (memory_operand(op, mode)
                               && qdsp6_legitimate_address_p(GET_MODE (op),
                                                             XEXP (op, 0),
-                                                            true, true))
+                                                            true, "cond"))
                              || gr_register_operand(op, mode)
                              || s12_const_int_operand(op, mode);
 }
@@ -4869,15 +7055,15 @@ qdsp6_compute_dwarf_frame_information(void)
 
   frame = qdsp6_frame_info();
 
-  /* Did we omit the allocframe instruction? */
-  if(frame->lrfp_size != 0){
-    /* No. */
+  /* Did we use the allocframe instruction? */
+  if(frame->use_allocframe){
+    /* Yes. */
     dwarf2out_def_cfa(label, HARD_FRAME_POINTER_REGNUM, frame->lrfp_size);
     dwarf2out_reg_save(label, LINK_REGNUM, -UNITS_PER_WORD);
     dwarf2out_reg_save(label, HARD_FRAME_POINTER_REGNUM, -(2 * UNITS_PER_WORD));
   }
   else {
-    /* Yes. */
+    /* No. */
     dwarf2out_def_cfa(label, STACK_POINTER_REGNUM, frame->total_size);
   }
 
@@ -4886,14 +7072,14 @@ qdsp6_compute_dwarf_frame_information(void)
                         /* hard_frame_pointer_rtx */ : frame->lrfp_size)
            + frame->offset;
   /* Did we save any callee-save registers as pairs? */
-  for(i = frame->num_saved_pairs - 1; i >= 0; i--){
+  for(i = 0; i < frame->num_saved_pairs; i++){
     offset -= 2 * UNITS_PER_WORD;
     dwarf2out_reg_save(label, frame->saved_pairs[i], offset);
     dwarf2out_reg_save(label, frame->saved_pairs[i] + 1,
                               offset + UNITS_PER_WORD);
   }
   /* Did we save any other callee-save registers? */
-  for(i = frame->num_saved_singles - 1; i >= 0; i--){
+  for(i = 0; i < frame->num_saved_singles; i++){
     offset -= UNITS_PER_WORD;
     dwarf2out_reg_save(label, frame->saved_singles[i], offset);
   }
@@ -4907,27 +7093,34 @@ qdsp6_compute_dwarf_frame_information(void)
    Allocate stack space by decrementing SP. */
 
 static void
-qdsp6_allocate_stack(unsigned HOST_WIDE_INT size){
-  rtx r28;
+qdsp6_allocate_stack(unsigned HOST_WIDE_INT size, int allocate_stack_insn){
+  rtx offset;
 
-  /* If more than two add instructions would be required, then reload the offset
+  if(size == 0){
+    return;
+  }
+
+  /* If more than two add instructions would be required, then load the offset
      into r28. */
   if(size > 2 * -MIN_ADD_IMMED){
-    r28 = gen_rtx_REG (SImode, 28);
-    emit_move_insn(r28, gen_int_mode(-size, Pmode));
-    emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx, r28));
+    offset = gen_rtx_REG (SImode, 28);
+    emit_move_insn(offset, gen_int_mode(-size, Pmode));
+    size = 0;
+  }
+  else if(size > -MIN_ADD_IMMED){
+    offset = gen_int_mode(MIN_ADD_IMMED, Pmode);
+    size -= -MIN_ADD_IMMED;
   }
   else {
-    while(size > -MIN_ADD_IMMED){
-      emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx,
-                                              gen_int_mode(MIN_ADD_IMMED,
-                                                           Pmode)));
-      size -= -MIN_ADD_IMMED;
-    }
-    if(size > 0){
-      emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx,
-                                              gen_int_mode(-size, Pmode)));
-    }
+    offset = gen_int_mode(-size, Pmode);
+    size = 0;
+  }
+
+  emit_insn(GEN_FCN (allocate_stack_insn)(offset));
+
+  if(size > 0){
+    offset = gen_int_mode(-size, Pmode);
+    emit_insn(gen_increment_stack_pointer(offset));
   }
 }
 
@@ -4943,34 +7136,38 @@ qdsp6_expand_prologue(void)
   struct qdsp6_frame_info *frame;
   rtx base_reg;
   HOST_WIDE_INT offset;
-  int i;
+  unsigned int i;
 
   frame = qdsp6_frame_info();
 
-  /* Can we omit the allocframe instruction? */
-  if(frame->lrfp_size != 0){
-    emit_insn(gen_allocframe(gen_int_mode(frame->allocframe_size, SImode)));
+  /* Do we need to use the allocframe instruction? */
+  if(frame->use_allocframe){
+    rtx allocframe_size = gen_int_mode(frame->allocframe_size, SImode);
+    emit_insn(GEN_FCN (frame->allocframe_insn)(allocframe_size));
   }
 
   /* Allocate any remaning stack space. */
-  qdsp6_allocate_stack(frame->sp_adjustment);
+  qdsp6_allocate_stack(frame->sp_adjustment, frame->allocate_stack_insn);
 
   /* Save callee-save registers. */
   if(frame->prologue_function != CODE_FOR_nothing){
     emit_insn(GEN_FCN (frame->prologue_function)(NULL_RTX));
   }
   base_reg = frame->base_reg;
-  offset = frame->offset - 2 * UNITS_PER_WORD * frame->num_function_saved_pairs;
+  offset = frame->offset;
+  /* Account for any pairs that have already been saved. */
+  offset -= 2 * UNITS_PER_WORD * frame->num_specially_saved_pairs;
   /* Save any callee-save registers that can be stored as pairs and have not
-     been saved by a common prologue function. */
-  i = frame->num_saved_pairs - frame->num_function_saved_pairs - 1;
-  for(; i >= 0; i--){
+     already been saved in some other manner. */
+  for(i = frame->num_specially_saved_pairs; i < frame->num_saved_pairs; i++){
     offset -= 2 * UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (DImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (DImode, frame->saved_pairs[i]));
   }
+  /* Account for any singles that have already been saved. */
+  offset -= UNITS_PER_WORD * frame->num_specially_saved_singles;
   /* Save any remaining callee-save registers. */
-  for(i = frame->num_saved_singles - 1; i >= 0; i--){
+  for(i = frame->num_specially_saved_singles; i < frame->num_saved_singles; i++){
     offset -= UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (SImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (SImode, frame->saved_singles[i]));
@@ -4989,7 +7186,9 @@ qdsp6_direct_return(void)
 {
   struct qdsp6_frame_info *frame = qdsp6_frame_info();
 
-  return reload_completed && frame->total_size == 0;
+  return reload_completed && (frame->total_size == 0
+                              || (TARGET_V4_FEATURES && frame->use_allocframe
+                                                     && frame->reg_size == 0));
 }
 
 
@@ -5047,31 +7246,33 @@ qdsp6_expand_epilogue(bool sibcall)
 
   /* Restore callee-save registers. */
   base_reg = frame->base_reg;
-  offset = frame->offset
-           - (2 * UNITS_PER_WORD
-              * (sibcall ? frame->num_sibcall_function_restored_pairs
-                         : frame->num_function_restored_pairs));
-  /* Restore any callee-save registers that can be loaded as pairs and will not
-     be loaded by a common epilogue function. */
-  i = frame->num_saved_pairs
-      - (sibcall ? frame->num_sibcall_function_restored_pairs
-                 : frame->num_function_restored_pairs) - 1;
-  for(; i >= 0; i--){
-    offset -= 2 * UNITS_PER_WORD;
-    emit_move_insn(gen_rtx_REG (DImode, frame->saved_pairs[i]),
-                   gen_rtx_MEM (DImode, plus_constant(base_reg, offset)));
-  }
-  /* Restore any remaining callee-save registers. */
-  for(i = frame->num_saved_singles - 1; i >= 0; i--){
-    offset -= UNITS_PER_WORD;
+  offset = frame->offset - (2 * frame->num_saved_pairs
+                              + frame->num_saved_singles) * UNITS_PER_WORD;
+  /* Restore any callee-save registers not stored as part of a pair. */
+  for(i = (int) frame->num_saved_singles - 1; i >= 0; i--){
     emit_move_insn(gen_rtx_REG (SImode, frame->saved_singles[i]),
                    gen_rtx_MEM (SImode, plus_constant(base_reg, offset)));
+    offset += UNITS_PER_WORD;
+  }
+  /* Restore any callee-save registers that can be loaded as pairs and will not
+     be loaded by a common epilogue function. */
+  for(i = (int) frame->num_saved_pairs - 1;
+      i >= (int) (sibcall ? frame->num_sibcall_function_restored_pairs
+                          : frame->num_function_restored_pairs);
+      i--){
+    emit_move_insn(gen_rtx_REG (DImode, frame->saved_pairs[i]),
+                   gen_rtx_MEM (DImode, plus_constant(base_reg, offset)));
+    offset += 2 * UNITS_PER_WORD;
   }
 
-  /* Can we omit the deallocframe instruction? */
-  if(frame->lrfp_size == 0){
+  /* Determine how best to deallocate the stack frame and restore LR and FP if
+     necessary. */
+  /* If LR and FP do not need to be restored, then simply deallocate the
+     stack. */
+  if(!frame->use_allocframe){
     qdsp6_deallocate_stack(frame->sp_adjustment);
   }
+  /* Otherwise, call a function if doing so will save code size. */
   else if(!sibcall && frame->epilogue_function != CODE_FOR_nothing){
     emit_jump_insn(GEN_FCN (frame->epilogue_function)(NULL_RTX));
     emit_return = false;
@@ -5079,15 +7280,24 @@ qdsp6_expand_epilogue(bool sibcall)
   else if(sibcall && frame->sibcall_epilogue_function != CODE_FOR_nothing){
     emit_insn(GEN_FCN (frame->sibcall_epilogue_function)(NULL_RTX));
   }
+  /* Otherwise, on V4 and up, use the dealloc_return instruction if possible. */
+  else if(TARGET_V4_FEATURES && emit_return
+          && !crtl->calls_eh_return){
+    emit_jump_insn(gen_deallocframe_return());
+    emit_return = false;
+  }
+  /* Otherwise, use separate deallocframe and return instructions. */
   else {
     emit_insn(gen_deallocframe());
   }
 
+  /* If returning to an exception handler, adjust the stack as necessary. */
   if(crtl->calls_eh_return){
     emit_insn(gen_addsi3(stack_pointer_rtx,
                          stack_pointer_rtx, EH_RETURN_STACKADJ_RTX));
   }
 
+  /* Emit a return jump if we still need to. */
   if(emit_return){
     emit_jump_insn(gen_return_jump());
   }
@@ -5107,15 +7317,16 @@ qdsp6_expand_compare(enum rtx_code code)
   rtx op1 = cfun->machine->compare_op1;
   enum rtx_code compare_code, jump_code;
   rtx p_reg, const_reg;
-  bool offset = false;
+  int offset = 0;
 
   if(GET_MODE (op0) == BImode){
     gcc_assert(REG_P (op0) && (code == NE || code == EQ) && op1 == const0_rtx);
     return gen_rtx_fmt_ee(code, BImode, op0, op1);
   }
 
-  if(REG_P (op1)){
+  if(REG_P (op1) || GET_CODE (op1) == SUBREG){
     switch(code) {
+      /* Equality compares */
       case EQ:
         SET_CODES (EQ, NE); break;
       case NE:
@@ -5142,90 +7353,48 @@ qdsp6_expand_compare(enum rtx_code code)
         SET_CODES (GTU, EQ); SWAP_OPERANDS; break;
 
       default:
-        abort();
+        gcc_unreachable();
     }
   }
   else {
-    gcc_assert(GET_MODE(op0) != DImode && GET_MODE(op1) != DImode);
+    gcc_assert(GET_MODE (op0) != DImode && GET_MODE (op1) != DImode);
+
     switch(code) {
+      /* Equality compares */
       case EQ:
-/*
-        if(cfun->machine->compare_op1 == const0_rtx){
-          SET_CODES (NE, EQ); break;
-        }
-        else {
-*/
-          SET_CODES (EQ, NE); break;
-/*
-        }
-*/
+        SET_CODES (EQ, NE); break;
       case NE:
         SET_CODES (EQ, EQ); break;
 
       /* Signed compares */
       case LT:
-        SET_CODES (GT, EQ); offset = true; break;
+        SET_CODES (GT, EQ); offset = -1; break;
       case LE:
         SET_CODES (GT, EQ); break;
       case GT:
         SET_CODES (GT, NE); break;
       case GE:
-        SET_CODES (GT, NE); offset = true; break;
+        SET_CODES (GT, NE); offset = -1; break;
 
       /* Unsigned compares */
       case LTU:
-        SET_CODES (GTU, EQ); offset = true; break;
+        SET_CODES (GTU, EQ); offset = -1; break;
       case LEU:
         SET_CODES (GTU, EQ); break;
       case GTU:
         SET_CODES (GTU, NE); break;
       case GEU:
-        SET_CODES (GTU, NE); offset = true; break;
+        SET_CODES (GTU, NE); offset = -1; break;
 
       default:
-        abort();
+        gcc_unreachable();
     }
 
-    if(TARGET_V2_FEATURES){
-      if(   INTVAL (op1) >= (compare_code == GTU ? offset ?    0 + 1 :    0
-                                                 : offset ? -512 + 1 : -512)
-         && INTVAL (op1) <= (offset ? 511 + 1 : 511)){
-        if(offset){
-          op1 = GEN_INT (INTVAL (op1) - 1);
-        }
-      }
-      else {
-        const_reg = gen_reg_rtx(SImode);
-        emit_move_insn(const_reg, op1);
-        if(offset){
-          jump_code = jump_code == EQ ? NE : EQ;
-          op1 = op0;
-          op0 = const_reg;
-        }
-        else {
-          op1 = const_reg;
-        }
-      }
-    }
-    else {
-      if(   INTVAL (op1) >= (compare_code == GTU ?   0 : -128)
-         && INTVAL (op1) <= (compare_code == GTU ? 255 :  127)){
-        if(offset){
-          compare_code = compare_code == GT ? GE : GEU;
-        }
-      }
-      else {
-        const_reg = gen_reg_rtx(SImode);
-        emit_move_insn(const_reg, op1);
-        if(offset){
-          jump_code = jump_code == EQ ? NE : EQ;
-          op1 = op0;
-          op0 = const_reg;
-        }
-        else {
-          op1 = const_reg;
-        }
-      }
+    op1 = plus_constant(op1, offset);
+
+    if(GET_CODE (op1) != CONST_INT
+       || !IN_RANGE (INTVAL (op1), compare_code == GTU ? 0 : -512, 511)){
+      op1 = force_reg(SImode, op1);
     }
   }
 
@@ -5242,129 +7411,222 @@ qdsp6_expand_compare(enum rtx_code code)
 
 
 
-bool
-qdsp6_expand_movmem(rtx operands[])
+/* Creates a tree node for a block-move function named NAME. */
+
+static tree
+qdsp6_special_case_memcpy_fn(const char *name)
+{
+  tree args, fn;
+
+  fn = get_identifier(name);
+  args = build_function_type_list(ptr_type_node, ptr_type_node,
+                                  const_ptr_type_node, sizetype,
+                                  NULL_TREE);
+
+  fn = build_decl(FUNCTION_DECL, fn, args);
+  DECL_EXTERNAL (fn) = 1;
+  TREE_PUBLIC (fn) = 1;
+  DECL_ARTIFICIAL (fn) = 1;
+  TREE_NOTHROW (fn) = 1;
+  DECL_VISIBILITY (fn) = VISIBILITY_DEFAULT;
+  DECL_VISIBILITY_SPECIFIED (fn) = 1;
+  make_decl_rtl(fn);
+  assemble_external(fn);
+
+  return fn;
+}
+
+
+
+
+/* Emits a call to block-move function *FN named NAME with parameters DST, SRC,
+   and SIZE.  TAILCALL is true only if the call may be implemented as a tail
+   call.  If *FN is NULL, then it is initialized to a tree node for a function
+   named NAME. */
+
+static void
+qdsp6_emit_special_case_memcpy_fn(
+  tree *fn,
+  const char *name,
+  rtx dst,
+  rtx src,
+  rtx size,
+  bool tailcall
+)
+{
+  rtx dst_addr, src_addr;
+  tree call_expr, src_tree, dst_tree, size_tree;
+  enum machine_mode size_mode;
+
+  /* Emit code to copy the addresses of DST and SRC and SIZE into new
+     pseudos.  We can then place those new pseudos into a VAR_DECL and
+     use them later.  */
+
+  dst_addr = copy_to_mode_reg(Pmode, XEXP (dst, 0));
+  src_addr = copy_to_mode_reg(Pmode, XEXP (src, 0));
+
+  dst_addr = convert_memory_address(ptr_mode, dst_addr);
+  src_addr = convert_memory_address(ptr_mode, src_addr);
+
+  dst_tree = make_tree(ptr_type_node, dst_addr);
+  src_tree = make_tree(ptr_type_node, src_addr);
+
+  size_mode = TYPE_MODE (sizetype);
+
+  size = convert_to_mode(size_mode, size, 1);
+  size = copy_to_mode_reg(size_mode, size);
+
+  size_tree = make_tree(sizetype, size);
+
+  if(!*fn){
+    *fn = qdsp6_special_case_memcpy_fn(name);
+  }
+  call_expr = build_call_expr (*fn, 3, dst_tree, src_tree, size_tree);
+  CALL_EXPR_TAILCALL (call_expr) = tailcall;
+
+  expand_normal (call_expr);
+}
+
+
+
+
+/* Emits an inline implementation of a block move.  OPERANDS[0] is a MEM
+   containing the destination address.  OPERANDS[1] is a MEM containing the
+   source address.  OPERANDS[2] is a CONST_INT containing the number of bytes to
+   be copied.  OPERANDS[3] is a CONST_INT containing the guaranteed minimum
+   alignment of both the source and destination addresses.  If VOLATILE_P is
+   true then the final assembly corresponding to the code being emitted must not
+   contain any packets containing more than one memory access. */
+
+static void
+qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p)
 {
   rtx src_0, dst_0, src_reg, dst_reg, src_mem, dst_mem, value_reg, count_reg;
-  rtx label;
-  int count, loopcount, align;
+  rtx label, loopcount_rtx, doloop_fixup_code;
+  int count, loopcount, align, size, log2size;
+  enum machine_mode mode;
+  rtx (*gen_memcpy_kernel)(rtx, rtx, rtx, rtx);
 
+  count = INTVAL (operands[2]);
   align = INTVAL (operands[3]);
 
-  if((align & 3) != 0  || GET_CODE (operands[2]) != CONST_INT){
-    return false;
-  }
+  gcc_assert(count >= 0);
 
   src_0 = operands[1];
   dst_0 = operands[0];
   src_reg = copy_to_mode_reg(Pmode, XEXP (src_0, 0));
   dst_reg = copy_to_mode_reg(Pmode, XEXP (dst_0, 0));
-  count = INTVAL (operands[2]);
 
+  /* Copy as many pieces as possible of size equal to the mutual alignment of
+     the source and destination. */
   if((align & 7) == 0){
+    mode = DImode;
+    size = 8;
+    log2size = 3;
+    gen_memcpy_kernel = gen_memcpy_kerneldi;
+  }
+  else if((align & 3) == 0){
+    mode = SImode;
+    size = 4;
+    log2size = 2;
+    gen_memcpy_kernel = gen_memcpy_kernelsi;
+  }
+  else if((align & 1) == 0){
+    mode = HImode;
+    size = 2;
+    log2size = 1;
+    gen_memcpy_kernel = gen_memcpy_kernelhi;
+  }
+  else {
+    mode = QImode;
+    size = 1;
+    log2size = 0;
+    gen_memcpy_kernel = gen_memcpy_kernelqi;
+  }
 
-    loopcount = count >> 3;
-    if(loopcount > 2){
+  src_mem = change_address(src_0, mode, src_reg);
+  dst_mem = change_address(dst_0, mode, dst_reg);
 
-      value_reg = gen_reg_rtx(DImode);
-      src_mem = change_address(src_0, DImode, src_reg);
-      count_reg = gen_reg_rtx(SImode);
-      label = gen_label_rtx();
+  /* Only form a loop if it would execute for at least two iterations. */
+  loopcount = count >> log2size;
+  if(loopcount > 2){
 
+    /* If the source or destination might be volatile, then load and store
+       serially inside the loop.  Otherwise, software pipeline the loop. */
+
+    value_reg = gen_reg_rtx(mode);
+    count_reg = gen_reg_rtx(SImode);
+    doloop_fixup_code = GEN_INT (REGNO (count_reg));
+    loopcount_rtx = gen_int_mode(volatile_p ? loopcount : loopcount - 1,
+                                 SImode);
+    label = gen_label_rtx();
+
+    if(!volatile_p){
       emit_move_insn(value_reg, src_mem);
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-      emit_insn(gen_doloop_begin0(gen_int_mode(loopcount - 1, SImode),
-                                  GEN_INT (REGNO (count_reg))));
-      emit_label(label);
+      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(size, Pmode)));
+    }
 
-      src_mem = change_address(src_0, DImode, src_reg);
-      dst_mem = change_address(dst_0, DImode, dst_reg);
-
-      emit_insn(gen_memcpy_kerneldi(dst_mem, value_reg, value_reg, src_mem));
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-      emit_jump_insn(gen_endloop0(label, GEN_INT (REGNO (count_reg))));
-      qdsp6_hardware_loop();
-
-      dst_mem = change_address(dst_0, DImode, dst_reg);
-
-      emit_move_insn(dst_mem, value_reg);
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
-
+    if(TARGET_HARDWARE_LOOPS){
+      emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
     }
     else {
-      for(; loopcount; loopcount--){
-
-        value_reg = gen_reg_rtx(DImode);
-        src_mem = change_address(src_0, DImode, src_reg);
-        dst_mem = change_address(dst_0, DImode, dst_reg);
-
-        emit_move_insn(value_reg, src_mem);
-        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(8, Pmode)));
-        emit_move_insn(dst_mem, value_reg);
-        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(8, Pmode)));
-
-      }
+      emit_move_insn(count_reg, loopcount_rtx);
     }
-    if(count & 4){
 
-      value_reg = gen_reg_rtx(SImode);
-      src_mem = change_address(src_0, SImode, src_reg);
-      dst_mem = change_address(dst_0, SImode, dst_reg);
+    emit_label(label);
 
+    if(volatile_p){
       emit_move_insn(value_reg, src_mem);
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
       emit_move_insn(dst_mem, value_reg);
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
+    }
+    else {
+      emit_insn(gen_memcpy_kernel(dst_mem, value_reg, value_reg, src_mem));
+    }
+    emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(size, Pmode)));
+    emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(size, Pmode)));
 
+    if(TARGET_HARDWARE_LOOPS){
+      emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
+      qdsp6_hardware_loop();
+    }
+    else {
+      rtx pred = gen_reg_rtx(BImode);
+      emit_insn(gen_addsi3(count_reg, count_reg, constm1_rtx));
+      emit_insn(gen_cmpsi_eq(pred, count_reg, const0_rtx));
+      emit_jump_insn(gen_cond_jump(gen_rtx_EQ (BImode, pred, const0_rtx),
+                                   pred, label));
+    }
+
+    if(!volatile_p){
+      emit_move_insn(dst_mem, value_reg);
+      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(size, Pmode)));
     }
 
   }
   else {
+    for(; loopcount; loopcount--){
 
-    loopcount = count >> 2;
-    if(loopcount > 2){
-
-      value_reg = gen_reg_rtx(SImode);
-      src_mem = change_address(src_0, SImode, src_reg);
-      count_reg = gen_reg_rtx(SImode);
-      label = gen_label_rtx();
+      value_reg = gen_reg_rtx(mode);
 
       emit_move_insn(value_reg, src_mem);
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-      emit_insn(gen_doloop_begin0(gen_int_mode(loopcount - 1, SImode),
-                                  GEN_INT (REGNO (count_reg))));
-      emit_label(label);
-
-      src_mem = change_address(src_0, SImode, src_reg);
-      dst_mem = change_address(dst_0, SImode, dst_reg);
-
-      emit_insn(gen_memcpy_kernelsi(dst_mem, value_reg, value_reg, src_mem));
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
-      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-      emit_jump_insn(gen_endloop0(label, GEN_INT (REGNO (count_reg))));
-      qdsp6_hardware_loop();
-
-      dst_mem = change_address(dst_0, SImode, dst_reg);
-
+      emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(size, Pmode)));
       emit_move_insn(dst_mem, value_reg);
-      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
+      emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(size, Pmode)));
 
     }
-    else {
-      for(; loopcount; loopcount--){
+  }
 
-        value_reg = gen_reg_rtx(SImode);
-        src_mem = change_address(src_0, SImode, src_reg);
-        dst_mem = change_address(dst_0, SImode, dst_reg);
+  /* Copy any leftovers. */
+  if((align & 7) == 0 && count & 4){
 
-        emit_move_insn(value_reg, src_mem);
-        emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
-        emit_move_insn(dst_mem, value_reg);
-        emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
+    value_reg = gen_reg_rtx(SImode);
+    src_mem = change_address(src_0, SImode, src_reg);
+    dst_mem = change_address(dst_0, SImode, dst_reg);
 
-      }
-    }
+    emit_move_insn(value_reg, src_mem);
+    emit_insn(gen_addsi3(src_reg, src_reg, gen_int_mode(4, Pmode)));
+    emit_move_insn(dst_mem, value_reg);
+    emit_insn(gen_addsi3(dst_reg, dst_reg, gen_int_mode(4, Pmode)));
 
   }
   if(count & 2){
@@ -5389,11 +7651,232 @@ qdsp6_expand_movmem(rtx operands[])
     emit_move_insn(dst_mem, value_reg);
 
   }
-
-  return true;
 }
 
 
+
+
+/* Tree nodes for specialized block-move functions */
+
+static GTY(()) tree qdsp6_memcpy_volatile;
+static GTY(()) tree qdsp6_memcpy_likely_aligned8_min32_mult8;
+
+/* Emits RTL to perform a block move or returns false.  OPERANDS[0] is a MEM
+   containing the destination address.  OPERANDS[1] is a MEM containing the
+   source address.  OPERANDS[2] is a CONST_INT containing the number of bytes to
+   be copied.  OPERANDS[3] is a CONST_INT containing the guaranteed minimum
+   alignment of both the source and destination addresses.  OPERANDS[6] is a
+   CONST_INT with a non-zero value only if the block move may be performed via a
+   tail call. */
+
+bool
+qdsp6_expand_movmem(rtx operands[])
+{
+  HOST_WIDE_INT length, align;
+  int cycles, leftovers;
+  bool volatile_p, simple_copy_p;
+  const int O3_inline_cycle_threshold = 10;
+  const int O2_inline_cycle_threshold = 5;
+  const int likely_aligned_cycle_threshold = 100;
+
+  volatile_p = !TARGET_V4_FEATURES
+               && (MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
+                   || !qdsp6_dual_memory_accesses);
+
+  align = MIN (INTVAL (operands[3]), BIGGEST_ALIGNMENT / BITS_PER_UNIT);
+  if(GET_CODE (operands[2]) == CONST_INT){
+    length = INTVAL (operands[2]);
+    length &= 0xFFFFFFFFLL;
+    simple_copy_p = (length <= align && exact_log2(length) != -1)
+                    || length == 0;
+  }
+  else {
+    length = -1;
+    simple_copy_p = false;
+  }
+  gcc_assert(length >= -1);
+  gcc_assert((align & (align - 1)) == 0);
+
+  cycles = length / align + 1;
+  for(leftovers = length & (align - 1); leftovers; leftovers >>= 1){
+    cycles += leftovers & 1;
+  }
+
+  if(optimize
+     && (simple_copy_p
+         || (!optimize_size
+             && (align & 3) == 0
+             && length != -1
+             && cycles <= (optimize >= 3 ? O3_inline_cycle_threshold
+                                         : O2_inline_cycle_threshold)))){
+    qdsp6_expand_movmem_inline(operands, volatile_p);
+    return true;
+  }
+
+  if(optimize && !volatile_p
+     && (align & 3) == 0 && length >= 32 && length % 8 == 0
+     && cycles < likely_aligned_cycle_threshold){
+    qdsp6_emit_special_case_memcpy_fn(&qdsp6_memcpy_likely_aligned8_min32_mult8,
+                                      "__qdsp_memcpy_likely_aligned_min32bytes_mult8bytes",
+                                      operands[0], operands[1], operands[2],
+                                      INTVAL (operands[6]));
+    return true;
+  }
+
+  if(volatile_p){
+    qdsp6_emit_special_case_memcpy_fn(&qdsp6_memcpy_volatile, "memcpy_v",
+                                      operands[0], operands[1], operands[2],
+                                      INTVAL (operands[6]));
+    return true;
+  }
+
+  return false;
+}
+
+/* Block set instruction. The destination string is the first operand, given as a 
+   mem:BLK whose address is in mode Pmode. The number of bytes to set is the second operand, 
+   in mode m. The value to initialize the memory with is the third operand. Targets that only 
+   support the clearing of memory should reject any value that is not the constant 0.
+
+   The fourth operand is the known alignment of the destination, in the form of a const_int rtx. 
+   Thus, if the compiler knows that the destination is word-aligned, it may provide the value 4 for this operand.
+
+   Optional operands 5 and 6 specify expected alignment and size of block respectively. The expected 
+   alignment differs from alignment in operand 4 in a way that the blocks are not required to be aligned 
+   according to it in all cases. This expected alignment is also in bytes, just like operand 4. Expected 
+   size, when unknown, is set to (const_int -1). 
+
+   Implementation details-
+   1. From the alignment, figure out all valid modes which can be used to set memory. For example-
+      a. alignment == 4  -> valid modes (QI, HI, SI)
+      b. aligment == 128 -> valid modes (QI, HI, SI, DI)
+
+   2. Now loop thru all valid modes starting from the widest to the narrowest-
+      a. calculate loop count = bytes-to-copy / mode-size
+      b. if loop count == 0 -> not enough bytes to store
+      c. if loop count == 1 -> do simple store
+      d. if loop count > 1  -> do hardware loop
+*/
+
+bool
+qdsp6_expand_setmem(rtx operands[])
+{
+#define MEMSET_LIBCALL_THRESHOLD 64
+  HOST_WIDE_INT align_intval, nbytes_intval, initval_intval;
+  rtx destaddr, nbytes, initval, align;
+
+  if (!flag_optimize_memset)
+    return false;
+
+  destaddr = operands[0];
+  nbytes = operands[1];
+  initval = operands[2];
+  align = operands[3];
+
+  /* Sanity checks */
+  gcc_assert(destaddr && nbytes && initval);
+
+  /* nbytes should be constant */
+  if (GET_CODE(nbytes) != CONST_INT)
+    return false;
+
+  /* align should be constant. We should probably assert but... */
+  if (GET_CODE(align) != CONST_INT)
+    return false;
+
+  /* initval should be constant. */
+  if (GET_CODE(initval) != CONST_INT)
+    return false;
+
+  align_intval = INTVAL(align);
+  nbytes_intval = INTVAL(nbytes);
+  initval_intval = INTVAL(initval);
+
+  /* If nothing to set or large memory (memset might optimize it better), return */
+  if (nbytes_intval <= 0 || nbytes_intval > MEMSET_LIBCALL_THRESHOLD)
+    return false;
+
+  /* If not clearing memory, return */
+  if (initval_intval != 0)
+    return false;
+
+  /* Now starting from the narrowest mode, figure out all valid modes */
+  enum machine_mode valid_modes[MAX_MODE_INT-MIN_MODE_INT+1] = {VOIDmode};
+  enum machine_mode curr_mode;
+  int index = 0;
+
+  /* Step 1. See comments above */
+  for (curr_mode = GET_CLASS_NARROWEST_MODE(MODE_INT); curr_mode != VOIDmode;
+       curr_mode = GET_MODE_WIDER_MODE(curr_mode))
+    {
+      /* Is mode supported */
+      if (!targetm.scalar_mode_supported_p(curr_mode))
+        continue;
+
+      /* Make sure alignment does not exceed align */
+      if (GET_MODE_SIZE(curr_mode) > align_intval)
+        break;
+
+      valid_modes[index++] = curr_mode;
+    }
+
+  /* Index must be non-zero */
+  gcc_assert(index);
+
+  /* Get the base pointer */
+  rtx base_reg = copy_to_mode_reg(SImode, XEXP(destaddr, 0));
+  int nbytes_left = nbytes_intval;
+  /* Step 2. Starting from the widest mode, generate hardware loop stores */
+  for (index = index-1; index >= 0; index--)
+    {
+      rtx store_reg, label;
+      curr_mode = valid_modes[index];
+      int loop_count = nbytes_left / GET_MODE_SIZE(curr_mode);
+      /* Size is smaller than the alignment */
+      if (loop_count == 0)
+          continue;
+
+      /* r = #0 */
+      rtx zero_reg = gen_reg_rtx(curr_mode);
+      emit_move_insn(zero_reg, initval);
+
+      if (loop_count == 1)
+        {
+          /* Simple store */
+          store_reg = gen_rtx_MEM(curr_mode, base_reg);
+          MEM_COPY_ATTRIBUTES(store_reg, destaddr);
+          emit_move_insn(store_reg, zero_reg);
+
+          /* Increment the base pointer */
+          emit_insn(gen_addsi3(base_reg, base_reg, 
+                               gen_int_mode(GET_MODE_SIZE(curr_mode), SImode)));
+        }
+      else
+        {
+          /* Hardware loop */
+          store_reg = gen_rtx_MEM(curr_mode, base_reg);
+          MEM_COPY_ATTRIBUTES(store_reg, destaddr);
+          label = gen_label_rtx();
+          /* Hack for hardware loop */
+          rtx count_reg = gen_reg_rtx(SImode);
+          rtx doloop_fixup_code = GEN_INT(REGNO(count_reg));
+          rtx loopcount_rtx = gen_int_mode(loop_count, SImode);
+
+          emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+          emit_label(label);
+          emit_move_insn(store_reg, zero_reg);
+          emit_insn(gen_addsi3(base_reg, base_reg, 
+                               gen_int_mode(GET_MODE_SIZE(curr_mode), SImode)));
+          emit_jump_insn(gen_endloop0(label, doloop_fixup_code));
+          qdsp6_hardware_loop();
+        }
+
+      /* Count leftover */
+      nbytes_left = nbytes_left % GET_MODE_SIZE(curr_mode);
+    }
+  gcc_assert(nbytes_left == 0);
+  return true;
+}
 
 
 #if 0
@@ -5780,6 +8263,7 @@ static struct qdsp6_insn_info *qdsp6_predicate_insn(
                                  struct qdsp6_insn_info *insn_info,
                                  struct qdsp6_insn_info *jump_insn_info,
                                  bool invert_condition);
+static int qdsp6_dot_newify_reg(rtx *x, void *y);
 static struct qdsp6_insn_info *qdsp6_dot_newify_insn(
                                  struct qdsp6_insn_info *insn_info);
 static rtx  qdsp6_bb_real_head_insn(basic_block bb);
@@ -5821,22 +8305,22 @@ static void qdsp6_free_packing_info(void);
 #define QDSP6_ENDLOOP               QDSP6_MASK(1, 7)
 #define QDSP6_CALL                  QDSP6_MASK(1, 8)
 #define QDSP6_EMULATION_CALL        QDSP6_MASK(1, 9)
-#define QDSP6_JUMP \
-  (QDSP6_DIRECT_JUMP | QDSP6_INDIRECT_JUMP | QDSP6_ENDLOOP)
 #define QDSP6_CONTROL (QDSP6_CALL | QDSP6_JUMP)
 
 #define QDSP6_MEM                   QDSP6_MASK(1, 10)
 #define QDSP6_VOLATILE              QDSP6_MASK(1, 11)
 
 #define QDSP6_WANDERED              QDSP6_MASK(1, 12)
+#define QDSP6_REGCOND_JUMP          QDSP6_MASK(1, 13)
+
+#define QDSP6_JUMP \
+  (QDSP6_DIRECT_JUMP | QDSP6_INDIRECT_JUMP | QDSP6_ENDLOOP  | QDSP6_REGCOND_JUMP) 
 
 #define QDSP6_PREDICATE_NUMBER(INSN) \
   ((INSN)->flags & QDSP6_PREDICATE_NUMBER_MASK)
 #define QDSP6_PREDICATE(INSN) ((INSN)->flags & QDSP6_PREDICATE_MASK)
 #define QDSP6_DOT_NEW_P(INSN) (((INSN)->flags & QDSP6_DOT_NEW) != 0)
 #define QDSP6_CONDITION(INSN) ((INSN)->flags & QDSP6_CONDITION_MASK)
-#define QDSP6_CONDITIONAL_P(INSN) \
-  (((INSN)->flags & QDSP6_CONDITION_MASK) != QDSP6_UNCONDITIONAL)
 #define QDSP6_CONFLICT_P(ACCESS0, ACCESS1) \
   (gcc_assert(QDSP6_CONDITION (ACCESS0) && QDSP6_CONDITION (ACCESS1)), \
    ((ACCESS0)->flags & (ACCESS1)->flags & QDSP6_CONDITION_MASK \
@@ -5855,28 +8339,38 @@ static void qdsp6_free_packing_info(void);
 
 #define QDSP6_WANDERED_P(INSN) (((INSN)->flags & QDSP6_WANDERED) != 0)
 
+/* PDB. True if ((insn_info*)INSN)->insn is a register conditional jump */
+#define QDSP6_REGCOND_JUMP_P(INSN) (((INSN)->flags & QDSP6_REGCOND_JUMP) != 0)
 
+#define QDSP6_CONFLICT_P(ACCESS0, ACCESS1) \
+  (gcc_assert(QDSP6_CONDITION (ACCESS0) && QDSP6_CONDITION (ACCESS1)), \
+   ((ACCESS0)->flags & (ACCESS1)->flags & QDSP6_CONDITION_MASK \
+    || QDSP6_PREDICATE (ACCESS0) != QDSP6_PREDICATE (ACCESS1)))
 
+/* PDB. Register conditional jump is also a conditional jump */
+#define QDSP6_CONDITIONAL_P(INSN) \
+  ((((INSN)->flags & QDSP6_CONDITION_MASK) != QDSP6_UNCONDITIONAL) || \
+  (((INSN)->flags & QDSP6_REGCOND_JUMP) != 0))
 
 #define QDSP6_DEP_NONE            0
 #define QDSP6_DEP_UNCONDITIONAL   QDSP6_MASK(1, 0)
 #define QDSP6_DEP_NOT_DOT_NEWABLE QDSP6_MASK(1, 1)
 #define QDSP6_DEP_DOT_NEWABLE     QDSP6_MASK(1, 2)
+/* PDB. Dual jump is a new special kind of dependence between two instructions. */
+#define QDSP6_DEP_DUALJUMP        QDSP6_MASK(1, 3)
 
 #define QDSP6_DEP_NONE_P(DEP) ((DEP) == 0)
 #define QDSP6_DEP_UNCONDITIONAL_P(DEP) (((DEP) & QDSP6_DEP_UNCONDITIONAL) != 0)
 #define QDSP6_DEP_NOT_DOT_NEWABLE_P(DEP) \
   (((DEP) & QDSP6_DEP_NOT_DOT_NEWABLE) != 0)
 #define QDSP6_DEP_DOT_NEWABLE_P(DEP) (((DEP) & QDSP6_DEP_DOT_NEWABLE) != 0)
+/* PDB. True if the dependence DEP is a dual jump dependence. Put the instructions that depend in terms of DEP in one packet. */
+#define QDSP6_DEP_DUALJUMP_P(DEP) (((DEP) & QDSP6_DEP_DUALJUMP) != 0)
 
 
 
 
 static bool final_packing = false;
-static bool let_cmp_jump_pack_together	= false; /* _LSY_ Allow in non final pass to 
-						   allocate compare and jum.new in the same
-						   packet */  
-
 static state_t qdsp6_state;
 
 static GTY(()) struct qdsp6_packet_info *qdsp6_head_packet;
@@ -5884,7 +8378,6 @@ static GTY(()) struct qdsp6_packet_info *qdsp6_tail_packet;
 static GTY(()) struct qdsp6_bb_aux_info *qdsp6_head_bb_aux;
 static GTY(()) struct qdsp6_transformed_insn_stack *qdsp6_insn_stack;
 
-// _LSY_ Keep an alternative list to analyze better schedule. 
 
 
 
@@ -5929,9 +8422,6 @@ qdsp6_print_insn_info(FILE *file, struct qdsp6_insn_info *insn_info)
     if(QDSP6_CALL_P (insn_info)){
       fputs("call", file);
     }
-    if(QDSP6_EMULATION_CALL_P (insn_info)){
-      fputs("emulation_call", file);
-    }
     if(QDSP6_ENDLOOP_P (insn_info)){
       fputs("endloop", file);
     }
@@ -5943,20 +8433,27 @@ qdsp6_print_insn_info(FILE *file, struct qdsp6_insn_info *insn_info)
 
   fputs(";; flags: (", file);
   first = true;
+  if(QDSP6_EMULATION_CALL_P (insn_info)){
+    fputs("emulation_call", file);
+    first = false;
+  }
   if(QDSP6_VOLATILE_P (insn_info)){
+    if(!first){
+      fputs(", ", file);
+    }
     fputs("volatile", file);
     first = false;
   }
   if(QDSP6_MEM_P (insn_info)){
     if(!first){
-      fputc(',', file);
+      fputs(", ", file);
     }
     fputs("mem", file);
     first = false;
   }
   if(QDSP6_WANDERED_P (insn_info)){
     if(!first){
-      fputc(',', file);
+      fputs(", ", file);
     }
     fputs("wandered", file);
   }
@@ -6139,6 +8636,7 @@ qdsp6_wandered_too_far_p(rtx insn)
     case CODE_FOR_cond_jump:
     case CODE_FOR_loop0:
     case CODE_FOR_loop1:
+    case CODE_FOR_gpr_cond_jump:
       if(get_attr_length(insn) > 4){
         return true;
       }
@@ -6153,41 +8651,85 @@ qdsp6_wandered_too_far_p(rtx insn)
 
 
 
+/* Return true if TEST is a valid relational operator for a conditional jump */
+static int
+qdsp6_cond_jump_compare_operator (rtx test)
+{
+  enum rtx_code code = GET_CODE (test);
+  /* v3 has more compare codes because of the register conditional jumps. */
+  if (TARGET_V3_FEATURES)
+    return (code == NE || code == EQ || code == LE || code == GE || code == GT || code == LT);
+  else
+    return (code == NE || code == EQ);
+}
+
+
+
+
 static int
 qdsp6_get_flags(rtx insn)
 {
   int flags;
+  rtx pattern;
   rtx test;
 
   flags = 0;
 
-  if(GET_CODE (PATTERN (insn)) == COND_EXEC){
-    test = COND_EXEC_TEST (PATTERN (insn));
+  pattern = PATTERN (insn);
+  if(GET_CODE (pattern) == PARALLEL){
+    pattern = XVECEXP (pattern, 0, 0);
   }
-  else if(JUMP_P (insn) && GET_CODE (PATTERN (insn)) == SET
-          && GET_CODE (SET_SRC (PATTERN (insn))) == IF_THEN_ELSE){
-    test = XEXP (SET_SRC (PATTERN (insn)), 0);
+
+  if(GET_CODE (pattern) == COND_EXEC){
+    test = COND_EXEC_TEST (pattern);
+  }
+  else if(JUMP_P (insn) && GET_CODE (pattern) == SET
+          && GET_CODE (SET_SRC (pattern)) == IF_THEN_ELSE){
+
+    test = XEXP (SET_SRC (pattern), 0);
+
+    if(C_REG_P (XEXP (test, 0))){
+      flags |= QDSP6_ENDLOOP;
+      test = NULL_RTX;
+    }
   }
   else {
     test = NULL_RTX;
   }
 
   if(test){
-    gcc_assert((GET_CODE (test) == NE || GET_CODE (test) == EQ)
+    if (TARGET_V3_FEATURES)
+      gcc_assert (qdsp6_cond_jump_compare_operator (test)
+		  && XEXP (test,1 ) == const0_rtx);
+    else
+      gcc_assert(qdsp6_cond_jump_compare_operator (test)
                && P_REG_P (XEXP (test, 0))
                && XEXP (test, 1) == const0_rtx);
+    if (P_REG_P (XEXP (test, 0)))
+      {
+	flags |= REGNO (XEXP (test, 0)) - P0_REGNUM;
+	flags |= GET_CODE (test) == NE ? QDSP6_IF_TRUE : QDSP6_IF_FALSE;
+      }
+    else
+      {
+	/* This is a speculative-register-conditional jump. */
+	flags |= QDSP6_REGCOND_JUMP;
 
-    flags |= REGNO (XEXP (test, 0)) - P0_REGNUM;
-    flags |= GET_CODE (test) == NE ? QDSP6_IF_TRUE : QDSP6_IF_FALSE;
+	/* PDB.  **IMPORTANT**.This really is a condition instruction, but here it means that it is not 
+	   predicated on a predicate register. To check whether an instruction is conditional
+	   use QDSP6_CONDITIONAL_P, _not_ QDSP6_UNCONDITIONAL. The latter only tell us if a '!'
+	   needs to be added before a predicate register, if used. */
+	flags |= QDSP6_UNCONDITIONAL;
+      }
   }
   else {
     flags |= QDSP6_UNCONDITIONAL;
   }
 
-  if(JUMP_P (insn)){
-    if(GET_CODE (PATTERN (insn)) == SET){
-      if(GET_CODE (SET_SRC (PATTERN (insn))) == IF_THEN_ELSE){
-        if(GET_CODE (XEXP (SET_SRC (PATTERN (insn)), 1)) == LABEL_REF){
+  if(JUMP_P (insn) && !(flags & QDSP6_ENDLOOP)){
+    if(GET_CODE (pattern) == SET){
+      if(GET_CODE (SET_SRC (pattern)) == IF_THEN_ELSE){
+        if(GET_CODE (XEXP (SET_SRC (pattern), 1)) == LABEL_REF){
           flags |= QDSP6_DIRECT_JUMP;
         }
         else {
@@ -6195,7 +8737,7 @@ qdsp6_get_flags(rtx insn)
         }
       }
       else {
-        if(GET_CODE (SET_SRC (PATTERN (insn))) == LABEL_REF){
+        if(GET_CODE (SET_SRC (pattern)) == LABEL_REF){
           flags |= QDSP6_DIRECT_JUMP;
         }
         else {
@@ -6203,13 +8745,18 @@ qdsp6_get_flags(rtx insn)
         }
       }
     }
-    else {
-      flags |= QDSP6_ENDLOOP;
-    }
   }
   else if(CALL_P (insn)){
     flags |= QDSP6_CALL;
   }
+  /* Ignore instructions that do nothing */
+  else if ((GET_CODE (PATTERN (insn)) == CLOBBER) ||
+	   (GET_CODE (PATTERN (insn)) == USE) || 
+	   (GET_CODE (PATTERN (insn)) == ADDR_VEC) ||
+	   (GET_CODE (PATTERN (insn)) == ADDR_DIFF_VEC))
+    {
+      /* do nothing */
+    }
   else if(get_attr_emulation_call(insn) == EMULATION_CALL_YES){
     flags |= QDSP6_EMULATION_CALL;
   }
@@ -6292,21 +8839,23 @@ qdsp6_record_reads(rtx *y, void *info)
       for_each_rtx(&COND_EXEC_CODE (x), qdsp6_record_reads, insn_info);
       return -1;
     case SET:
-      if(GET_CODE (SET_SRC (x)) != CALL){
-        for_each_rtx(&SET_DEST (x), qdsp6_record_writes, insn_info);
+    case POST_MODIFY:
+      if(GET_CODE (XEXP (x, 1)) != CALL){
+        for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
       }
-      for_each_rtx(&SET_SRC (x), qdsp6_record_reads, insn_info);
+      for_each_rtx(&XEXP (x, 1), qdsp6_record_reads, insn_info);
       return -1;
     case CALL:
       gcc_assert(MEM_P (XEXP (x, 0)));
       for_each_rtx(&XEXP (XEXP (x, 0), 0), qdsp6_record_reads, insn_info);
       return -1;
     case CLOBBER:
-    case POST_DEC:
-    case POST_INC:
-    case POST_MODIFY:
       for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
       return -1;
+    case POST_DEC:
+    case POST_INC:
+      for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
+      return 0;
     case MEM:
       mem_access = ggc_alloc_cleared(sizeof(struct qdsp6_mem_access));
       mem_access->mem = x;
@@ -6324,6 +8873,15 @@ qdsp6_record_reads(rtx *y, void *info)
       for(; regno < next_hard_regno; regno++){
         reg_access = ggc_alloc_cleared(sizeof(struct qdsp6_reg_access));
         reg_access->regno = PN_REGNO_P (regno) ? regno - DOT_NEW_OFFSET : regno;
+        reg_access->flags = insn_info->flags;
+        reg_access->next = insn_info->reg_reads;
+        insn_info->reg_reads = reg_access;
+      }
+      return 0;
+    case RETURN:
+      if(!QDSP6_CALL_P (insn_info)){
+        reg_access = ggc_alloc_cleared(sizeof(struct qdsp6_reg_access));
+        reg_access->regno = LINK_REGNUM;
         reg_access->flags = insn_info->flags;
         reg_access->next = insn_info->reg_reads;
         insn_info->reg_reads = reg_access;
@@ -6351,14 +8909,269 @@ qdsp6_get_insn_info(rtx insn)
 
   /* Transfers of immediate values that cannot be encoded in a transfer
      immediate instruction are implemented as GP-relative loads. */
-  if(get_attr_type(insn) == TYPE_LOAD){
-    insn_info->flags |= QDSP6_MEM;
-  }
-
+  if ((GET_CODE (PATTERN (insn)) == CLOBBER) ||
+      (GET_CODE (PATTERN (insn)) == USE) || 
+      (GET_CODE (PATTERN (insn)) == ADDR_VEC) ||
+      (GET_CODE (PATTERN (insn)) == ADDR_DIFF_VEC))
+    {
+      /* do nothing */
+    }
+  else if (get_attr_type(insn) == TYPE_LOAD)
+    {
+      insn_info->flags |= QDSP6_MEM;
+    }
+  
   return insn_info;
 }
 
 
+/* Given register reg, return its corresponding pair register */
+static inline unsigned int 
+get_pair_reg(unsigned int regno)
+{
+  return (regno & 0x1) ? regno - 1 : regno + 1;
+}
+
+
+/* 
+   Given a vector tranfer_source that maps register numbers to insn pointers:
+   Iterate through the vector.
+   If an element of the vector is a register copy with orig_reg as a source, 
+   replace that element with replacement 
+*/
+static void
+qdsp6_replace_transfer_map(VEC(rtx, gc)* transfer_source, unsigned orig_reg, 
+			   rtx replacement)
+{
+  unsigned int iter;
+
+  gcc_assert((replacement == NULL_RTX) || INSN_P(replacement));
+
+  for (iter = 0; iter <  FIRST_PSEUDO_REGISTER; ++iter) 
+    {
+      rtx element = VEC_index(rtx, transfer_source, iter);
+      if (element != NULL_RTX) 
+	{
+	  rtx element_source = SET_SRC (single_set (element));
+	  if (REG_P (element_source) && 
+	      (REGNO (element_source) == orig_reg))
+	    {
+	      VEC_replace(rtx, transfer_source, iter, replacement);
+	    }
+	}
+    }
+}
+
+
+/* Predicate that returns true if insn is a register-to-register or
+   a register-to-immediate copy */
+static inline bool 
+qdsp6_register_copy_word_p (rtx insn)
+{
+  rtx reg_copy;
+  bool dest_reg, src_reg_imm;
+  if (!insn || (!(reg_copy = single_set(insn))))
+    {
+      return false;
+    }
+  
+  dest_reg = register_operand(SET_DEST (reg_copy), SImode);
+  src_reg_imm = register_operand(SET_SRC (reg_copy), SImode) || 
+    const_int_operand(SET_SRC (reg_copy), SImode);
+
+  return (dest_reg && src_reg_imm);
+}
+
+/* Predicate that checks if REG is a lower component of a pair register */
+#define QDSP6_LOWER_PAIR(REG)         (!(REG & 0x1))
+
+
+/* 
+   Pass that scans through all basic blocks and changes register-register
+   and register-immediate transfers into combine instructions where possible.
+   For instance, it combines:
+   r0 = r3
+   ...
+   r1 = r4
+   into r1:0 = combine(r4,r3)
+
+   High-level overview of the pass:
+   --------------------------------
+   Iterate over all instructions I in the basic block. 
+   Maintain a map M from register number to insn pointer of the last write 
+   of that register
+   For all register reads, R, clear map(R)
+   Consider all transfer instructions of the form rx = y, where rx is a 
+   register and y is a register or an immediate
+   Consult the map to verify if the corresponding pair register for rx
+   was written to by a transfer. If so, replace the transfers with a combine
+   instruction
+   For all non-transfer instructions, iterate over the register writes
+   and invalidate the corresponding entry in the map
+*/
+static void
+qdsp6_local_combine_pass(void) 
+{
+  rtx insn;
+  basic_block bb;
+  rtx head_insn;
+  rtx end_insn;
+
+  /* transfer_source: vector that holds the sources used by a transfer 
+     instruction. The index is the physical register defined by the transfer. 
+     The vector element is the rtx of the source used by the transfer 
+     instruction. 
+     This vector depends on NULL_RTX being defined to 0
+  */
+  VEC(rtx, gc) *transfer_source = NULL;
+  VEC_safe_grow_cleared(rtx, gc, transfer_source, FIRST_PSEUDO_REGISTER);  
+  
+  FOR_EACH_BB(bb)
+    {
+      rtx combine_insn;
+      head_insn = BB_HEAD (bb);
+      end_insn = BB_END (bb);
+      insn = head_insn;
+
+      /* Reset the vector */
+      VEC_truncate(rtx, transfer_source, 0);
+      VEC_safe_grow_cleared(rtx, gc, transfer_source, FIRST_PSEUDO_REGISTER);
+      
+      FOR_BB_INSNS (bb, insn)
+	{
+	  struct qdsp6_insn_info *insn_info;
+	  struct qdsp6_reg_access *read;
+	  struct qdsp6_reg_access *write;
+
+	  /* Only process instructions */
+	  if (!INSN_P(insn)) 
+	    {
+	      continue;
+	    }
+	  insn_info = qdsp6_get_insn_info(insn);
+
+	  /* Process all instructions -- transfers and non-transfers. If the 
+	     instruction is reading the register. Remove from map. This condition
+	     must be checked before processing register copies. Else, the code will
+	     incorrectly handle this situation:
+	     r1 = r25
+	     r0 = r1   ;; We must invalidate r1 before processing this instruction
+                       ;; We cannot insert a r1:0=combine(r25,r1) here
+	  */
+	  for(read = insn_info->reg_reads; read; read = read->next)
+	    {
+	      VEC_replace(rtx, transfer_source, read->regno, NULL_RTX);
+	    }
+	  
+
+	  if (qdsp6_register_copy_word_p (insn))
+	    {
+	      rtx source;
+	      unsigned int dest_pair_regno;
+	      rtx dest_pair_insn, source_pair;
+	      unsigned int dest_regno = REGNO (SET_DEST(single_set (insn)));
+	      gcc_assert(dest_regno < FIRST_PSEUDO_REGISTER);
+
+	      /* Get the source for this transfer instruction */
+	      source = SET_SRC (single_set (insn));
+	      VEC_replace(rtx, transfer_source, dest_regno, insn);
+
+	      /* A register has been defined. If that register is an element of
+		 transfer_source, we can no longer consider that transfer to be valid.
+		 Invalidate that element */
+	      qdsp6_replace_transfer_map (transfer_source, dest_regno, NULL_RTX);
+	      
+	      /* Get the pair register for dest_regno */
+	      dest_pair_regno = get_pair_reg(dest_regno);
+	      if ((dest_pair_insn = VEC_index(rtx, transfer_source, dest_pair_regno)))
+		{
+		  enum machine_mode dummy_mode;
+		  source_pair = SET_SRC (single_set (dest_pair_insn));
+
+		  /* Check if the sources for transfer instructions defining the pair are either:
+		     1. Both registers, in which case we can use combine(reg, reg), or
+		     2. Both immediates, in which case we can use combine(imm, imm)
+		  */
+		  /*
+		        To consider: Can I make the int operand belongs to s8 code more generic?
+		  */
+		  if ((REG_P (source_pair) && REG_P (source)) || 
+		      (CONST_INT_P (source_pair) && CONST_INT_P (source) && 
+		       s8_const_int_operand(source, dummy_mode) && 
+		       s8_const_int_operand(source_pair, dummy_mode)))
+		    {
+		      rtx dest_reg_rtx  = gen_rtx_REG(SImode, dest_regno);
+		      rtx dest_pair_rtx = gen_rtx_REG(SImode, dest_pair_regno);
+		      
+		      /* Check if the current instruction defines the lower or the higher pair
+			 and create the appropriate combine instruction */
+		      if (QDSP6_LOWER_PAIR (dest_regno))
+			{
+			  combine_insn = 
+			    emit_insn_after( gen_combinesi (dest_pair_rtx, 
+							    source_pair, 
+							    dest_reg_rtx,
+							    source), 
+					     insn);
+			}
+		      else 
+			{
+			  combine_insn = 
+			    emit_insn_after( gen_combinesi (dest_reg_rtx, 
+							    source, 
+							    dest_pair_rtx,
+							    source_pair), 
+					     insn);
+			}
+
+		      delete_insn(insn);
+		      /* If this pass hasn't already deleted dest_pair_insn, then 
+			 delete it
+			 This can happen if dest_pair_insn has been replaced with a combine,
+			 and then the defined register is used in another replacement */
+		      if (!INSN_DELETED_P (dest_pair_insn)) 
+			{
+			  delete_insn(dest_pair_insn);
+			}
+		      insn = combine_insn;
+		    }
+		}
+	    } /* qdsp6_is_register_copy */
+	  else 
+	    {
+	      /* For Call instructions we need to invalidate all caller-saved registers */
+	      if (CALL_P(insn)) {
+		unsigned int i;
+		for (i = 0; i < VEC_length(rtx, transfer_source); ++i) 
+		  {
+		    if (call_used_regs[i])
+		      {
+			VEC_replace(rtx, transfer_source, i, NULL_RTX); 
+			/* If any element of the vector contains a caller-save register
+			   invalidate that entry */
+			qdsp6_replace_transfer_map (transfer_source, i, NULL_RTX);
+		      }
+		  }
+	      }
+
+	      /* An non-transfer instruction is writing to a register. Remove from map */
+	      for(write = insn_info->reg_writes; write; write = write->next)
+		{
+		  unsigned int defined_reg = write->regno;
+		  
+		  VEC_replace(rtx, transfer_source, defined_reg, NULL_RTX);
+		  /* Register defined_reg is redefined. Iterate through vector and remove all 
+		     occurrences of register defined_reg as a source 
+		     
+		     This can be made more efficient by maintaining a map of regno to 
+		     a list of indices in transfer_source that contain regno as an 
+		     element */
+		  qdsp6_replace_transfer_map(transfer_source, defined_reg, NULL_RTX); 
+		}
+	    }
+	}
+    }
+}
 
 
 static struct qdsp6_packet_info *
@@ -6506,11 +9319,12 @@ qdsp6_control_conflict_p(
 
 
 
+
 static bool
 qdsp6_predicable(struct qdsp6_insn_info *insn_info)
 {
   rtx cond_exec;
-  rtx qdsp6_cond_exec_wrapper; 
+  rtx cond_exec_wrapper; 
 
   /* Ignore calls for now, which are predicable in V1. */
   if(!TARGET_V2_FEATURES){
@@ -6523,31 +9337,29 @@ qdsp6_predicable(struct qdsp6_insn_info *insn_info)
   }
 
   /* Form a COND_EXEC wrapper to test for predicability. */
-  //if(!qdsp6_cond_exec_wrapper){
-    cond_exec = gen_rtx_COND_EXEC (VOIDmode,
-                                   gen_rtx_NE (BImode,
-                                               gen_rtx_REG (BImode, P0_REGNUM),
-                                               const0_rtx),
-                                   NULL_RTX);
-    start_sequence();
-    emit_insn(cond_exec);
-    qdsp6_cond_exec_wrapper = get_insns();
-    end_sequence();
-  //}
+  cond_exec = gen_rtx_COND_EXEC (VOIDmode,
+    gen_rtx_NE (BImode,
+                gen_rtx_REG (BImode, P0_REGNUM),
+                const0_rtx),
+                NULL_RTX);
+  start_sequence();
+  emit_insn(cond_exec);
+  cond_exec_wrapper = get_insns();
+  end_sequence();
 
   /* Wrap the pattern of the insn in a COND_EXEC. */
-  COND_EXEC_CODE (PATTERN (qdsp6_cond_exec_wrapper))
+  COND_EXEC_CODE (PATTERN (cond_exec_wrapper))
     = PATTERN (insn_info->insn);
 
   /* If the COND_EXEC version exists, then the original insn is predicable. 
           Must check both instruction and operand constraints */
 		  
-   if(MEM_P (qdsp6_cond_exec_wrapper)){
-	if (! memory_address_p (GET_MODE (qdsp6_cond_exec_wrapper), 
-		XEXP (qdsp6_cond_exec_wrapper, 0)))
+   if(MEM_P (cond_exec_wrapper)){
+	if (! memory_address_p (GET_MODE (cond_exec_wrapper), 
+		XEXP (cond_exec_wrapper, 0)))
 		return 0; 
    }
-   else if(insn_invalid_p(qdsp6_cond_exec_wrapper)){
+   else if(insn_invalid_p(cond_exec_wrapper)){
      	return 0; 
    }
    return 1; 
@@ -6576,9 +9388,19 @@ qdsp6_dot_newable(struct qdsp6_insn_info *insn_info)
     return false;
   }
 
-  /* The only control insns that can be .new predicated are direct jumps. */
-  if(QDSP6_CONTROL_P (insn_info) && !QDSP6_DIRECT_JUMP_P (insn_info)){
+  /* Before V4, the only control insns that could be .new predicated were direct
+     jumps. In V4, all control instructions can be .new predicated except calls
+     and register-condition jumps. */
+  if(QDSP6_CONTROL_P (insn_info)
+     && (QDSP6_REGCOND_JUMP_P (insn_info)
+         || QDSP6_CALL_P (insn_info)
+         || (!TARGET_V4_FEATURES && !QDSP6_DIRECT_JUMP_P (insn_info)))){
     return false;
+  }
+
+  /* In V4, all non-control predicable instructions are .new predicable. */
+  if(TARGET_V4_FEATURES){
+    return true;
   }
 
   x = PATTERN (insn_info->insn);
@@ -6649,6 +9471,9 @@ qdsp6_prologue_insn_p(struct qdsp6_insn_info *insn_info)
 
 
 
+#define QDSP6_LOOP_INSN(INSN) (   INSN_CODE (INSN->insn) == CODE_FOR_loop0 \
+                               || INSN_CODE (INSN->insn) == CODE_FOR_loop1)
+
 static void
 qdsp6_insns_truly_dependent(
   struct qdsp6_insn_info *writer,
@@ -6663,6 +9488,17 @@ qdsp6_insns_truly_dependent(
 
   if(QDSP6_CONTROL_P (writer)){
     /* need to handle calls and multiple jumps */
+    if (TARGET_V3_FEATURES) {
+      if (QDSP6_CONDITIONAL_P(writer) && QDSP6_DIRECT_JUMP_P(writer) &&
+          QDSP6_CONDITIONAL_P(reader) && QDSP6_DIRECT_JUMP_P(reader) &&
+          /* not a dot-new jump */
+          (!QDSP6_DOT_NEW_P(reader) && !QDSP6_DOT_NEW_P(writer)) &&
+          /* not a register-condition jump */
+          (!QDSP6_REGCOND_JUMP_P(reader) && !QDSP6_REGCOND_JUMP_P(writer)) &&
+          (!QDSP6_LOOP_INSN(reader) && !QDSP6_LOOP_INSN(writer))) {
+        *dependence |= QDSP6_DEP_DUALJUMP;
+      }
+    }
     *dependence = QDSP6_DEP_UNCONDITIONAL;
     return;
   }
@@ -6730,8 +9566,6 @@ qdsp6_insns_truly_dependent(
         }
         if(QDSP6_CONFLICT_P (write, read)){
           if(PO_REGNO_P (read->regno)
-             && (!QDSP6_CONTROL_P (reader) || final_packing || 
-			 let_cmp_jump_pack_together)	// _LSY_ let cond/jump merge 
              && qdsp6_dot_newable(reader)){
             *dependence |= QDSP6_DEP_DOT_NEWABLE;
           }
@@ -6926,9 +9760,16 @@ qdsp6_packet_insn_internal_dependence(
   *dependence = QDSP6_DEP_NONE;
 
   num_insns = packet->num_insns;
-  /* When pulling an insn across a basic block, ignore the jump. */
+
+
+/*   When pulling an insn across a basic block, ignore the jump. */
+  
+/* PDB. DO NOT ignore register conditional jumps though, because they do read something other than
+     a predicate register.*/
+
   if(packet->num_insns
-     && QDSP6_JUMP_P (packet->insns[packet->num_insns - 1])){
+     && ((QDSP6_JUMP_P (packet->insns[packet->num_insns - 1]))
+	 && (!QDSP6_REGCOND_JUMP_P(packet->insns[packet->num_insns - 1])))){
     num_insns--;
   }
 
@@ -7020,34 +9861,48 @@ qdsp6_predicate_insn(
 
 
 
+static int
+qdsp6_dot_newify_reg(rtx *x, void *y)
+{
+  rtx old_reg = (rtx) y;
+
+  if(REG_P (*x) && REGNO (*x) == REGNO (old_reg)){
+    *x = gen_rtx_REG (GET_MODE (old_reg), REGNO (old_reg) + DOT_NEW_OFFSET);
+  }
+  return 0;
+}
+
+
+
+
 static struct qdsp6_insn_info *
 qdsp6_dot_newify_insn(struct qdsp6_insn_info *insn_info)
 {
   rtx pattern;
-  rtx test;
   rtx old_reg;
 
   gcc_assert(QDSP6_CONDITIONAL_P (insn_info));
 
   pattern = PATTERN (insn_info->insn);
+  if(GET_CODE (pattern) == PARALLEL){
+    pattern = XVECEXP (pattern, 0, 0);
+  }
+
   if(GET_CODE (pattern) == COND_EXEC){
-    test = COND_EXEC_TEST (pattern);
+    old_reg = XEXP (COND_EXEC_TEST (pattern), 0);
   }
   else {
     gcc_assert(JUMP_P (insn_info->insn));
-    test = XEXP (SET_SRC (pattern), 0);
+    old_reg = XEXP (XEXP (SET_SRC (pattern), 0), 0);
   }
 
-  old_reg = XEXP (test, 0);
   gcc_assert(PO_REG_P (old_reg));
-  XEXP (test, 0) = gen_rtx_REG (GET_MODE (old_reg),
-                                REGNO (old_reg) + DOT_NEW_OFFSET);
 
-  insn_info = qdsp6_get_insn_info(insn_info->insn);
-
-  if(!final_packing){
-    XEXP (test, 0) = old_reg;
+  if(final_packing){
+    for_each_rtx(&pattern, qdsp6_dot_newify_reg, old_reg);
   }
+
+  insn_info->flags |= QDSP6_DOT_NEW;
 
   return insn_info;
 }
@@ -7102,8 +9957,8 @@ qdsp6_pack_insns(void)
   struct qdsp6_packet_info *packet;
   struct qdsp6_insn_info *insn_info;
   rtx insn;
-  rtx bb_head_insn;
-  rtx bb_end_insn;
+  rtx bb_head_insn = NULL;
+  rtx bb_end_insn  = NULL;
   int start_packet;
   int dependence;
 
@@ -7112,8 +9967,15 @@ qdsp6_pack_insns(void)
 
   if(!final_packing){
     bb = ENTRY_BLOCK_PTR->next_bb;
-    bb_head_insn = qdsp6_bb_real_head_insn(bb);
-    bb_end_insn = qdsp6_bb_real_end_insn(bb);
+    do{
+      if(bb){ 
+        bb_head_insn = qdsp6_bb_real_head_insn(bb);
+        bb_end_insn = qdsp6_bb_real_end_insn(bb);
+        if(!(bb_head_insn && bb_end_insn)){
+          bb = bb->next_bb;
+        }
+      }
+    }while(bb && !(bb_head_insn && bb_end_insn));
     gcc_assert(bb_head_insn && bb_end_insn);
   }
   else {
@@ -7160,7 +10022,7 @@ qdsp6_pack_insns(void)
        || QDSP6_WANDERED_P (insn_info)
        || state_transition(qdsp6_state, insn) >= 0){
       packet = qdsp6_start_new_packet(insn_info);
-    }
+   } 
     else {
       qdsp6_packet_insn_dependence(packet, insn_info, false, &dependence);
       if(QDSP6_DEP_UNCONDITIONAL_P (dependence)){
@@ -7198,6 +10060,125 @@ qdsp6_pack_insns(void)
 
   }
 
+}
+
+
+
+
+static int
+check_call_reorder_feasibility(struct qdsp6_insn_info *insn_info){  
+
+   struct qdsp6_reg_access *write;
+   struct qdsp6_reg_access *read;
+   char call_used_regs[] = CALL_USED_REGISTERS;
+
+   gcc_assert(insn_info);
+   /* If this is a call, I should assume it to alias with any memory access,
+               but I might try to reason about calee-save registers	*/
+   if(QDSP6_MEM_P (insn_info))	return QDSP6_DEP_UNCONDITIONAL; 
+    for(write = insn_info->reg_writes; write; write = write->next){
+	  if(call_used_regs[write->regno] || (write->regno == LINK_REGNUM))
+			return QDSP6_DEP_UNCONDITIONAL;
+    }
+    for(read = insn_info->reg_reads; read; read = read->next){
+	  if(call_used_regs[read->regno] || (read->regno == LINK_REGNUM))
+			return QDSP6_DEP_UNCONDITIONAL;
+    }
+	return QDSP6_DEP_NONE;
+}
+
+
+
+
+/* This function is  used by tail merging
+   Looks at the relationship of two instructions
+   and tries to establish their independenc. 
+   Conservative.  
+   Shaped after qdsp6_insns_truly_dependent(from,to,&dependence); 	*/ 
+
+int
+qdsp6_instructions_dependent (rtx from,rtx to){
+ struct qdsp6_insn_info *insn_info_from = NULL; 
+ struct qdsp6_insn_info *insn_info_to   = NULL; 
+ struct qdsp6_mem_access *store;
+ struct qdsp6_mem_access *load;
+ struct qdsp6_reg_access *write;
+ struct qdsp6_reg_access *read;
+ 
+
+  /* I know it is INSN_P for both cases, and it should not be a jump, 
+          since we are not at the "bottom" of BB, but I will double check 
+          for generality */ 
+  if(!INSN_P(from) || 
+    (GET_CODE (PATTERN (from)) == USE) || 
+	(GET_CODE (PATTERN (from)) == CLOBBER))
+	return QDSP6_DEP_UNCONDITIONAL; 
+  if(!INSN_P(to) || 
+    (GET_CODE (PATTERN (to)) == USE) || 
+	(GET_CODE (PATTERN (to)) == CLOBBER))
+	return QDSP6_DEP_UNCONDITIONAL; 
+  
+  insn_info_from = qdsp6_get_insn_info(from); 
+  insn_info_to   = qdsp6_get_insn_info(to); 
+				
+  if(QDSP6_JUMP_P(insn_info_from) || QDSP6_JUMP_P(insn_info_to))
+    /* I really should not have jumps here... */ 
+	return QDSP6_DEP_UNCONDITIONAL;
+  
+  if(QDSP6_EMULATION_CALL_P (insn_info_from) || 
+     QDSP6_EMULATION_CALL_P (insn_info_to))
+    /* not handling these yet */ 
+    return QDSP6_DEP_UNCONDITIONAL;
+
+  /* If this is a call, I should assume it to alias with any memory access,
+               but I might try to reason about calee-save registers	*/
+  if(QDSP6_CALL_P (insn_info_from))
+    return check_call_reorder_feasibility(insn_info_to);  
+
+  /* If this is a call, I should assume it to alias with any memory access,
+               but I might try to reason about calee-save registers	*/
+  if(QDSP6_CALL_P(insn_info_to))
+    return check_call_reorder_feasibility(insn_info_from);  
+  
+  /* this will cover the case of memory output dependency   */
+  if((QDSP6_VOLATILE_P (insn_info_from) || QDSP6_VOLATILE_P (insn_info_to)) 
+  && (QDSP6_MEM_P (insn_info_from) && QDSP6_MEM_P (insn_info_to))) 
+    return QDSP6_DEP_UNCONDITIONAL; 
+
+  /* Check for possible true memory dependencies. */
+  for(store = insn_info_from->stores; (store && store->mem); store = store->next){
+    for(load = insn_info_to->loads; (load && load->mem); load = load->next){
+	   if(true_dependence(store->mem, VOIDmode, load->mem, rtx_varies_p))
+		  return QDSP6_DEP_UNCONDITIONAL;
+    }
+  }
+
+  /* Check for possible anti memory dependencies. */
+  for(store = insn_info_to->stores; (store && store->mem); store = store->next){
+    for(load = insn_info_from->loads; (load && load->mem); load = load->next){
+	   if(true_dependence(store->mem, VOIDmode, load->mem, rtx_varies_p))
+		  return QDSP6_DEP_UNCONDITIONAL;
+    }
+  }
+  
+  /* Check for true register dependencies. */
+  for(write = insn_info_from->reg_writes; write; write = write->next){
+    for(read = insn_info_to->reg_reads; read; read = read->next){
+	  if(write->regno == read->regno)
+			return QDSP6_DEP_UNCONDITIONAL;
+    }
+  }
+  /* Check for anti register dependencies. */
+  for(write = insn_info_to->reg_writes; write; write = write->next){
+    for(read = insn_info_from->reg_reads; read; read = read->next){
+	  if(write->regno == read->regno)
+		return QDSP6_DEP_UNCONDITIONAL;
+    }
+  }
+  /* We do not need to check for output dependency since this is a check inside BB, and DCE has been recently
+     performed */ 
+
+  return QDSP6_DEP_NONE;
 }
 
 
@@ -7330,6 +10311,8 @@ qdsp6_move_insn(
 }
 
 
+
+
 static void
 qdsp6_sanity_check_cfg_packet_info(void)
 {
@@ -7399,8 +10382,10 @@ qdsp6_sanity_check_cfg_packet_info(void)
 }
 
 
+
+
 static unsigned int 
-qdsp6_count_packets()
+qdsp6_count_packets(void)
 {
   unsigned int total = 0; 
   struct qdsp6_packet_info *packet	= NULL; 
@@ -7410,7 +10395,7 @@ qdsp6_count_packets()
 }
 
 
-#define MAX_NUM_EDGES_IN_BB	1024
+
 
 static void
 qdsp6_pull_up_insns(void)
@@ -7418,7 +10403,7 @@ qdsp6_pull_up_insns(void)
 #if !GCC_3_4_6
   basic_block bb;
   basic_block successor_bb;
-  edge e,tmp_e;
+  edge e;
   edge_iterator ei;
   struct qdsp6_packet_info *top_packet;
   struct qdsp6_packet_info *forward_edge_packet;
@@ -7434,6 +10419,7 @@ qdsp6_pull_up_insns(void)
   int i;
   int j,k;
   int num_edges = 0; 
+  /* This fixed way of book keeping will need to be updated */
   edge sorted_edge_list[MAX_NUM_EDGES_IN_BB];
 
 
@@ -7464,37 +10450,40 @@ qdsp6_pull_up_insns(void)
   FOR_EACH_BB (bb){
     if(!(BB_HEAD_PACKET (bb) && BB_END_PACKET (bb))
        || !JUMP_P (BB_END (bb))){
+      /* || !QDSP6_DIRECT_JUMP_P (qdsp6_get_insn_info(BB_END (bb)))*/ 
       continue;
     }
-	// construct a sorted list of edges 
-	num_edges = 0; 
+    /* construct a sorted list of edges */
+    num_edges = 0; 
     FOR_EACH_EDGE (e, ei, bb->succs){
-		edge insert_this = e; 
-		edge tmp; 
-		// Insert in sorted order
-		/* _LSY_ Here we can use a better sorting algorithm, but V2 will not have more than 2 edges
-		so this brut force should work for now */ 
-		for(k=0;k<num_edges;k++){
-			if(e->probability >= sorted_edge_list[k]->probability){
-				int ll; 
-				for(ll=num_edges;ll>k;ll--){
-					sorted_edge_list[ll] = sorted_edge_list[ll-1]; 
-				}
-				insert_this	= sorted_edge_list[num_edges]; 
-				sorted_edge_list[k]	= e; 
-			}
-		}
-		sorted_edge_list[num_edges] = insert_this; 
-		num_edges++; 
-		gcc_assert(num_edges < MAX_NUM_EDGES_IN_BB);
+      edge insert_this = e; 
+      /* Insert in sorted order */
+      /* _LSY_ Here we can use a better sorting algorithm, but V2 will not have more than 2 edges
+	 so this brute force should work for now */ 
+      for(k=0;k<num_edges;k++){
+	if(e->probability >= sorted_edge_list[k]->probability){
+	  int ll; 
+	  for(ll=num_edges;ll>k;ll--){
+	    sorted_edge_list[ll] = sorted_edge_list[ll-1]; 
+	  }
+	  insert_this	= sorted_edge_list[num_edges]; 
+	  sorted_edge_list[k]	= e; 
 	}
-	for(k=0;k<num_edges;k++){
-	  e = sorted_edge_list[k]; 
+      }
+      sorted_edge_list[num_edges] = insert_this; 
+      num_edges++; 
+      gcc_assert(num_edges < MAX_NUM_EDGES_IN_BB);
+    }
+    for(k=0;k<num_edges;k++){
+      e = sorted_edge_list[k]; 
       successor_bb = e->dest;
       if(e->flags & EDGE_COMPLEX
          || successor_bb->index == EXIT_BLOCK
          || !(BB_HEAD_PACKET (successor_bb) && BB_END_PACKET (successor_bb))
          || !single_pred_p(successor_bb)){
+    /*   || e->probability < 0.1 ) Can set a threshold  to prevent low probability code 
+         from speculation, but need more investigation. 
+    */
         continue;
       }
       gcc_assert(single_pred(successor_bb) == bb);
@@ -7515,14 +10504,14 @@ qdsp6_pull_up_insns(void)
         for(i = 0; i < packet->num_insns; i++){
           original_insn = packet->insns[i];
           insn = original_insn;
-
+	  
           /* Don't try to reorder the final control flow insn if present. */
           if(control_flow_insn_p (insn->insn)){
             if(packet->num_insns > 1 || packet == back_edge_packet){
               break;
             }
             target_packet = packet->prev;
-            while(target_packet->num_insns == 0 && target_packet != back_edge_packet){
+	    while (target_packet->num_insns == 0 && target_packet != back_edge_packet){
               target_packet = target_packet->prev;
             }
             qdsp6_packet_insn_dependence(target_packet, insn, false, &dependence);
@@ -7533,7 +10522,6 @@ qdsp6_pull_up_insns(void)
                 break;
               }
             }
-
             qdsp6_remove_insn_from_packet(packet, insn);
             qdsp6_add_insn_to_packet(target_packet, insn);
             break;
@@ -7564,7 +10552,11 @@ qdsp6_pull_up_insns(void)
                 break;
               }
               if(QDSP6_CONDITIONAL_P (edge_insn)){
-                if(qdsp6_predicable(insn)){
+
+		/* PDB. EDGE_INSN can be conditional if it is a conditional jump on a predicate regsiter or a register conditional
+		   jump. In the latter case INSN cannot be predicated. Therefore, check for this latter case before predicating 
+		   INSN. */
+                if(!QDSP6_REGCOND_JUMP_P (edge_insn) && qdsp6_predicable(insn)){
                   /* predicate */
                   qdsp6_push_insn(insn, target_packet);
                   insn = qdsp6_predicate_insn(insn, edge_insn,
@@ -7591,7 +10583,7 @@ qdsp6_pull_up_insns(void)
             }
             /* anti-dependent? */
             qdsp6_packet_insn_internal_dependence(target_packet, insn, &dependence);
-            if(dependence){
+	    if(dependence){
               break;
             }
           }
@@ -7670,9 +10662,12 @@ qdsp6_pull_up_insns(void)
 #if 0
   verify_flow_info();
 #endif /* 0 */
-  /* _LSY_ Degrades performance 
-	cleanup_cfg(CLEANUP_EXPENSIVE | CLEANUP_CROSSJUMP);
+  /* CLEANUP_CROSSJUMP will not work any more here, 
+     but it is OK to try to clean up potential empty BBs
+     if any were created by the PULL-UP phase 
   */ 
+	cleanup_cfg(CLEANUP_EXPENSIVE);  
+ 
 
 #endif /* !GCC_3_4_6 */
 
@@ -7741,30 +10736,24 @@ qdsp6_free_packing_info(void)
 static void
 qdsp6_packet_optimizations(void)
 {
-
-  if(!(optimize && flag_schedule_insns_after_reload)){
+  if(!(TARGET_PACKETS && optimize)){
     return;
   }
 
-#if !GCC_3_4_6
-
-  unsigned int cost_with,cost_without; 
-
-  let_cmp_jump_pack_together      = true;
+  shorten_branches(get_insns());
   qdsp6_init_packing_info();
   qdsp6_pack_insns();
   qdsp6_pull_up_insns();
   qdsp6_free_packing_info();
-  let_cmp_jump_pack_together      = false;
-
-#endif /* !GCC_3_4_6 */
 }
+
+
 
 
 static void
 qdsp6_final_pack_insns(void)
 {
-  if(!(optimize && flag_schedule_insns_after_reload)){
+  if(!(TARGET_PACKETS && optimize)){
     return;
   }
 

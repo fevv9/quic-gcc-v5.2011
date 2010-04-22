@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* HOST_WIDE_INT definitions for the GNU compiler.
    Copyright (C) 1998, 2002, 2004, 2008 Free Software Foundation, Inc.
 
@@ -18,7 +23,12 @@
 /* The string that should be inserted into a printf style format to
    indicate a "long long" operand.  */
 #ifndef HOST_LONG_LONG_FORMAT 
+/* mingw cannot parse "ll" for long long. It needs I64 instead. */
+#ifdef __MINGW32__
+#define HOST_LONG_LONG_FORMAT "I64"
+#else
 #define HOST_LONG_LONG_FORMAT "ll"
+#endif
 #endif
 
 /* If HAVE_LONG_LONG and SIZEOF_LONG_LONG aren't defined, but

@@ -1,3 +1,8 @@
+/*****************************************************************
+# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
+# All Rights Reserved.
+# Modified by Qualcomm Innovation Center, Inc. on $Date$
+*****************************************************************/
 /* Convert tree expression to rtl instructions, for GNU compiler.
    Copyright (C) 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
    2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
@@ -127,7 +132,7 @@ static unsigned HOST_WIDE_INT move_by_pieces_ninsns (unsigned HOST_WIDE_INT,
 static void move_by_pieces_1 (rtx (*) (rtx, ...), enum machine_mode,
 			      struct move_by_pieces *);
 static bool block_move_libcall_safe_for_call_parm (void);
-static bool emit_block_move_via_movmem (rtx, rtx, rtx, unsigned, unsigned, HOST_WIDE_INT);
+static bool emit_block_move_via_movmem (rtx, rtx, rtx, unsigned, bool, unsigned, HOST_WIDE_INT);
 static tree emit_block_move_libcall_fn (int);
 static void emit_block_move_via_loop (rtx, rtx, rtx, unsigned);
 static rtx clear_by_pieces_1 (void *, HOST_WIDE_INT, enum machine_mode);
@@ -1231,6 +1236,7 @@ emit_block_move_hints (rtx x, rtx y, rtx size, enum block_op_methods method,
   if (GET_CODE (size) == CONST_INT && MOVE_BY_PIECES_P (INTVAL (size), align))
     move_by_pieces (x, y, INTVAL (size), align, 0);
   else if (emit_block_move_via_movmem (x, y, size, align,
+				       method == BLOCK_OP_TAILCALL,
 				       expected_align, expected_size))
     ;
   else if (may_use_call)
@@ -1303,7 +1309,7 @@ block_move_libcall_safe_for_call_parm (void)
    return true if successful.  */
 
 static bool
-emit_block_move_via_movmem (rtx x, rtx y, rtx size, unsigned int align,
+emit_block_move_via_movmem (rtx x, rtx y, rtx size, unsigned int align, bool tailcall,
 			    unsigned int expected_align, HOST_WIDE_INT expected_size)
 {
   rtx opalign = GEN_INT (align / BITS_PER_UNIT);
@@ -1356,13 +1362,27 @@ emit_block_move_via_movmem (rtx x, rtx y, rtx size, unsigned int align,
 	     that it doesn't fail the expansion because it thinks
 	     emitting the libcall would be more efficient.  */
 
-	  if (insn_data[(int) code].n_operands == 4)
-	    pat = GEN_FCN ((int) code) (x, y, op2, opalign);
-	  else
-	    pat = GEN_FCN ((int) code) (x, y, op2, opalign,
-					GEN_INT (expected_align
-						 / BITS_PER_UNIT),
-					GEN_INT (expected_size));
+	  switch (insn_data[(int) code].n_operands)
+	    {
+	    case 4:
+	      pat = GEN_FCN ((int) code) (x, y, op2, opalign);
+	      break;
+	    case 6:
+	      pat = GEN_FCN ((int) code) (x, y, op2, opalign,
+					  GEN_INT (expected_align
+						   / BITS_PER_UNIT),
+					  GEN_INT (expected_size));
+	      break;
+	    case 7:
+	      pat = GEN_FCN ((int) code) (x, y, op2, opalign,
+					  GEN_INT (expected_align
+						   / BITS_PER_UNIT),
+					  GEN_INT (expected_size),
+					  GEN_INT (tailcall));
+	      break;
+	    default:
+	      gcc_unreachable ();
+	    }
 	  if (pat)
 	    {
 	      emit_insn (pat);
