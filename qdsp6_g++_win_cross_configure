@@ -47,6 +47,5 @@ CC_FOR_BUILD=gcc \
   --without-fp \
   --disable-nls \
   --disable-libssp \
-  ${EXP_FLAGS} \
   --with-dinkumware
 
