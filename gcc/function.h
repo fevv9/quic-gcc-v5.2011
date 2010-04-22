@@ -441,12 +441,6 @@ struct rtl_data GTY(())
 
   /* True if dbr_schedule has already been called for this function.  */
   bool dbr_scheduled_p;
-
-  /* Nonzero if pass_combine is being run on this function.  */
-  bool combine_in_progress;
-
-  /* Nonzero if pass_combine was run on this function.  */
-  bool combine_completed;
 };
 
 #define return_label (crtl->x_return_label)
