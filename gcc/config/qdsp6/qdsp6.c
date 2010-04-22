@@ -4033,12 +4033,6 @@ qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
       && (flags & SECTION_DECLARED))
     {
       fprintf (asm_out_file, "\t.section\t%s\n", name);
-      /* But we still need to output subsection information
-         or we can end up with same section split and
-         sorted in different subsections of the same section */
-      if(TARGET_SECTION_SORTING && decl && (smallest_accessable_entity_in_declaration(decl) > 1))
-        fprintf (asm_out_file, "\t.subsection\t-%d\n",
-                 floor_log2(smallest_accessable_entity_in_declaration(decl)));
       return;
     }
 
@@ -7072,14 +7066,14 @@ qdsp6_compute_dwarf_frame_information(void)
                         /* hard_frame_pointer_rtx */ : frame->lrfp_size)
            + frame->offset;
   /* Did we save any callee-save registers as pairs? */
-  for(i = 0; i < frame->num_saved_pairs; i++){
+  for(i = frame->num_saved_pairs - 1; i >= 0; i--){
     offset -= 2 * UNITS_PER_WORD;
     dwarf2out_reg_save(label, frame->saved_pairs[i], offset);
     dwarf2out_reg_save(label, frame->saved_pairs[i] + 1,
                               offset + UNITS_PER_WORD);
   }
   /* Did we save any other callee-save registers? */
-  for(i = 0; i < frame->num_saved_singles; i++){
+  for(i = frame->num_saved_singles - 1; i >= 0; i--){
     offset -= UNITS_PER_WORD;
     dwarf2out_reg_save(label, frame->saved_singles[i], offset);
   }

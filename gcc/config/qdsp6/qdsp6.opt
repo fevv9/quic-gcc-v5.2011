@@ -139,7 +139,3 @@ Convert mux's to predicated transfers where possible
 moptimize-memset
 Common Target Var(flag_optimize_memset) Optimization
 Optimize memset routine in the backend
-
-menable-subreg1
-Common Target Var(flag_enable_subreg1) Optimization
-Enable subreg pass 1 (default)
