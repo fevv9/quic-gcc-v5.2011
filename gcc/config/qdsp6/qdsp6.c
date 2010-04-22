@@ -67,9 +67,6 @@
 #include "sched-int.h"
 
 
-
-
-
 enum qdsp6_architecture qdsp6_arch = QDSP6_ARCH_UNSPECIFIED;
 #if GCC_3_4_6
 const char * qdsp6_arch_string = QDSP6_ARCH_DEFAULT_STRING;
@@ -148,26 +145,13 @@ static bool qdsp6_legit_addr_const_p(
 #if !GCC_3_4_6
 static bool qdsp6_reg_ok_for_base_p(rtx x, bool reg_ok_strict_p);
 #endif /* !GCC_3_4_6 */
-static bool qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p);
 #if !GCC_3_4_6
 static tree qdsp6_vectorize_builtin_mask_for_load(void);
 #endif /* !GCC_3_4_6 */
 
 static bool qdsp6_free_immediate(rtx x, int outer_code, int value);
-static bool qdsp6_rtx_costs(
-              rtx x,
-              int code,
-              int outer_code,
-              int *total,
-              bool speed);
-static bool qdsp6_rtx_costs_debug(
-              rtx x,
-              int code,
-              int outer_code,
-              int *total,
-              bool speed);
-static int qdsp6_address_cost(rtx address, bool speed);
-static int qdsp6_address_cost_debug(rtx address, bool speed);
+static bool qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total);
+static int qdsp6_address_cost(rtx address);
 
 static int qdsp6_sched_issue_rate(void);
 static void qdsp6_sched_dependencies_eval (rtx, rtx);
@@ -226,9 +210,7 @@ static void qdsp6_print_rtx(FILE *file, rtx x);
 static void qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x);
 
 static void qdsp6_compute_dwarf_frame_information(void);
-static void qdsp6_allocate_stack(
-              unsigned HOST_WIDE_INT size,
-              int allocate_stack_insn);
+static void qdsp6_allocate_stack(unsigned HOST_WIDE_INT size);
 static void qdsp6_deallocate_stack(unsigned HOST_WIDE_INT size);
 static tree qdsp6_special_case_memcpy_fn(const char *name);
 static void qdsp6_emit_special_case_memcpy_fn(
@@ -243,7 +225,9 @@ static void qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p);
 static void qdsp6_packet_optimizations(void);
 static void qdsp6_final_pack_insns(void);
 
-static unsigned HOST_WIDE_INT  sdata_symbolic_operand_smallest_accessable_size(rtx);
+bool        qdsp6_cannot_change_mode_class (enum machine_mode, enum machine_mode,enum reg_class);
+static unsigned HOST_WIDE_INT  
+            sdata_symbolic_operand_smallest_accessable_size(rtx);
 
 
 /* Initialize the GCC target structure. */
@@ -256,7 +240,7 @@ Run-time Target Specification
 #undef TARGET_DEFAULT_TARGET_FLAGS
 #define TARGET_DEFAULT_TARGET_FLAGS \
   (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
-   | MASK_DOT_NEW | MASK_BASE_PLUS_INDEX | MASK_MEMOPS | MASK_SECTION_SORTING \
+   | MASK_DOT_NEW | MASK_PULLUP | MASK_SECTION_SORTING \
    | MASK_SECTION_SORTING_CODE_SUPPORT)
 #endif /* !GCC_3_4_6 */
 
@@ -483,14 +467,15 @@ Miscellaneous Parameters
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
-static enum section_category	qdsp6_categorize_decl_for_section (const_tree decl, int reloc); 
-void default_unique_section_2 (tree decl, int reloc); 
+static enum section_category	
+                        qdsp6_categorize_decl_for_section (const_tree decl, int reloc); 
+void                    default_unique_section_2 (tree decl, int reloc); 
 unsigned HOST_WIDE_INT  smallest_accessable_entity_in_declaration(tree decl); 
-bool has_this_tree_been_visited(tree node); 
-void remember_this_tree(tree node); 
-unsigned int descent_smallest(const char *prefix, tree node, unsigned int smallest); 
-int qdsp6_named_section_sbss (tree decl, const char *name, int reloc); 
-extern section * get_named_section (tree decl, const char *name, int reloc); 
+bool                    has_this_tree_been_visited(tree node); 
+void                    remember_this_tree(tree node); 
+unsigned int            descent_smallest(const char *prefix, tree node, unsigned int smallest); 
+int                     qdsp6_named_section_sbss (tree decl, const char *name, int reloc); 
+extern section *        get_named_section (tree decl, const char *name, int reloc); 
 /*---------------------------
 Run-time Target Specification
 ---------------------------*/
@@ -613,6 +598,14 @@ qdsp6_override_options(void)
   }
 #endif /* GCC_3_4_6 */
 
+  if(TARGET_INTERIM_ABI){
+#if GCC_3_4_6
+    warning("Ignoring the deprecated -minterim-abi option.");
+#else /* !GCC_3_4_6 */
+    warning(0, "Ignoring the deprecated -minterim-abi option.");
+#endif /* !GCC_3_4_6 */
+  }
+
   if(TARGET_UNCACHED_DATA){
     if(qdsp6_arch == QDSP6_ARCH_V1 || qdsp6_arch == QDSP6_ARCH_V2){
       qdsp6_dual_memory_accesses = false;
@@ -628,16 +621,6 @@ qdsp6_override_options(void)
 
   if(!g_switch_set){
     g_switch_value = 2 * UNITS_PER_WORD;
-  }
-
-  if(TARGET_COMPRESSED){
-    flag_schedule_insns = 0;
-    flag_schedule_insns_after_reload = 0;
-    target_flags &= ~MASK_PACKETS;
-  }
-
-  if(!TARGET_PACKETS){
-    target_flags &= ~MASK_PULLUP;
   }
 
   /* Align functions to 16-byte boundaries to prevent
@@ -664,7 +647,7 @@ void
 qdsp6_optimization_options(int level, int size)
 {
   if(level >= 2){
-    target_flags |= MASK_PACKETS;
+    //target_flags |= MASK_PACKETS;
     target_flags |= MASK_PULLUP;
     flag_optimize_memset = 1;
   }
@@ -721,6 +704,7 @@ qdsp6_init_machine_status(void)
 {
   struct machine_function *mf;
   mf = ggc_alloc_cleared(sizeof(struct machine_function));
+  mf->final_info.insns_left_in_packet = 1;
   return mf;
 }
 
@@ -744,8 +728,6 @@ get_inner_array_type (const_tree array)
 
   return type;
 }
-
-
 
 
 /* Helper function for the alignment routines
@@ -782,25 +764,6 @@ qdsp6_data_alignment(tree type, int align)
 {
   if(TREE_CODE (type) == ARRAY_TYPE){
     return qdsp6_array_alignment(type, align);
-  }
-
-  return align;
-}
-
-
-
-
-/* Implements macro CONSTANT_ALIGNMENT
-
-   Doubleword align constant strings. */
-
-int
-qdsp6_constant_alignment(tree constant, int align)
-{
-  if(!optimize_size && TREE_CODE (constant) == STRING_CST
-     && TREE_STRING_LENGTH (constant) >= BIGGEST_ALIGNMENT
-     && (align) < BIGGEST_ALIGNMENT){
-    return BIGGEST_ALIGNMENT;
   }
 
   return align;
@@ -891,35 +854,6 @@ qdsp6_conditional_register_usage(void)
 Register Classes
 --------------*/
 
-/* Implements macro CANNOT_CHANGE_MODE_CLASS
-
-   Prevent predicates from being represented as QImode SUBREGs of SImode. */
-
-bool
-qdsp6_cannot_change_mode_class(
-  enum machine_mode from,
-  enum machine_mode to,
-  enum reg_class rclass
-)
-{
-  if(from == to){
-    return false;
-  }
-
-  if((   rclass == PREDICATE_DOT_OLD_REGS
-      || rclass == PREDICATE_DOT_NEW_REGS
-      || rclass == PREDICATE_REGS)
-     && from == SImode
-     && to == QImode){
-    return true;
-  }
-
-  return false;
-}
-
-
-
-
 /* Implements macro CONST_OK_FOR_CONSTRAINT_P
 
    IsN means signed, two's complement integers in [-2^(N-1), 2^(N-1) - 1]
@@ -927,14 +861,8 @@ qdsp6_cannot_change_mode_class(
    InN means negative integers in [-(2^N - 1), 0]
    ImN means signed magnitude integers in [-(2^(N-1) - 1), 2^(N-1) - 1]
 
-   J[sunm]N_M means I[sunm]N shifted left M bits
-
    K16 means 16
    K32 means 32
-   Ku7p1 integers in [1, 128]
-   Ks8p1 integers in [-127, 128]
-   Ku9p1 integers in [1, 512]
-   Ks10p1 integers in [-511, 512]
    Ks8s8 means integers that can be formed using combine(#s8,#s8)
    Konehot32 means power of 2 integers that can be represented in 32 bits
    Konenot32 means one's complements of Konehot32 constants */
@@ -944,25 +872,17 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
 {
   const char *p;
   HOST_WIDE_INT bits;
-  HOST_WIDE_INT low;
-  HOST_WIDE_INT high;
-  HOST_WIDE_INT scale;
-  HOST_WIDE_INT scale_bits;
+  HOST_WIDE_INT low  = 0;
+  HOST_WIDE_INT high = 0;
 
   switch(c){
     case 'I':
-    case 'J':
       if(!((str[1] == 's' || str[1] == 'u' || str[1] == 'n' || str[1] == 'm')
            && ISDIGIT (str[2]))){
         return false;
       }
 
       bits = 0;
-      low = 0;
-      high = 0;
-      scale = 0;
-      scale_bits = 0;
-
       p = &str[2];
       do {
         bits = (10 * bits) + (*p++ - '0');
@@ -990,53 +910,26 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
         low = -high;
       }
 
-      if(c == 'J'){
-        if(!(p[0] == '_' && ISDIGIT (p[1]))){
-          return false;
-        }
-
-        p++;
-        do {
-          scale = (10 * scale) + (*p++ - '0');
-        }while(ISDIGIT (*p));
-
-        high <<= scale;
-        low <<= scale;
-        scale_bits = value & ((1 << scale) - 1);
-      }
-
-      return low <= value && value <= high && scale_bits == 0;
+      return low <= value && value <= high;
 
     case 'K':
-      if(QDSP6_CONSTRAINT_P(str, 16)){
+      if(QDSP6_KOOKY_KONSTANT_P(str, 16)){
         return value == 16;
       }
-      else if(QDSP6_CONSTRAINT_P(str, 32)){
+      else if(QDSP6_KOOKY_KONSTANT_P(str, 32)){
         return value == 32;
       }
-      else if(QDSP6_CONSTRAINT_P(str, u7p1)){
-        return IN_RANGE (value, 1, 128);
-      }
-      else if(QDSP6_CONSTRAINT_P(str, s8p1)){
-        return IN_RANGE (value, -127, 128);
-      }
-      else if(QDSP6_CONSTRAINT_P(str, u9p1)){
-        return IN_RANGE (value, 1, 512);
-      }
-      else if(QDSP6_CONSTRAINT_P(str, s10p1)){
-        return IN_RANGE (value, -511, 512);
-      }
-      else if(QDSP6_CONSTRAINT_P(str, s8s8)){
+      else if(QDSP6_KOOKY_KONSTANT_P(str, s8s8)){
         high = value >> 32ULL;
         low = value & 0xFFFFFFFFULL;
         return ((high & 0xFFFFFF00) == (high & 0x80 ? 0xFFFFFF00 : 0))
             && ((low  & 0xFFFFFF00) == (low  & 0x80 ? 0xFFFFFF00 : 0));
       }
-      else if(QDSP6_CONSTRAINT_P(str, onehot32)){
+      else if(QDSP6_KOOKY_KONSTANT_P(str, onehot32)){
         value &= 0xFFFFFFFFULL;
         return value == (value & -value);
       }
-      else if(QDSP6_CONSTRAINT_P(str, onenot32)){
+      else if(QDSP6_KOOKY_KONSTANT_P(str, onenot32)){
         value = ~value & 0xFFFFFFFFULL;
         return value == (value & -value);
       }
@@ -1105,7 +998,7 @@ qdsp6_return_addr_rtx(int count, rtx frame)
 
   cfun->machine->calls_builtin_return_address = true;
 
-  if(count == 0){
+  if(count == 0) {
     frame = gen_rtx_REG(Pmode, HARD_FRAME_POINTER_REGNUM);
   }
 
@@ -1148,12 +1041,12 @@ Eliminating Frame Pointer and Arg Pointer
                                         | (8 bytes total)       |
                                   FP+0->+-----------------------+
                                         |                       |
-                                        |  register save area   |
-                                        |  (callee saved)       |
+                                        |  local variables      |
                                         |                       |
                                         +-----------------------+
                                         |                       |
-                                        |  local variables      |
+                                        |  register save area   |
+                                        |  (callee saved)       |
                                         |                       |
                                         +-----------------------+
                                         |                       |
@@ -1234,120 +1127,57 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
     enum insn_code sibcall_epilogue_function;
     unsigned int num_sibcall_function_restored_pairs;
   }
-    prologue_epilogue_functions_abi1[] =
+  const prologue_epilogue_functions[] =
+    {
       {
-        {
-          CODE_FOR_nothing, 0,
-          CODE_FOR_deallocframe_function, 0,
-          CODE_FOR_nothing, 0
-        },
-        {
-          CODE_FOR_nothing, 0,
-          CODE_FOR_restore_r24_through_r25_and_deallocframe, 1,
-          CODE_FOR_restore_r24_through_r25_and_deallocframe_before_sibcall, 1
-        },
-        {
-          CODE_FOR_save_r24_through_r27, 2,
-          CODE_FOR_restore_r24_through_r27_and_deallocframe, 2,
-          CODE_FOR_restore_r24_through_r27_and_deallocframe_before_sibcall, 2
-        }
+        CODE_FOR_nothing, 0,
+        CODE_FOR_deallocframe_function, 0,
+        CODE_FOR_nothing, 0
       },
-    prologue_epilogue_functions_abi2[] =
       {
-        {
-          CODE_FOR_nothing, 0,
-          CODE_FOR_deallocframe_function, 0,
-          CODE_FOR_nothing, 0
-        },
-        {
-          CODE_FOR_nothing, 0,
-          CODE_FOR_restore_r16_through_r17_and_deallocframe, 1,
-          CODE_FOR_restore_r16_through_r17_and_deallocframe_before_sibcall, 1
-        },
-        {
-          CODE_FOR_save_r16_through_r19, 2,
-          CODE_FOR_restore_r16_through_r19_and_deallocframe, 2,
-          CODE_FOR_restore_r16_through_r19_and_deallocframe_before_sibcall, 2
-        },
-        {
-          CODE_FOR_save_r16_through_r21, 3,
-          CODE_FOR_restore_r16_through_r21_and_deallocframe, 3,
-          CODE_FOR_restore_r16_through_r21_and_deallocframe_before_sibcall, 3
-        },
-        {
-          CODE_FOR_save_r16_through_r23, 4,
-          CODE_FOR_restore_r16_through_r23_and_deallocframe, 4,
-          CODE_FOR_restore_r16_through_r23_and_deallocframe_before_sibcall, 4
-        },
-        {
-          CODE_FOR_save_r16_through_r25, 5,
-          CODE_FOR_restore_r16_through_r25_and_deallocframe, 5,
-          CODE_FOR_restore_r16_through_r25_and_deallocframe_before_sibcall, 5
-        },
-        {
-          CODE_FOR_save_r16_through_r27, 6,
-          CODE_FOR_restore_r16_through_r27_and_deallocframe, 6,
-          CODE_FOR_restore_r16_through_r27_and_deallocframe_before_sibcall, 6
-        }
+        CODE_FOR_nothing, 0,
+        CODE_FOR_restore_r27_through_r26_and_deallocframe, 1,
+        CODE_FOR_restore_r27_through_r26_and_deallocframe_before_sibcall, 1
       },
-    *prologue_epilogue_functions;
-
-  static const enum insn_code
-    allocframe_insn[] = {
-      CODE_FOR_allocframe,
-      CODE_FOR_allocframe_and_save_r16,
-      CODE_FOR_allocframe_and_save_r16_and_r17
-    },
-    allocate_stack_insn[] = {
-      CODE_FOR_increment_stack_pointer,
-      CODE_FOR_allocate_stack_and_save_r16,
-      CODE_FOR_allocate_stack_and_save_r16_and_r17,
-      CODE_FOR_allocate_stack_and_save_r16_through_r18,
-      CODE_FOR_allocate_stack_and_save_r16_through_r19
+      {
+        CODE_FOR_save_r27_through_r24, 2,
+        CODE_FOR_restore_r27_through_r24_and_deallocframe, 2,
+        CODE_FOR_restore_r27_through_r24_and_deallocframe_before_sibcall, 2
+      },
+      {
+        CODE_FOR_save_r27_through_r22, 3,
+        CODE_FOR_restore_r27_through_r22_and_deallocframe, 3,
+        CODE_FOR_restore_r27_through_r22_and_deallocframe_before_sibcall, 3
+      },
+      {
+        CODE_FOR_save_r27_through_r20, 4,
+        CODE_FOR_restore_r27_through_r20_and_deallocframe, 4,
+        CODE_FOR_restore_r27_through_r20_and_deallocframe_before_sibcall, 4
+      },
+      {
+        CODE_FOR_save_r27_through_r18, 5,
+        CODE_FOR_restore_r27_through_r18_and_deallocframe, 5,
+        CODE_FOR_restore_r27_through_r18_and_deallocframe_before_sibcall, 5
+      },
+      {
+        CODE_FOR_save_r27_through_r16, 6,
+        CODE_FOR_restore_r27_through_r16_and_deallocframe, 6,
+        CODE_FOR_restore_r27_through_r16_and_deallocframe_before_sibcall, 6
+      }
     };
-
-  bool use_common_functions;
-  unsigned int max_function_saved_pairs = 0;
-  unsigned int first_callee_save_regno = 0;
-  unsigned int num_regs_to_save_while_allocating = 0;
   unsigned int regno;
-  unsigned int i = 0;
+  unsigned int i;
   unsigned int j;
 
-  /* Select the set of prologue and epilogue functions for the target ABI. */
-  if(qdsp6_abi == QDSP6_ABI_2){
-    prologue_epilogue_functions = prologue_epilogue_functions_abi2;
-    max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi2)
-                               - 1;
-    first_callee_save_regno = 16;
-  }
-  else {
-    prologue_epilogue_functions = prologue_epilogue_functions_abi1;
-    max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi1)
-                               - 1;
-    first_callee_save_regno = 24;
-  }
-
-  /* For V4, don't call the __deallocframe function, since we have the
-     dealloc_return instruction. */
-  if(TARGET_V4_FEATURES){
-    prologue_epilogue_functions[0].epilogue_function
-      = CODE_FOR_nothing;
-  }
-  else {
-    prologue_epilogue_functions[0].epilogue_function
-      = CODE_FOR_deallocframe_function;
-  }
-
   /* Can we omit the allocframe and deallocframe instructions? */
-  if(!info->use_allocframe){
+  if(info->lrfp_size == 0){
     info->allocframe_size = 0;
     info->sp_adjustment = info->frame_size;
     info->base_reg = stack_pointer_rtx;
     info->offset = info->frame_size;
   }
   else {
-    /* Can we allocate the entire stack frame with one allocframe
+    /* Can we allocate the entire stack frame with one allocfame
        instruction? */
     if(info->frame_size <= MAX_ALLOCFRAME_IMMED){
       info->allocframe_size = info->frame_size;
@@ -1357,60 +1187,8 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
       info->allocframe_size = MAX_ALLOCFRAME_IMMED;
       info->sp_adjustment = info->frame_size - MAX_ALLOCFRAME_IMMED;
     }
-    /* Use SP as the base if the offset would be small, making the loads and
-       stores candidates for duplexes. */
-    if(!TARGET_COMPRESSED && info->frame_size <= 256){
-      info->base_reg = stack_pointer_rtx;
-      info->offset = info->frame_size;
-    }
-    else {
-      info->base_reg = hard_frame_pointer_rtx;
-      info->offset = 0;
-    }
-  }
-
-  use_common_functions = (optimize_size || optimize == 2)
-                         && info->use_allocframe && !crtl->calls_eh_return;
-
-  /* If we are using a function to save or restore callee-save registers or we
-     are forming packets, then maximize the number of registers saved as pairs,
-     since the common prologue and epilogue functions only save registers as
-     pairs and doubleword store subinstructions have larger offsets than word
-     store subinstructions. */
-  if((use_common_functions || (optimize && TARGET_PACKETS))
-     && info->num_saved_singles % 2 == 1){
-
-    /* Count the number of contiguous callee-save register pairs being saved. */
-    for(i = 0, regno = first_callee_save_regno;
-        i < info->num_saved_pairs && info->saved_pairs[i] == regno;
-        i++, regno += 2);
-
-    /* If the first single callee-save register is part of the next pair that
-       could be saved, then remove it from the list of single callee-save
-       registers and insert it into the list of paired callee-save
-       registers. */
-    if((   info->saved_singles[0] == regno
-        || info->saved_singles[0] == regno + 1)
-       && !call_used_regs[regno]
-       && !call_used_regs[regno + 1]){
-
-      for(j = 0; j < info->num_saved_singles - 1; j++){
-        info->saved_singles[j] = info->saved_singles[j + 1];
-      }
-      for(j = info->num_saved_pairs; j > i; j--){
-        info->saved_pairs[j] = info->saved_pairs[j - 1];
-      }
-      info->saved_pairs[i] = regno;
-      info->num_saved_pairs++;
-      info->num_saved_singles--;
-
-      /* The callee-save registers being saved must still fit in the space
-         allocated. */
-      gcc_assert(info->reg_size >= 2 * UNITS_PER_WORD
-                                     * info->num_saved_pairs
-                                   + UNITS_PER_WORD
-                                     * info->num_saved_singles);
-    }
+    info->base_reg = hard_frame_pointer_rtx;
+    info->offset = 0;
   }
 
   info->prologue_function = CODE_FOR_nothing;
@@ -1419,91 +1197,55 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
 
   /* Determine whether we can save code size by using functions to implement
      common prologue or epilogue sequences. */
-  if(use_common_functions){
+  if(optimize_size && !crtl->calls_eh_return
+     && info->lrfp_size != 0){
+
+    /* If saving and restoring one of the single callee-save registers as a pair
+       allows it to be saved and/or restored via a function call, then do so. */
+    if(info->num_saved_singles % 2 == 1){
+
+      for(i = info->num_saved_pairs, regno = 26;
+          i > 0 && info->saved_pairs[i - 1] == regno;
+          i--, regno -= 2);
+
+      if(info->num_saved_pairs - i < ARRAY_SIZE (prologue_epilogue_functions)
+         && (info->saved_singles[info->num_saved_singles - 1] == regno + 1
+             || info->saved_singles[info->num_saved_singles - 1] == regno)){
+
+        for(j = info->num_saved_pairs; j > i; j--){
+          info->saved_pairs[j] = info->saved_pairs[j - 1];
+        }
+        info->saved_pairs[i] = regno;
+        info->num_saved_pairs++;
+        info->num_saved_singles--;
+
+        /* The callee-save registers being saved must still fit in the space
+           allocated. */
+        gcc_assert(info->reg_size >= 2 * UNITS_PER_WORD
+                                       * info->num_saved_pairs
+                                     + UNITS_PER_WORD
+                                       * info->num_saved_singles);
+      }
+    }
 
     /* Count the number of callee-save register pairs that can be saved or
        restored by function calls in the prologue and epilogue. */
-    for(i = 0, regno = first_callee_save_regno;
-        i < info->num_saved_pairs && info->saved_pairs[i] == regno;
-        i++, regno += 2);
-    if(i > max_function_saved_pairs){
-      i = max_function_saved_pairs;
+    for(i = info->num_saved_pairs, regno = 26;
+        i > 0 && info->saved_pairs[i - 1] == regno;
+        i--, regno -= 2);
+    i = info->num_saved_pairs - i;
+    if(i > ARRAY_SIZE (prologue_epilogue_functions) - 1){
+      i = ARRAY_SIZE (prologue_epilogue_functions) - 1;
     }
 
-    /* At -O2, use the common prologe and epilogue functions only if they save
-       and restore 3 or more pairs of callee-save registers. */
-    if(optimize_size || i >= 3){
-      #define SET_PROLOGUE_EPILOGUE_FUNCTION_INFO(FIELD) \
-        info->FIELD = prologue_epilogue_functions[i].FIELD
-      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (prologue_function);
-      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_saved_pairs);
-      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (epilogue_function);
-      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_restored_pairs);
-      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (sibcall_epilogue_function);
-      SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_sibcall_function_restored_pairs);
-    }
-    info->num_specially_saved_pairs = info->num_function_saved_pairs;
-  }
-
-  info->allocframe_insn = CODE_FOR_allocframe;
-  info->allocate_stack_insn = CODE_FOR_increment_stack_pointer;
-
-  /* If possible, save one or more callee-save registers while allocating
-     stack. */
-  if(optimize && TARGET_PACKETS
-     && (info->use_allocframe || info->sp_adjustment != 0)
-     && info->num_function_saved_pairs == 0){
-
-    if(TARGET_V4_FEATURES && !info->use_allocframe){
-      switch(info->num_saved_pairs){
-        case 0:
-          if(info->num_saved_singles == 1 && info->saved_singles[0] == 16){
-            num_regs_to_save_while_allocating = 1;
-          }
-          break;
-        case 1:
-          if(info->saved_pairs[0] == 16){
-            if(info->num_saved_singles == 1 && info->saved_singles[0] == 18){
-              num_regs_to_save_while_allocating = 3;
-            }
-            else {
-              num_regs_to_save_while_allocating = 2;
-            }
-          }
-          break;
-        default:
-          if(info->saved_pairs[0] == 16){
-            if(info->saved_pairs[1] == 18){
-              num_regs_to_save_while_allocating = 4;
-            }
-            else {
-              num_regs_to_save_while_allocating = 2;
-            }
-          }
-          break;
-      }
-    }
-    else if(TARGET_V4_FEATURES || !info->use_allocframe){
-      if(info->num_saved_pairs == 0){
-        if(info->num_saved_singles == 1 && info->saved_singles[0] == 16){
-          num_regs_to_save_while_allocating = 1;
-        }
-      }
-      else if(info->saved_pairs[0] == 16){
-        num_regs_to_save_while_allocating = 2;
-      }
-    }
-
-    if(info->use_allocframe){
-      info->allocframe_insn
-        = allocframe_insn[num_regs_to_save_while_allocating];
-    }
-    else {
-      info->allocate_stack_insn
-        = allocate_stack_insn[num_regs_to_save_while_allocating];
-    }
-    info->num_specially_saved_pairs = num_regs_to_save_while_allocating / 2;
-    info->num_specially_saved_singles = num_regs_to_save_while_allocating % 2;
+    #define SET_PROLOGUE_EPILOGUE_FUNCTION_INFO(FIELD) \
+      info->FIELD = prologue_epilogue_functions[i].FIELD
+    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (prologue_function);
+    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_saved_pairs);
+    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (epilogue_function);
+    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_function_restored_pairs);
+    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (sibcall_epilogue_function);
+    SET_PROLOGUE_EPILOGUE_FUNCTION_INFO (num_sibcall_function_restored_pairs);
   }
 }
 
@@ -1584,7 +1326,6 @@ qdsp6_frame_info(void)
   else {
     info->lrfp_size = 2 * UNITS_PER_WORD;
   }
-  info->use_allocframe = info->lrfp_size != 0;
 
   info->total_size = info->frame_size + info->lrfp_size;
 
@@ -1776,6 +1517,25 @@ qdsp6_vector_mode_supported_p(enum machine_mode mode)
 }
 #endif /* !GCC_3_4_6 */
 
+/* Return true if a change from mode FROM to mode TO for a register
+   in register class RCLASS is invalid.  */
+
+bool
+qdsp6_cannot_change_mode_class (enum machine_mode from, enum machine_mode to,
+                             enum reg_class rclass)
+{
+  if (from == to)
+    return false;
+
+  if(((rclass == PREDICATE_DOT_OLD_REGS) ||
+      (rclass == PREDICATE_DOT_NEW_REGS) ||
+      (rclass == PREDICATE_REGS)) &&
+      (from == SImode) &&
+      (to == QImode))  
+	 return true;
+
+  return false;
+}
 
 
 
@@ -1828,7 +1588,12 @@ qdsp6_return_in_memory(const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
     byte_size = int_size_in_bytes(type);
   }
 
-  return !IN_RANGE (byte_size, 0, 2 * UNITS_PER_WORD);
+  if(byte_size < 0 || 2 * UNITS_PER_WORD < byte_size){
+    return true;
+  }
+  else {
+    return false;
+  }
 }
 
 
@@ -2060,236 +1825,107 @@ static bool
 qdsp6_reg_ok_for_base_p(rtx x, bool reg_ok_strict_p)
 {
   if(reg_ok_strict_p){
-    return G_REG_P (x) || REGNO (x) == FRAME_POINTER_REGNUM
-                       || REGNO (x) == ARG_POINTER_REGNUM;
+    return REGNO (x) < 32 || REGNO (x) == FRAME_POINTER_REGNUM
+                          || REGNO (x) == ARG_POINTER_REGNUM;
   }
   else {
-    return G_REG_P (x) || REGNO (x) == FRAME_POINTER_REGNUM
-                       || REGNO (x) == ARG_POINTER_REGNUM
-                       || REGNO (x) >= FIRST_PSEUDO_REGISTER;
+    return REGNO (x) < 32 || REGNO (x) == FRAME_POINTER_REGNUM
+                          || REGNO (x) == ARG_POINTER_REGNUM
+                          || REGNO (x) >= FIRST_PSEUDO_REGISTER;
   }
 }
 
 
 
 
-/* Helper function for qdsp6_legitimate_address_p */
-
-static bool
-qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p)
-{
-  if(reg_ok_strict_p){
-    return G_REG_P (x);
-  }
-  else {
-    return G_REG_P (x) || REGNO (x) >= FIRST_PSEUDO_REGISTER;
-  }
-}
-
-
-
-
-/* Used by macro GO_IF_LEGITIMATE_ADDRESS
-
-   The CONSTRAINT argument is the constraint string excluding any initial 'A'.
-   The different constraints correspond to differnt types of instuctions, each
-   of which can utilize a different set of addressing modes.  The possible
-   values for the constraint string are:
-
-   m       basic loads and stores, allowing an immediate extender
-   noext   basic loads and stores
-   cond    conditional loads and stores
-   econd   conditional loads and stores, allowing an immediate extender
-   si      store immediate
-   csi     conditional store immediate
-   memop   load-op-stores
-   ememop  load-op-stores, allowing an immediate extender */
+/* Used by macro GO_IF_LEGITIMATE_ADDRESS */
 
 bool
 qdsp6_legitimate_address_p(
   enum machine_mode mode,
   rtx x,
   bool reg_ok_strict_p,
-  const char *constraint
+  bool conditional
 )
 {
-  rtx xop0 = NULL_RTX;
-  rtx xop1 = NULL_RTX;
-  rtx xop1op0 = NULL_RTX;
-  rtx xop1op1 = NULL_RTX;
-  bool allow_extension = false;
-  bool allow_gp = false;
-  bool allow_absolute = false;
-  bool allow_immediate_base = false;
-  bool allow_base_plus_index = false;
-  bool allow_post_inc = false;
-  int offset_bits = 6;
+  bool check_mode;
+  int offset_bits;
 
-  if(TARGET_V4_FEATURES
-     && (crtl->combine_in_progress || crtl->combine_completed)
-     && (   !strcmp(constraint, "m")
-         || !strcmp(constraint, "econd")
-         || !strcmp(constraint, "ememop"))){
-    allow_extension = true;
-  }
-
-  if(!strcmp(constraint, "m") || !strcmp(constraint, "noext")){
-    if(TARGET_V4_FEATURES){
-      allow_absolute = true;
-      allow_immediate_base = true;
-      allow_base_plus_index = true;
-    }
-    allow_gp = true;
-    allow_post_inc = true;
-    offset_bits = -11;
-  }
-  else if(!strcmp(constraint, "cond") || !strcmp(constraint, "econd")){
-    if(TARGET_V4_FEATURES){
-      allow_absolute = true;
-      allow_base_plus_index = true;
-    }
-    allow_post_inc = true;
-  }
-  else if(!TARGET_V4_FEATURES){
-    return false;
-  }
-  else if(!strcmp(constraint, "si")){
-  }
-  else if(!strcmp(constraint, "csi")){
-  }
-  else if(!strcmp(constraint, "memop") || !strcmp(constraint, "ememop")){
-    if(!TARGET_MEMOPS){
-      return false;
-    }
-  }
-  else {
-    gcc_unreachable();
-  }
-
-  if(!TARGET_BASE_PLUS_INDEX){
-    allow_base_plus_index = false;
-  }
-
-  /* Extract operands and canonicalize commutitive operators. */
-  if(GET_CODE (x) == PLUS || GET_CODE (x) == POST_MODIFY){
-    xop0 = XEXP (x, 0);
-    xop1 = XEXP (x, 1);
-    if(GET_CODE (x) == PLUS && GET_CODE (x) != POST_MODIFY
-       && ((REG_P (xop1) || CONSTANT_P (xop1)) && !REG_P (xop0))){
-      xop0 = XEXP (x, 1);
-      xop1 = XEXP (x, 0);
-    }
-    if(   GET_CODE (xop1) == PLUS
-       || GET_CODE (xop1) == MULT
-       || GET_CODE (xop1) == ASHIFT){
-      xop1op0 = XEXP (xop1, 0);
-      xop1op1 = XEXP (xop1, 1);
-      if(GET_CODE (xop1) != ASHIFT && !REG_P (xop1op0)){
-        xop1op0 = XEXP (xop1, 1);
-        xop1op1 = XEXP (xop1, 0);
-      }
-    }
-  }
-  else if(GET_CODE (x) == POST_INC || GET_CODE (x) == POST_DEC){
-    xop0 = XEXP (x, 0);
-  }
-
-  /* GP-relative address */
-  if(allow_gp){
-    if(sdata_symbolic_operand(x, Pmode)){
-      return true;
-    }
-  }
-
-  /* absolute address */
-  if(allow_absolute && allow_extension && CONSTANT_P (x)){
+  if(TARGET_V2_FEATURES && sdata_symbolic_operand(x, Pmode) && !conditional){
+    /* Will be GP relative */
     return true;
   }
 
-  /* register-indirect address */
-  if(REG_P (x)){
-    return qdsp6_reg_ok_for_base_p(x, reg_ok_strict_p);
-  }
+  if(GET_CODE (x) == REG && qdsp6_reg_ok_for_base_p(x, reg_ok_strict_p))
+    return true;
+
+  /* ??? DFmode? BImode? Why do we check the mode anyway? */
+  check_mode =    mode == DImode
+               || mode == SImode
+               || mode == SFmode
+               || mode == HImode
+               || mode == QImode
+               || mode == V2SImode
+               || mode == V4HImode
+               || mode == V8QImode
+               || mode == V2HImode
+               || mode == V4QImode;
 
   /* We allow FP+offset addresses here because that is necessary for SP+offset
      addresses later.  Note that we don't check the range of the constant. */
   if(!reg_ok_strict_p
      && GET_CODE (x) == PLUS
-     && REG_P (xop0)
-     && REGNO (xop0) == FRAME_POINTER_REGNUM
-     && GET_CODE (xop1) == CONST_INT){
+     && check_mode
+     && GET_CODE (XEXP (x, 0)) == REG
+     && REGNO (XEXP (x, 0)) == FRAME_POINTER_REGNUM
+     && GET_CODE (XEXP (x, 1)) == CONST_INT){
     return true;
   }
 
-  /* base+offset/index address */
+  offset_bits = conditional ? 6 : -11;
+
+  /* base+offset address */
   if(   GET_CODE (x) == PLUS
-     && ((REG_P (xop0) && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p))
-         || (allow_immediate_base && allow_extension
-             && CONSTANT_P (xop0) && !CONSTANT_P (xop1)))){
-    rtx offset = xop1;
-    rtx index = xop1op0;
-    rtx scale = xop1op1;
-
-    /* base+extended offset address */
-    if(allow_extension && CONSTANT_P (offset)){
-      if(GET_CODE (offset) == CONST_INT){
-        return (INTVAL (offset) & (GET_MODE_SIZE (mode) - 1)) == 0;
-      }
-      return allow_immediate_base;
-    }
-
-    /* base+offset address */
-    if(GET_CODE (offset) == CONST_INT){
-      return qdsp6_legit_addr_const_p(INTVAL (offset), mode, offset_bits);
-    }
-
-    /* base+index address */
-    if(allow_base_plus_index){
-      if(REG_P (offset)){
-        return qdsp6_reg_ok_for_base_p(offset, reg_ok_strict_p);
-      }
-      if(GET_CODE (offset) == MULT){
-        return    REG_P (index)
-               && qdsp6_reg_ok_for_index_p(index, reg_ok_strict_p)
-               && GET_CODE (scale) == CONST_INT
-               && (   INTVAL (scale) == 1
-                   || INTVAL (scale) == 2
-                   || INTVAL (scale) == 4
-                   || INTVAL (scale) == 8);
-      }
-      if(GET_CODE (offset) == ASHIFT){
-        return    REG_P (index)
-               && qdsp6_reg_ok_for_index_p(index, reg_ok_strict_p)
-               && GET_CODE (scale) == CONST_INT
-               && IN_RANGE (INTVAL (scale), 0, 3);
-      }
-    }
+     && check_mode
+     && GET_CODE (XEXP (x, 0)) == REG
+     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)
+     && GET_CODE (XEXP (x, 1)) == CONST_INT
+     && qdsp6_legit_addr_const_p(INTVAL (XEXP (x, 1)), mode, offset_bits)){
+    return true;
   }
 
-  if(allow_post_inc){
-    /* post increment/decrement address with the increment/decrement equal to
-       the access size */
-    if(GET_CODE (x) == POST_INC || GET_CODE (x) == POST_DEC){
-      return REG_P (xop0) && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p);
-    }
+  /* We don't check the constant for post inc/dec because it */
+  /* is always the size of the element */
+  if(   GET_CODE (x) == POST_INC
+     && (reg_ok_strict_p || check_mode) /* ??? Is this right? */
+     && GET_CODE (XEXP (x, 0)) == REG
+     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
+    return true;
+  }
 
-    /* post increment/decrement address */
-    if(GET_CODE (x) == POST_MODIFY){
-      return    REG_P (xop0)
-             && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p)
-             && GET_CODE (xop1) == PLUS
-             && REG_P (xop1op0)
-             && REGNO (xop1op0) == REGNO (xop0)
-             && GET_CODE (xop1op1) == CONST_INT
-             && qdsp6_legit_addr_const_p(INTVAL (xop1op1), mode, -4);
+  if(   GET_CODE (x) == POST_DEC
+     && (reg_ok_strict_p || check_mode) /* ??? Is this right? */
+     && GET_CODE (XEXP (x, 0)) == REG
+     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
+    return true;
+  }
+
+  if(   GET_CODE (x) == POST_MODIFY
+     && check_mode
+     && GET_CODE (XEXP (x, 0)) == REG
+     && qdsp6_reg_ok_for_base_p(XEXP (x, 0), reg_ok_strict_p)){
+    rtx mod = XEXP (x, 1);
+    if(   GET_CODE (mod) == PLUS
+       && GET_CODE (XEXP (mod, 0)) == REG
+       && REGNO (XEXP (mod, 0)) == REGNO (XEXP (x, 0))
+       && GET_CODE (XEXP (mod, 1)) == CONST_INT
+       && qdsp6_legit_addr_const_p(INTVAL (XEXP (mod, 1)), mode, -4)){
+      return true;
     }
   }
 
   return false;
 }
-
-
-
 
 /* Construct a unique section name based on the decl name and the
    categorization performed above.  Original in gcc/varasm.c  */
@@ -2385,17 +2021,11 @@ default_unique_section_2 (tree decl, int reloc)
   DECL_SECTION_NAME (decl) = build_string (nlen + plen, string);
 }
 
-
-
-
 static void
 qdsp6_unique_section (tree decl, int reloc)
 {
   default_unique_section_2 (decl, reloc);
 }
-
-
-
 
 /* _LSY_ Loks for smallest addressable entity in
    a declaration, not overall declaration size. */  
@@ -2438,7 +2068,6 @@ sdata_symbolic_operand_smallest_accessable_size(rtx op)
       return size;
   }
 }
-
 
 
 
@@ -2551,16 +2180,11 @@ qdsp6_GP_or_reg_operand_c (rtx op, enum machine_mode mode)
   return 0;
 }
 
-
-
-
 int
 qdsp6_nonimmediate_operand_with_GP_c (rtx op, enum machine_mode mode)
 {
-  return (! CONSTANT_P (op) && GP_or_reg_operand (op, mode));
+  return (! CONSTANT_P (op) && qdsp6_GP_or_reg_operand (op, mode));
 }
-
-
 
 
 static GTY(()) tree qdsp6_builtin_mask_for_load;
@@ -2582,32 +2206,6 @@ qdsp6_vectorize_builtin_mask_for_load(void)
 Describing Relative Costs of Operations
 -------------------------------------*/
 
-/* Implements hook STORE_BY_PIECES_P */
-
-bool
-qdsp6_store_by_pieces_p(unsigned HOST_WIDE_INT size, unsigned int alignment)
-{
-  unsigned HOST_WIDE_INT ninsns;
-  unsigned int store_width = MIN (MAX (alignment, 1), 4);
-
-  ninsns = size / store_width * (TARGET_V4_FEATURES ? 2 : 3);
-  size %= store_width;   
-  if(optimize_size){
-    while(size){
-      store_width /= 2;
-      ninsns += size / store_width * 2;
-      size %= store_width;   
-    }
-    return ninsns <= 3;
-  }
-  else {
-    return ninsns <= 16;
-  }
-}
-
-
-
-
 /* Helper function for qdsp6_rtx_costs */
 
 static bool
@@ -2622,7 +2220,7 @@ qdsp6_free_immediate(rtx x, int outer_code, int value)
 /* Implements hook TARGET_RTX_COSTS */
 
 static bool
-qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed)
+qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total)
 {
   enum machine_mode mode = GET_MODE (x);
 
@@ -2822,121 +2420,47 @@ qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed)
 
 
 
-static bool
-qdsp6_rtx_costs_debug(rtx x, int code, int outer_code, int *total, bool speed)
-{
-  bool retval;
-
-  debug_rtx(x);
-  retval = qdsp6_rtx_costs(x, code, outer_code, total, speed);
-  fprintf(stderr, "rtx_cost:  %d, %s\n\n", *total, retval ? "true" : "false");
-
-  return retval;
-}
-
-
-
-
 /* Implements hook TARGET_ADDRESS_COST */
 
 static int
-qdsp6_address_cost(rtx address, bool speed)
+qdsp6_address_cost(rtx address)
 {
   enum rtx_code code = GET_CODE(address);
   rtx mod;
 
   switch(code){
-    case SYMBOL_REF:
-    case CONST:
-      if(g_switch_value > 0){
-        return COSTS_N_INSNS (1) - 2;
-      }
-      if(TARGET_V4_FEATURES){
-        return COSTS_N_INSNS (1) + 1;
-      }
-      return COSTS_N_INSNS (3);
     case PRE_INC:
     case PRE_DEC:
-      return COSTS_N_INSNS (3);
+      fprintf(stderr, "Cost requested for unsupported PRE_{INC,DEC}\n");
+      return COSTS_N_INSNS (10);
     case POST_INC:
     case POST_DEC:
-      return COSTS_N_INSNS (1) - 3;
+      return 0;
     case POST_MODIFY:
       mod = XEXP (address, 1);
       if(GET_CODE (mod) == PLUS
-         && REG_P (XEXP (mod, 0))
+         && GET_CODE (XEXP (mod, 0)) == REG
          && GET_CODE (XEXP (mod, 1)) == CONST_INT){
-        return COSTS_N_INSNS (1) - 3;
+        return 0;
       }
-      return COSTS_N_INSNS (3);
+      fprintf(stderr, "Unknown POST_MODIFY address type:\n");
+      debug_rtx(address);
+      return COSTS_N_INSNS (2);
     case REG:
-      return COSTS_N_INSNS (1);
+      /* Not doing anything! */
+      return COSTS_N_INSNS (2);
     case PLUS:
-      {
-        rtx base = XEXP (address, 0);
-        rtx offset = XEXP (address, 1);
-        if((REG_P (offset) || CONSTANT_P (offset)) && !REG_P (base)){
-          base = XEXP (address, 1);
-          offset = XEXP (address, 0);
-        }
-        if(REG_P (base)
-           || (TARGET_V4_FEATURES && CONSTANT_P (base))){
-          if(GET_CODE (offset) == CONST_INT
-             && IN_RANGE (INTVAL (offset), -(1 << 12), (1 << 12) - 4)){
-            return COSTS_N_INSNS (1);
-          }
-          if(TARGET_V4_FEATURES && CONSTANT_P (offset)){
-            return COSTS_N_INSNS (1) + 2;
-          }
-          if(TARGET_V4_FEATURES && TARGET_BASE_PLUS_INDEX){
-            if(REG_P (offset)){
-              return COSTS_N_INSNS (1) - 1;
-            }
-            if(GET_CODE (offset) == MULT || GET_CODE (offset) == ASHIFT){
-              rtx index = XEXP (offset, 0);
-              rtx scale = XEXP (offset, 1);
-              if(GET_CODE (offset) == MULT && !REG_P (index)){
-                index = XEXP (offset, 1);
-                scale = XEXP (offset, 0);
-              }
-              if(REG_P (index)
-                 && GET_CODE (scale) == CONST_INT){
-                if(REG_P (base)){
-                  return COSTS_N_INSNS (1) - 2;
-                }
-                return COSTS_N_INSNS (1) + 1;
-              }
-            }
-          }
-        }
+    case MINUS:
+      if(GET_CODE (XEXP (address, 0)) == REG
+         && GET_CODE (XEXP (address, 1)) == CONST_INT){
+        return COSTS_N_INSNS (2);
       }
-      return COSTS_N_INSNS (3);
-    case CONST_INT:
-    case LABEL_REF:
-      if(TARGET_V4_FEATURES){
-        return COSTS_N_INSNS (1) + 1;
-      }
-      /* FALL THROUGH */
-    default:
-      return COSTS_N_INSNS (3);
+      return COSTS_N_INSNS (2);
+    default: /* ?? Label and such */
+      return COSTS_N_INSNS (10);
   }
   /* Should never get here */
-  gcc_unreachable();
-}
-
-
-
-
-static int
-qdsp6_address_cost_debug(rtx address, bool speed)
-{
-  int retval;
-
-  debug_rtx(address);
-  retval = qdsp6_address_cost(address, speed);
-  fprintf(stderr, "address_cost:  %d\n\n", retval);
-
-  return retval;
+  return COSTS_N_INSNS (30);
 }
 
 
@@ -3659,9 +3183,6 @@ qdsp6_asm_select_rtx_section(
 }
 #endif /* !GCC_3_4_6 */
 
-
-
-
 extern void switch_to_section (section *);                 
 
 #define MAX_DECLARE_RECURSION   1024
@@ -3678,9 +3199,6 @@ has_this_tree_been_visited(tree node){
    return 0;
 }
 
-
-
-
 void
 remember_this_tree(tree node){
    int i;
@@ -3696,9 +3214,6 @@ remember_this_tree(tree node){
    }
    return;
 }
-
-
-
 
 /* descent_smallest designed to identify the smallest addressable entity
    in a declaration. Used for sdata elements sorting */ 
@@ -3830,9 +3345,6 @@ descent_smallest(const char *prefix, tree node, unsigned int smallest){
     return new_smallest;  
 }
 
-
-
-
 /* smallest_accessable_entity_in_declaration designed to identify the smallest addressable entity
 in a declaration. Used for sdata elements sorting */ 
 unsigned HOST_WIDE_INT
@@ -3842,9 +3354,6 @@ smallest_accessable_entity_in_declaration(tree decl)
    /* Here I assume there are no atomic data types larger than 128 bytes in this machine */ 
    return descent_smallest(" top ", decl, DEFAULT_LARGEST_ALIGNMENT); 
 }
-
-
-
 
 static bool
 bss_initializer_p (const_tree decl)
@@ -3856,8 +3365,6 @@ bss_initializer_p (const_tree decl)
               && !TREE_READONLY (decl)
               && initializer_zerop (DECL_INITIAL (decl))));
 }
-
-
 
 
 /* Copycat from similar internal declaration */ 
@@ -3932,9 +3439,6 @@ qdsp6_categorize_decl_for_section (const_tree decl, int reloc)
 
   return ret;
 }
-
-
-
 
 /* Similar to default_elf_select_section from varasm.c  but is capable of sorting sdata 
    into subsections. sbss is also handled in a similar way, but not in this 
@@ -4013,9 +3517,6 @@ qdsp6_select_section (tree decl, int reloc,
   return get_named_section (decl, sname, reloc);
 }
 
-
-
-
 void
 qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
 			       tree decl ATTRIBUTE_UNUSED)
@@ -4033,12 +3534,6 @@ qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
       && (flags & SECTION_DECLARED))
     {
       fprintf (asm_out_file, "\t.section\t%s\n", name);
-      /* But we still need to output subsection information
-         or we can end up with same section split and
-         sorted in different subsections of the same section */
-      if(TARGET_SECTION_SORTING && decl && (smallest_accessable_entity_in_declaration(decl) > 1))
-        fprintf (asm_out_file, "\t.subsection\t-%d\n",
-                 floor_log2(smallest_accessable_entity_in_declaration(decl)));
       return;
     }
 
@@ -4095,9 +3590,6 @@ qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
      fprintf (asm_out_file, "\t.subsection\t-%d\n",floor_log2(smallest_accessable_entity_in_declaration(decl)));
 }
 
-
-
-
 /* Implements hook TARGET_IN_SMALL_DATA_P */
 
 static bool
@@ -4139,8 +3631,6 @@ qdsp6_in_small_data_p(const_tree exp)
 }
 
 
-
-
 /*-------------------------------
 Output of Uninitialized Variables
 -------------------------------*/
@@ -4177,9 +3667,6 @@ qdsp6_asm_output_aligned_decl_common(
                   size, alignment / BITS_PER_UNIT);
 	}
 }
-
-
-
 
 /* Implements macro ASM_OUTPUT_ALIGNED_DECL_LOCAL
 
@@ -4223,9 +3710,6 @@ qdsp6_asm_output_aligned_decl_local(
    }
 }
 
-
-
-
 /*------------------------------
 Output of Assembler Instructions
 ------------------------------*/
@@ -4255,11 +3739,12 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
 {
   struct qdsp6_final_info *final_info;
   int c;
+  int ended_packet = 0;
   int oporder[MAX_RECOG_OPERANDS];
   char opoutput[MAX_RECOG_OPERANDS];
   int ops = 0;
 
-  if(!(TARGET_PACKETS && optimize)){
+  if(!(optimize && flag_schedule_insns_after_reload)){
     return ptr;
   }
 
@@ -4272,9 +3757,9 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
 
   /* Begin packet. */
   if(final_info->start_packet){
-    fputs("{\n\t", f);
+    fputs("{\n\t\t", f);
   }
-  if(final_info->indent_insn){
+  else if(final_info->indent_insn){
     fputc('\t', f);
   }
 
@@ -4377,22 +3862,27 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
   }
 
   /* End packet. */
-  if(final_info->print_endloop0){
-    fputs("}:endloop0 // start=", f);
-    output_asm_label(final_info->endloop_label);
-  }
-  else if(final_info->print_endloop1){
-    if(final_info->endloop0){
-      fputc(' ', f);
+  if(final_info->end_packet && !ended_packet){
+    if(final_info->endloop){
+      fputc('}', f);
+      /* Print endloops specially. */
+      if(final_info->endloop & (1 << 0)){
+        fputs(":endloop0 // start=", f);
+        output_asm_label(final_info->endloop0_label);
+        if(final_info->endloop & (1 << 1)){
+          fputs("\n\t :endloop1 // start=", f);
+          output_asm_label(final_info->insn_ops[0]);
+        }
+      }
+      else if(final_info->endloop & (1 << 1)){
+        fputs(":endloop1 // start=", f);
+        output_asm_label(final_info->insn_ops[0]);
+      }
     }
     else {
-      fputc('}', f);
+      fputs("\n\t}", f);
     }
-    fputs(":endloop1 // start=", f);
-    output_asm_label(final_info->endloop_label);
-  }
-  else if(final_info->end_packet){
-    fputs("\n\t}", f);
+    ended_packet = 1;
   }
 
   return ptr;
@@ -4401,11 +3891,18 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
 
 
 
+#define ENDLOOP_INSN(INSN) (   INSN_CODE (INSN) == CODE_FOR_endloop0 \
+                            || INSN_CODE (INSN) == CODE_FOR_endloop1)
+
+
+#define QDSP6_LOOP_INSN(INSN) (   INSN_CODE (INSN->insn) == CODE_FOR_loop0 \
+                                || INSN_CODE (INSN->insn) == CODE_FOR_loop1)
+
 /* Implements macro FINAL_PRESCAN_INSN
 
-   Looks at the current and next insns to determine how to format the next insn
-   to be printed and whether or not to print open or close curly brackets in
-   order to begin or end a packet. */
+   Looks ahead of the current insn and uses the marks made by qdsp6_pack_insns
+   to determine whether the current insn should begin or end a packet and
+   whether the current packet ends a hardware loop. */
 
 void
 qdsp6_final_prescan_insn(
@@ -4415,9 +3912,8 @@ qdsp6_final_prescan_insn(
 )
 {
   struct qdsp6_final_info *final_info;
-  rtx next_insn;
 
-  if(!(TARGET_PACKETS && optimize)){
+  if(!(optimize && flag_schedule_insns_after_reload)){
     return;
   }
 
@@ -4426,86 +3922,91 @@ qdsp6_final_prescan_insn(
   final_info->insn_ops = ops;
   final_info->start_packet = false;
   final_info->end_packet = false;
-  final_info->indent_insn = true;
   final_info->print_insn = true;
-  final_info->print_endloop0 = false;
-  final_info->print_endloop1 = false;
+  final_info->indent_insn = true;
 
   if(!INSN_P (insn) || INSN_CODE (insn) == -1){
     return;
   }
 
-  /* Check whether this insn starts a new packet. */
-  if(GET_MODE (insn) == TImode){
-    final_info->endloop0 = false;
+  /* Don't indent .faligns. */
+  if(INSN_CODE (insn) == CODE_FOR_falign){
+    final_info->indent_insn = false;
+  }
 
-    /* If this is not actually a packet but a sequence of serial instructions,
-       then it should not be grouped with any other insns, and it should not
-       have curly brackets printed around it. */
-    if(get_attr_type(insn) == TYPE_MULTIPLE){
-      final_info->indent_insn = false;
-      return;
+  /* If any instructions in the curent packet have not been printed, then they
+     have already been scanned. */
+  if(--final_info->insns_left_in_packet > 0){
+    /* Print endloops specially instead of using the template in the machine
+       description. */
+    if(final_info->endloop && ENDLOOP_INSN (insn)){
+      final_info->print_insn = false;
     }
+    /* If we intend to output an endloop0 specially, then save its label. */
+    if(final_info->endloop & (1 << 0) && INSN_CODE (insn) == CODE_FOR_endloop0){
+      final_info->endloop0_label = ops[0];
+    }
+    /* If this is the last insn in a packet, then end the packet. */
+    if(final_info->insns_left_in_packet == 1 && final_info->form_packet){
+      final_info->end_packet = true;
+      /* Don't indent endloops. */
+      if(final_info->endloop){
+        final_info->indent_insn = false;
+      }
+    }
+    return;
+  }
 
+  final_info->endloop = 0;
+
+  /* Scan all of the insns for the next packet. */
+  do {
+    /* Record whether this packet ends a hardware loop. */
+    if(ENDLOOP_INSN (insn) && final_info->insns_left_in_packet){
+      if(INSN_CODE (insn) == CODE_FOR_endloop0){
+        final_info->endloop |= 1 << 0;
+      }
+      else {
+        final_info->endloop |= 1 << 1;
+      }
+    }
+    /* Count the insns in this packet. */
+    if(INSN_CODE (insn) != -1){
+      final_info->insns_left_in_packet++;
+    }
+    /* Advance and skip notes. */
+    for(insn = NEXT_INSN (insn);
+        insn && NOTE_P (insn);
+        insn = NEXT_INSN (insn));
+  }while(insn && INSN_P (insn) && GET_MODE (insn) != TImode);
+
+  /* If we counted more than one insn, then form a packet. */
+  if(final_info->insns_left_in_packet > 1){
+    final_info->form_packet = true;
     final_info->start_packet = true;
   }
-
-  /* Insns that are actually sequences of serial instructions should always
-     start a packet. */
-  gcc_assert(get_attr_type(insn) != TYPE_MULTIPLE);
-
-  /* Print endloops specially instead of using the template in the machine
-     description. */
-  if(INSN_CODE (insn) == CODE_FOR_endloop0){
-    /* Record that this packet ends an inner hardware loop. */
-    final_info->endloop0 = true;
-    final_info->indent_insn = false;
-    final_info->print_insn = false;
-    final_info->print_endloop0 = true;
-    final_info->endloop_label = ops[0];
-  }
-  if(INSN_CODE (insn) == CODE_FOR_endloop1){
-    final_info->indent_insn = false;
-    final_info->print_insn = false;
-    final_info->print_endloop1 = true;
-    final_info->endloop_label = ops[0];
-  }
-
-  /* Advance and skip notes. */
-  for(next_insn = NEXT_INSN (insn);
-      next_insn && (!INSN_P (next_insn) || INSN_CODE (next_insn) == -1);
-      next_insn = NEXT_INSN (next_insn));
-  /* If this is the last insn in a packet, then end the packet. */
-  if(!next_insn || GET_MODE (next_insn) == TImode){
-    final_info->end_packet = true;
+  else {
+    final_info->form_packet = false;
   }
 }
 
 
 
 
-/* globals used to pass information from qdsp6_print_operand to
-   qdsp6_print_operand_address */
-
-/* whether the current operand contains an extended constant */
-static bool qdsp6_extended_constant;
-
-/* the mode of the current address being printed */
-static enum machine_mode qdsp6_address_mode;
-
 /* Implements macro PRINT_OPERAND */
 
 void
-qdsp6_print_operand(FILE *stream, rtx x, int code)
+qdsp6_print_operand(FILE *file, rtx x, int code)
 {
-  qdsp6_extended_constant = false;
+  rtx x0;
 
   switch(code){
     case 'P':
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fprintf(stream, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
+        fprintf(file, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
       }
       else {
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%P");
       }
       return;
@@ -4513,7 +4014,7 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
     case 'H':
       /* Output the second register of a 64 bit register pair. */
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fputs(reg_names[REGNO (x) + 1], stream);
+        fputs(reg_names[REGNO (x) + 1], file);
       }
       else {
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%H");
@@ -4523,7 +4024,7 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
     case 'L':
       /* Output the first register of a 64 bit register pair. */
       if(G_REG_P (x) && REGNO (x) % 2 == 0){
-        fputs(reg_names[REGNO (x)], stream);
+        fputs(reg_names[REGNO (x)], file);
       }
       else {
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%L");
@@ -4535,9 +4036,9 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
       if((GET_CODE (x) == NE || GET_CODE (x) == EQ)
          && P_REG_P (XEXP (x, 0)) && XEXP (x, 1) == const0_rtx){
         if((GET_CODE (x) == EQ) ^ (code == 'I')){
-          fputc('!', stream);
+          fputc('!', file);
         }
-        fputs(reg_names[REGNO (XEXP (x, 0))], stream);
+        fputs(reg_names[REGNO (XEXP (x, 0))], file);
       }
       else {
         if(code == 'C'){
@@ -4555,9 +4056,11 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHH = (bits & 0xffff0000UL) >> 16;
-        fprintf(stream, "%u", immValueHH);
+        fprintf(file, "%u", immValueHH);
       }
       else {
+        fputs("\n\n", stderr);
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%S");
       }
       return;
@@ -4566,9 +4069,11 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHL = bits & 0x0000ffffUL;
-        fprintf(stream, "%u", immValueHL);
+        fprintf(file, "%u", immValueHL);
       }
       else {
+        fputs("\n\n", stderr);
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%T");
       }
       return;
@@ -4577,9 +4082,11 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLH = (bits & 0xffff0000UL) >> 16;
-        fprintf(stream, "%u", immValueLH);
+        fprintf(file, "%u", immValueLH);
       }
       else {
+        fputs("\n\n", stderr);
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%U");
       }
       return;
@@ -4588,9 +4095,11 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DFmode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLL = bits & 0x0000ffffUL;
-        fprintf(stream, "%u", immValueLL);
+        fprintf(file, "%u", immValueLL);
       }
       else {
+        fputs("\n\n", stderr);
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%V");
       }
       return;
@@ -4601,9 +4110,11 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHH = (bits & 0xffff0000UL) >> 16;
-        fprintf(stream, "%u", immValueHH);
+        fprintf(file, "%u", immValueHH);
       }
       else {
+        fputs("\n\n", stderr);
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%W");
       }
       return;
@@ -4612,9 +4123,11 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         rtx subword = operand_subword(x, 1, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueHL = bits & 0x0000ffffUL;
-        fprintf(stream, "%u", immValueHL);
+        fprintf(file, "%u", immValueHL);
       }
       else {
+        fputs("\n\n", stderr);
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%X");
       }
       return;
@@ -4623,9 +4136,11 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLH = (bits & 0xffff0000UL) >> 16;
-        fprintf(stream, "%u", immValueLH);
+        fprintf(file, "%u", immValueLH);
       }
       else {
+        fputs("\n\n", stderr);
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%Y");
       }
       return;
@@ -4634,9 +4149,11 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         rtx subword = operand_subword(x, 0, 1, DImode);
         HOST_WIDE_INT bits = INTVAL (subword);
         unsigned short immValueLL = bits & 0x0000ffffUL;
-        fprintf(stream, "%u", immValueLL);
+        fprintf(file, "%u", immValueLL);
       }
       else {
+        fputs("\n\n", stderr);
+        debug_rtx(x);
         output_operand_lossage("qdsp6_print_operand: invalid operand for %%Z");
       }
       return;
@@ -4648,7 +4165,7 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
           output_operand_lossage("qdsp6_print_operand: invalid operand for %%J");
         }
         else {
-          fprintf(stream, "%d", log);
+          fprintf(file, "%d", log);
         }
       }
       return;
@@ -4660,16 +4177,10 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
           output_operand_lossage("qdsp6_print_operand: invalid operand for %%K");
         }
         else {
-          fprintf(stream, "%d", log);
+          fprintf(file, "%d", log);
         }
       }
       return;
-
-    case 'E':
-      gcc_assert(TARGET_V4_FEATURES);
-      qdsp6_extended_constant = true;
-      /* handled below */
-      break;
 
     case 0:
       /* handled below */
@@ -4685,10 +4196,10 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
       {
         if(REGNO (x) < FIRST_PSEUDO_REGISTER){
           if(G_REG_P (x) && GET_MODE_SIZE (GET_MODE (x)) > UNITS_PER_WORD){
-            fprintf(stream, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
+            fprintf(file, "%s:%d", reg_names[REGNO (x) + 1], REGNO (x));
           }
           else {
-            fputs(reg_names[REGNO (x)], stream);
+            fputs(reg_names[REGNO (x)], file);
           }
         }
         else {
@@ -4698,17 +4209,85 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
       break;
 
     case MEM:
-      qdsp6_address_mode = GET_MODE (x);
-      output_address(XEXP (x, 0));
+      x0 = XEXP (x,0);
 
+      switch(GET_CODE (x0)){
+        case REG:
+          if(G_REG_P (x0)){
+            fputs(reg_names[REGNO (x0)], file);
+          }
+          else {
+            output_operand_lossage("qdsp6_print_operand: invalid base register");
+          }
+          break;
+
+        case PLUS:
+          if(   G_REG_P (XEXP (x0, 0))
+             && GET_CODE (XEXP (x0, 1)) == CONST_INT){
+            fprintf(file, "%s+#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (XEXP (x0, 0))], INTVAL (XEXP (x0, 1)));
+          }
+          else {
+            output_operand_lossage("qdsp6_print_operand: invalid base+offset");
+          }
+          break;
+
+        case POST_INC:
+          if(G_REG_P (XEXP (x0, 0))){
+            fprintf(file, "%s++#%d", reg_names[REGNO (XEXP (x0, 0))], GET_MODE_SIZE (GET_MODE (x)));
+          }
+          else {
+            output_operand_lossage("qdsp6_print_operand: invalid post increment base register");
+          }
+          break;
+
+        case POST_DEC:
+          if(G_REG_P (XEXP (x0, 0))){
+            fprintf(file, "%s++#-%d", reg_names[REGNO (XEXP (x0, 0))], GET_MODE_SIZE (GET_MODE (x)));
+          }
+          else {
+            output_operand_lossage("qdsp6_print_operand: invalid post decrement base register");
+          }
+          break;
+
+        case POST_MODIFY:
+          {
+            rtx basereg = XEXP (x0, 0);
+            rtx mod = XEXP (x0, 1);
+            if(G_REG_P (XEXP (x0, 0))){
+              fprintf(file, "%s++#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (basereg)], INTVAL (XEXP (mod, 1)));
+            }
+            else {
+              output_operand_lossage("qdsp6_print_operand: invalid post modify base register");
+            }
+          }
+          break;
+
+        case SYMBOL_REF:
+          if(TARGET_V2_FEATURES && sdata_symbolic_operand(x0, Pmode)){
+            fputc('#', file);
+          }
+          output_address(x0);
+          break;
+
+        case CONST:
+          if(TARGET_V2_FEATURES && sdata_symbolic_operand(x0, Pmode)){
+            fputc('#', file);
+          }
+          output_address(x0);
+          break;
+
+        default:
+          output_operand_lossage("qdsp6_print_operand: invalid address code 0x%x", GET_CODE (x0));
+          break;
+      }
       break;
 
     case CONST_INT:
       if(INTVAL (x) < -0xFFFFFFFFLL){
-        fprintf(stream, HOST_WIDE_INT_PRINT_HEX, INTVAL (x));
+        fprintf(file, HOST_WIDE_INT_PRINT_HEX, INTVAL (x));
       }
       else {
-        fprintf(stream, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
+        fprintf(file, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
       }
       break;
 
@@ -4722,7 +4301,7 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         REAL_VALUE_FROM_CONST_DOUBLE (rv, x);
         REAL_VALUE_TO_TARGET_SINGLE (rv, l);
         l &= 0xFFFFFFFFUL;
-        fprintf(stream, "0x%08lx", l);
+        fprintf(file, "0x%08lx", l);
         break;
       }
       else if(GET_MODE (x) == DFmode){
@@ -4733,13 +4312,13 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
         REAL_VALUE_TO_TARGET_DOUBLE (rv, l);
         l[0] &= 0xFFFFFFFFUL;
         l[1] &= 0xFFFFFFFFUL;
-        fprintf(stream, "0x%08lx%08lx", l[1], l[0]);
+        fprintf(file, "0x%08lx%08lx", l[1], l[0]);
         break;
       }
       /* FALL THROUGH.  Let output_addr_const deal with it. */
 
     default:
-      output_addr_const(stream, x);
+      output_addr_const(file, x);
       break;
   }
 
@@ -4754,137 +4333,19 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
    Print a memory address as an operand to reference that memory location. */
 
 void
-qdsp6_print_operand_address(FILE *stream, rtx x)
+qdsp6_print_operand_address(FILE *stream, rtx address)
 {
-  switch(GET_CODE (x)){
-    case REG:
-      if(G_REG_P (x)){
-        fputs(reg_names[REGNO (x)], stream);
-        fputs("+#0", stream);
-      }
-      else {
-        output_operand_lossage("qdsp6_print_operand_address: invalid base register");
-      }
-      break;
-
-    case PLUS:
-      {
-        rtx base = XEXP (x, 0);
-        rtx offset = XEXP (x, 1);
-        rtx index = NULL_RTX;
-        rtx scale = NULL_RTX;
-
-        if(!(REG_P (base)
-             || (CONSTANT_P (base) && GET_CODE (base) != CONST_INT))
-           || (CONSTANT_P (offset) && GET_CODE (offset) != CONST_INT)){
-          base = XEXP (x, 1);
-          offset = XEXP (x, 0);
-        }
-        if(GET_CODE (offset) == MULT || GET_CODE (offset) == ASHIFT){
-          index = XEXP (offset, 0);
-          scale = XEXP (offset, 1);
-          if(!REG_P (index)){
-            index = XEXP (offset, 1);
-            scale = XEXP (offset, 0);
-          }
-        }
-
-        if(G_REG_P (base)){
-          fprintf(stream, "%s", reg_names[REGNO (base)]);
-          fputc('+', stream);
-        }
-        else if(!CONSTANT_P (base)){
-          output_operand_lossage("qdsp6_print_operand_address: invalid base+index base");
-          break;
-        }
-
-        if(CONSTANT_P (offset)){
-          fputc('#', stream);
-          if(qdsp6_extended_constant){
-            fputc('#', stream);
-          }
-          output_addr_const(stream, offset);
-        }
-        else if(REG_P (offset)){
-          fprintf(stream, "%s<<#0", reg_names[REGNO (offset)]);
-        }
-        else if(   GET_CODE (offset) == MULT
-                && REG_P (index)
-                && GET_CODE (scale) == CONST_INT){
-          int log = exact_log2(INTVAL (scale) & 0xFFFFFFFFULL);
-          if(log == -1){
-            output_operand_lossage("qdsp6_print_operand_address: invalid base+index scale amount");
-          }
-          else {
-            fprintf(stream, "%s<<#%d", reg_names[REGNO (index)], log);
-          }
-        }
-        else if(   GET_CODE (offset) == ASHIFT
-                && REG_P (index)
-                && GET_CODE (scale) == CONST_INT){
-          fprintf(stream, "%s<<#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (index)], INTVAL (scale));
-        }
-        else {
-          output_operand_lossage("qdsp6_print_operand_address: invalid base+index index");
-        }
-
-        if(CONSTANT_P (base)){
-          fputc('+', stream);
-          fputc('#', stream);
-          if(qdsp6_extended_constant){
-            fputc('#', stream);
-          }
-          output_addr_const(stream, base);
-        }
-        break;
-      }
-
-    case POST_INC:
-      if(G_REG_P (XEXP (x, 0))){
-        fprintf(stream, "%s++#%d", reg_names[REGNO (XEXP (x, 0))], GET_MODE_SIZE (qdsp6_address_mode));
-      }
-      else {
-        output_operand_lossage("qdsp6_print_operand_address: invalid post increment base register");
-      }
-      break;
-
-    case POST_DEC:
-      if(G_REG_P (XEXP (x, 0))){
-        fprintf(stream, "%s++#-%d", reg_names[REGNO (XEXP (x, 0))], GET_MODE_SIZE (qdsp6_address_mode));
-      }
-      else {
-        output_operand_lossage("qdsp6_print_operand_address: invalid post decrement base register");
-      }
-      break;
-
-    case POST_MODIFY:
-      {
-        rtx basereg = XEXP (x, 0);
-        rtx mod = XEXP (x, 1);
-        if(G_REG_P (XEXP (x, 0))){
-          fprintf(stream, "%s++#" HOST_WIDE_INT_PRINT_DEC, reg_names[REGNO (basereg)], INTVAL (XEXP (mod, 1)));
-        }
-        else {
-          output_operand_lossage("qdsp6_print_operand_address: invalid post modify base register");
-        }
-      }
-      break;
-
+  switch(GET_CODE (address)){
     case SYMBOL_REF:
+      output_addr_const(stream, address);
+      break;
+
     case CONST:
-    case CONST_INT:
-    case LABEL_REF:
-      if(sdata_symbolic_operand(x, Pmode) && !qdsp6_extended_constant){
-        fputc('#', stream);
-      }
-      else if(CONSTANT_P (x)){
-        fputs("##", stream);
-      }
-      output_addr_const(stream, x);
+      output_addr_const(stream, address);
       break;
 
     default:
-      output_operand_lossage("qdsp6_print_operand_address: invalid address code 0x%x", GET_CODE (x));
+      output_operand_lossage("qdsp6_print_operand_address: invalid address operand");
       break;
   }
 }
@@ -5040,7 +4501,7 @@ qdsp6_machine_dependent_reorg(void)
 #endif /* 0 */
 
   if(cfun->machine->has_hardware_loops
-     || (TARGET_PULLUP && optimize)){
+     || (TARGET_PULLUP && optimize && flag_schedule_insns_after_reload)){
     qdsp6_fixup_cfg();
   }
 
@@ -5054,7 +4515,7 @@ qdsp6_machine_dependent_reorg(void)
       qdsp6_local_combine_pass();
     }
 
-  if(TARGET_PULLUP && optimize){
+  if(TARGET_PULLUP && optimize && flag_schedule_insns_after_reload){
     qdsp6_packet_optimizations();
   }
 
@@ -5156,12 +4617,12 @@ qdsp6_init_builtins(void)
   tree DI_ftype_SI       ATTRIBUTE_UNUSED;
   tree DI_ftype_SISI     ATTRIBUTE_UNUSED;
   tree UDI_ftype_SISI    ATTRIBUTE_UNUSED;
-  tree DI_ftype_SIDI     ATTRIBUTE_UNUSED;
   tree DI_ftype_SISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_DI       ATTRIBUTE_UNUSED;
   tree SI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree SI_ftype_DISISI   ATTRIBUTE_UNUSED;
   tree DI_ftype_DI       ATTRIBUTE_UNUSED;
+  tree DI_ftype_SIDI     ATTRIBUTE_UNUSED;
   tree DI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree DI_ftype_DISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_SIDI     ATTRIBUTE_UNUSED;
@@ -5177,14 +4638,10 @@ qdsp6_init_builtins(void)
   tree SI_ftype_SISIDI   ATTRIBUTE_UNUSED;
 
   tree QI_ftype_SISI     ATTRIBUTE_UNUSED;
-  tree QI_ftype_SIDI     ATTRIBUTE_UNUSED;
-  tree QI_ftype_DISI     ATTRIBUTE_UNUSED;
   tree QI_ftype_DIDI     ATTRIBUTE_UNUSED;
   tree QI_ftype_QI       ATTRIBUTE_UNUSED;
   tree QI_ftype_SI       ATTRIBUTE_UNUSED;
-  tree QI_ftype_DI       ATTRIBUTE_UNUSED;
   tree QI_ftype_QIQI     ATTRIBUTE_UNUSED;
-  tree QI_ftype_QIQIQI   ATTRIBUTE_UNUSED;
   tree SI_ftype_QIQI     ATTRIBUTE_UNUSED;
   tree SI_ftype_QISISI   ATTRIBUTE_UNUSED;
   tree SI_ftype_QISI     ATTRIBUTE_UNUSED;
@@ -5249,10 +4706,6 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink))));
-  DI_ftype_SIDI =     build_function_type(   DI_type_node,
-                        tree_cons(NULL_TREE, SI_type_node,
-                        tree_cons(NULL_TREE, DI_type_node,
-                        endlink)));
   SI_ftype_DI =       build_function_type(   SI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         endlink));
@@ -5268,6 +4721,10 @@ qdsp6_init_builtins(void)
   DI_ftype_DI =       build_function_type(   DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         endlink));
+  DI_ftype_SIDI =     build_function_type(   DI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        endlink)));
   DI_ftype_DISI =     build_function_type(   DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         tree_cons(NULL_TREE, SI_type_node,
@@ -5336,16 +4793,6 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink)));
 
-  QI_ftype_SIDI   =   build_function_type(   QI_type_node,
-                        tree_cons(NULL_TREE, SI_type_node,
-                        tree_cons(NULL_TREE, DI_type_node,
-                        endlink)));
-
-  QI_ftype_DISI   =   build_function_type(   QI_type_node,
-                        tree_cons(NULL_TREE, DI_type_node,
-                        tree_cons(NULL_TREE, SI_type_node,
-                        endlink)));
-
   QI_ftype_DIDI   =   build_function_type(   QI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
                         tree_cons(NULL_TREE, DI_type_node,
@@ -5359,20 +4806,10 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, SI_type_node,
                         endlink));
 
-  QI_ftype_DI     =   build_function_type(   QI_type_node,
-                        tree_cons(NULL_TREE, DI_type_node,
-                        endlink));
-
   QI_ftype_QIQI   =   build_function_type(   QI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
                         endlink)));
-
-  QI_ftype_QIQIQI =   build_function_type(   QI_type_node,
-                        tree_cons(NULL_TREE, QI_type_node,
-                        tree_cons(NULL_TREE, QI_type_node,
-                        tree_cons(NULL_TREE, QI_type_node,
-                        endlink))));
 
   SI_ftype_QISISI =   build_function_type(   SI_type_node,
                         tree_cons(NULL_TREE, QI_type_node,
@@ -5582,7 +5019,7 @@ qdsp6_invalid_within_doloop(const_rtx insn)
       /* FALL THROUGH */
     case SET:
           reg = SET_DEST (side_effect);
-          if(REG_P (reg)){
+          if(GET_CODE (reg) == REG){
             switch(REGNO (reg)){
               case LC0_REGNUM:
                 return "lc0 is set in the loop.";
@@ -5605,7 +5042,7 @@ qdsp6_invalid_within_doloop(const_rtx insn)
       /* FALL THROUGH */
     case CLOBBER:
           reg = XEXP (side_effect, 0);
-          if(REG_P (reg)){
+          if(GET_CODE (reg) == REG){
             switch(REGNO (reg)){
               case LC0_REGNUM:
                 return "lc0 is clobbered in the loop.";
@@ -6971,7 +6408,7 @@ conditional_dest_operand(rtx op, enum machine_mode mode)
                            : (memory_operand(op, mode)
                               && qdsp6_legitimate_address_p(GET_MODE (op),
                                                             XEXP (op, 0),
-                                                            true, "cond"))
+                                                            true, true))
                              || gr_register_operand(op, mode);
 }
 
@@ -7008,7 +6445,7 @@ conditional_src_operand(rtx op, enum machine_mode mode)
                            : (memory_operand(op, mode)
                               && qdsp6_legitimate_address_p(GET_MODE (op),
                                                             XEXP (op, 0),
-                                                            true, "cond"))
+                                                            true, true))
                              || gr_register_operand(op, mode)
                              || s12_const_int_operand(op, mode);
 }
@@ -7055,15 +6492,15 @@ qdsp6_compute_dwarf_frame_information(void)
 
   frame = qdsp6_frame_info();
 
-  /* Did we use the allocframe instruction? */
-  if(frame->use_allocframe){
-    /* Yes. */
+  /* Did we omit the allocframe instruction? */
+  if(frame->lrfp_size != 0){
+    /* No. */
     dwarf2out_def_cfa(label, HARD_FRAME_POINTER_REGNUM, frame->lrfp_size);
     dwarf2out_reg_save(label, LINK_REGNUM, -UNITS_PER_WORD);
     dwarf2out_reg_save(label, HARD_FRAME_POINTER_REGNUM, -(2 * UNITS_PER_WORD));
   }
   else {
-    /* No. */
+    /* Yes. */
     dwarf2out_def_cfa(label, STACK_POINTER_REGNUM, frame->total_size);
   }
 
@@ -7072,14 +6509,14 @@ qdsp6_compute_dwarf_frame_information(void)
                         /* hard_frame_pointer_rtx */ : frame->lrfp_size)
            + frame->offset;
   /* Did we save any callee-save registers as pairs? */
-  for(i = 0; i < frame->num_saved_pairs; i++){
+  for(i = frame->num_saved_pairs - 1; i >= 0; i--){
     offset -= 2 * UNITS_PER_WORD;
     dwarf2out_reg_save(label, frame->saved_pairs[i], offset);
     dwarf2out_reg_save(label, frame->saved_pairs[i] + 1,
                               offset + UNITS_PER_WORD);
   }
   /* Did we save any other callee-save registers? */
-  for(i = 0; i < frame->num_saved_singles; i++){
+  for(i = frame->num_saved_singles - 1; i >= 0; i--){
     offset -= UNITS_PER_WORD;
     dwarf2out_reg_save(label, frame->saved_singles[i], offset);
   }
@@ -7093,34 +6530,27 @@ qdsp6_compute_dwarf_frame_information(void)
    Allocate stack space by decrementing SP. */
 
 static void
-qdsp6_allocate_stack(unsigned HOST_WIDE_INT size, int allocate_stack_insn){
-  rtx offset;
+qdsp6_allocate_stack(unsigned HOST_WIDE_INT size){
+  rtx r28;
 
-  if(size == 0){
-    return;
-  }
-
-  /* If more than two add instructions would be required, then load the offset
+  /* If more than two add instructions would be required, then reload the offset
      into r28. */
   if(size > 2 * -MIN_ADD_IMMED){
-    offset = gen_rtx_REG (SImode, 28);
-    emit_move_insn(offset, gen_int_mode(-size, Pmode));
-    size = 0;
-  }
-  else if(size > -MIN_ADD_IMMED){
-    offset = gen_int_mode(MIN_ADD_IMMED, Pmode);
-    size -= -MIN_ADD_IMMED;
+    r28 = gen_rtx_REG (SImode, 28);
+    emit_move_insn(r28, gen_int_mode(-size, Pmode));
+    emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx, r28));
   }
   else {
-    offset = gen_int_mode(-size, Pmode);
-    size = 0;
-  }
-
-  emit_insn(GEN_FCN (allocate_stack_insn)(offset));
-
-  if(size > 0){
-    offset = gen_int_mode(-size, Pmode);
-    emit_insn(gen_increment_stack_pointer(offset));
+    while(size > -MIN_ADD_IMMED){
+      emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx,
+                                              gen_int_mode(MIN_ADD_IMMED,
+                                                           Pmode)));
+      size -= -MIN_ADD_IMMED;
+    }
+    if(size > 0){
+      emit_insn(gen_addsi3(stack_pointer_rtx, stack_pointer_rtx,
+                                              gen_int_mode(-size, Pmode)));
+    }
   }
 }
 
@@ -7136,38 +6566,34 @@ qdsp6_expand_prologue(void)
   struct qdsp6_frame_info *frame;
   rtx base_reg;
   HOST_WIDE_INT offset;
-  unsigned int i;
+  int i;
 
   frame = qdsp6_frame_info();
 
-  /* Do we need to use the allocframe instruction? */
-  if(frame->use_allocframe){
-    rtx allocframe_size = gen_int_mode(frame->allocframe_size, SImode);
-    emit_insn(GEN_FCN (frame->allocframe_insn)(allocframe_size));
+  /* Can we omit the allocframe instruction? */
+  if(frame->lrfp_size != 0){
+    emit_insn(gen_allocframe(gen_int_mode(frame->allocframe_size, SImode)));
   }
 
   /* Allocate any remaning stack space. */
-  qdsp6_allocate_stack(frame->sp_adjustment, frame->allocate_stack_insn);
+  qdsp6_allocate_stack(frame->sp_adjustment);
 
   /* Save callee-save registers. */
   if(frame->prologue_function != CODE_FOR_nothing){
     emit_insn(GEN_FCN (frame->prologue_function)(NULL_RTX));
   }
   base_reg = frame->base_reg;
-  offset = frame->offset;
-  /* Account for any pairs that have already been saved. */
-  offset -= 2 * UNITS_PER_WORD * frame->num_specially_saved_pairs;
+  offset = frame->offset - 2 * UNITS_PER_WORD * frame->num_function_saved_pairs;
   /* Save any callee-save registers that can be stored as pairs and have not
-     already been saved in some other manner. */
-  for(i = frame->num_specially_saved_pairs; i < frame->num_saved_pairs; i++){
+     been saved by a common prologue function. */
+  i = frame->num_saved_pairs - frame->num_function_saved_pairs - 1;
+  for(; i >= 0; i--){
     offset -= 2 * UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (DImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (DImode, frame->saved_pairs[i]));
   }
-  /* Account for any singles that have already been saved. */
-  offset -= UNITS_PER_WORD * frame->num_specially_saved_singles;
   /* Save any remaining callee-save registers. */
-  for(i = frame->num_specially_saved_singles; i < frame->num_saved_singles; i++){
+  for(i = frame->num_saved_singles - 1; i >= 0; i--){
     offset -= UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (SImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (SImode, frame->saved_singles[i]));
@@ -7186,9 +6612,7 @@ qdsp6_direct_return(void)
 {
   struct qdsp6_frame_info *frame = qdsp6_frame_info();
 
-  return reload_completed && (frame->total_size == 0
-                              || (TARGET_V4_FEATURES && frame->use_allocframe
-                                                     && frame->reg_size == 0));
+  return reload_completed && frame->total_size == 0;
 }
 
 
@@ -7246,33 +6670,31 @@ qdsp6_expand_epilogue(bool sibcall)
 
   /* Restore callee-save registers. */
   base_reg = frame->base_reg;
-  offset = frame->offset - (2 * frame->num_saved_pairs
-                              + frame->num_saved_singles) * UNITS_PER_WORD;
-  /* Restore any callee-save registers not stored as part of a pair. */
-  for(i = (int) frame->num_saved_singles - 1; i >= 0; i--){
-    emit_move_insn(gen_rtx_REG (SImode, frame->saved_singles[i]),
-                   gen_rtx_MEM (SImode, plus_constant(base_reg, offset)));
-    offset += UNITS_PER_WORD;
-  }
+  offset = frame->offset
+           - (2 * UNITS_PER_WORD
+              * (sibcall ? frame->num_sibcall_function_restored_pairs
+                         : frame->num_function_restored_pairs));
   /* Restore any callee-save registers that can be loaded as pairs and will not
      be loaded by a common epilogue function. */
-  for(i = (int) frame->num_saved_pairs - 1;
-      i >= (int) (sibcall ? frame->num_sibcall_function_restored_pairs
-                          : frame->num_function_restored_pairs);
-      i--){
+  i = frame->num_saved_pairs
+      - (sibcall ? frame->num_sibcall_function_restored_pairs
+                 : frame->num_function_restored_pairs) - 1;
+  for(; i >= 0; i--){
+    offset -= 2 * UNITS_PER_WORD;
     emit_move_insn(gen_rtx_REG (DImode, frame->saved_pairs[i]),
                    gen_rtx_MEM (DImode, plus_constant(base_reg, offset)));
-    offset += 2 * UNITS_PER_WORD;
+  }
+  /* Restore any remaining callee-save registers. */
+  for(i = frame->num_saved_singles - 1; i >= 0; i--){
+    offset -= UNITS_PER_WORD;
+    emit_move_insn(gen_rtx_REG (SImode, frame->saved_singles[i]),
+                   gen_rtx_MEM (SImode, plus_constant(base_reg, offset)));
   }
 
-  /* Determine how best to deallocate the stack frame and restore LR and FP if
-     necessary. */
-  /* If LR and FP do not need to be restored, then simply deallocate the
-     stack. */
-  if(!frame->use_allocframe){
+  /* Can we omit the deallocframe instruction? */
+  if(frame->lrfp_size == 0){
     qdsp6_deallocate_stack(frame->sp_adjustment);
   }
-  /* Otherwise, call a function if doing so will save code size. */
   else if(!sibcall && frame->epilogue_function != CODE_FOR_nothing){
     emit_jump_insn(GEN_FCN (frame->epilogue_function)(NULL_RTX));
     emit_return = false;
@@ -7280,24 +6702,15 @@ qdsp6_expand_epilogue(bool sibcall)
   else if(sibcall && frame->sibcall_epilogue_function != CODE_FOR_nothing){
     emit_insn(GEN_FCN (frame->sibcall_epilogue_function)(NULL_RTX));
   }
-  /* Otherwise, on V4 and up, use the dealloc_return instruction if possible. */
-  else if(TARGET_V4_FEATURES && emit_return
-          && !crtl->calls_eh_return){
-    emit_jump_insn(gen_deallocframe_return());
-    emit_return = false;
-  }
-  /* Otherwise, use separate deallocframe and return instructions. */
   else {
     emit_insn(gen_deallocframe());
   }
 
-  /* If returning to an exception handler, adjust the stack as necessary. */
   if(crtl->calls_eh_return){
     emit_insn(gen_addsi3(stack_pointer_rtx,
                          stack_pointer_rtx, EH_RETURN_STACKADJ_RTX));
   }
 
-  /* Emit a return jump if we still need to. */
   if(emit_return){
     emit_jump_insn(gen_return_jump());
   }
@@ -7317,16 +6730,15 @@ qdsp6_expand_compare(enum rtx_code code)
   rtx op1 = cfun->machine->compare_op1;
   enum rtx_code compare_code, jump_code;
   rtx p_reg, const_reg;
-  int offset = 0;
+  bool offset = false;
 
   if(GET_MODE (op0) == BImode){
     gcc_assert(REG_P (op0) && (code == NE || code == EQ) && op1 == const0_rtx);
     return gen_rtx_fmt_ee(code, BImode, op0, op1);
   }
 
-  if(REG_P (op1) || GET_CODE (op1) == SUBREG){
+  if(REG_P (op1)){
     switch(code) {
-      /* Equality compares */
       case EQ:
         SET_CODES (EQ, NE); break;
       case NE:
@@ -7353,48 +6765,90 @@ qdsp6_expand_compare(enum rtx_code code)
         SET_CODES (GTU, EQ); SWAP_OPERANDS; break;
 
       default:
-        gcc_unreachable();
+        abort();
     }
   }
   else {
-    gcc_assert(GET_MODE (op0) != DImode && GET_MODE (op1) != DImode);
-
+    gcc_assert(GET_MODE(op0) != DImode && GET_MODE(op1) != DImode);
     switch(code) {
-      /* Equality compares */
       case EQ:
-        SET_CODES (EQ, NE); break;
+/*
+        if(cfun->machine->compare_op1 == const0_rtx){
+          SET_CODES (NE, EQ); break;
+        }
+        else {
+*/
+          SET_CODES (EQ, NE); break;
+/*
+        }
+*/
       case NE:
         SET_CODES (EQ, EQ); break;
 
       /* Signed compares */
       case LT:
-        SET_CODES (GT, EQ); offset = -1; break;
+        SET_CODES (GT, EQ); offset = true; break;
       case LE:
         SET_CODES (GT, EQ); break;
       case GT:
         SET_CODES (GT, NE); break;
       case GE:
-        SET_CODES (GT, NE); offset = -1; break;
+        SET_CODES (GT, NE); offset = true; break;
 
       /* Unsigned compares */
       case LTU:
-        SET_CODES (GTU, EQ); offset = -1; break;
+        SET_CODES (GTU, EQ); offset = true; break;
       case LEU:
         SET_CODES (GTU, EQ); break;
       case GTU:
         SET_CODES (GTU, NE); break;
       case GEU:
-        SET_CODES (GTU, NE); offset = -1; break;
+        SET_CODES (GTU, NE); offset = true; break;
 
       default:
-        gcc_unreachable();
+        abort();
     }
 
-    op1 = plus_constant(op1, offset);
-
-    if(GET_CODE (op1) != CONST_INT
-       || !IN_RANGE (INTVAL (op1), compare_code == GTU ? 0 : -512, 511)){
-      op1 = force_reg(SImode, op1);
+    if(TARGET_V2_FEATURES){
+      if(   INTVAL (op1) >= (compare_code == GTU ? offset ?    0 + 1 :    0
+                                                 : offset ? -512 + 1 : -512)
+         && INTVAL (op1) <= (offset ? 511 + 1 : 511)){
+        if(offset){
+          op1 = GEN_INT (INTVAL (op1) - 1);
+        }
+      }
+      else {
+        const_reg = gen_reg_rtx(SImode);
+        emit_move_insn(const_reg, op1);
+        if(offset){
+          jump_code = jump_code == EQ ? NE : EQ;
+          op1 = op0;
+          op0 = const_reg;
+        }
+        else {
+          op1 = const_reg;
+        }
+      }
+    }
+    else {
+      if(   INTVAL (op1) >= (compare_code == GTU ?   0 : -128)
+         && INTVAL (op1) <= (compare_code == GTU ? 255 :  127)){
+        if(offset){
+          compare_code = compare_code == GT ? GE : GEU;
+        }
+      }
+      else {
+        const_reg = gen_reg_rtx(SImode);
+        emit_move_insn(const_reg, op1);
+        if(offset){
+          jump_code = jump_code == EQ ? NE : EQ;
+          op1 = op0;
+          op0 = const_reg;
+        }
+        else {
+          op1 = const_reg;
+        }
+      }
     }
   }
 
@@ -7679,9 +7133,8 @@ qdsp6_expand_movmem(rtx operands[])
   const int O2_inline_cycle_threshold = 5;
   const int likely_aligned_cycle_threshold = 100;
 
-  volatile_p = !TARGET_V4_FEATURES
-               && (MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
-                   || !qdsp6_dual_memory_accesses);
+  volatile_p = (MEM_VOLATILE_P (operands[0]) || MEM_VOLATILE_P (operands[1])
+                || !qdsp6_dual_memory_accesses);
 
   align = MIN (INTVAL (operands[3]), BIGGEST_ALIGNMENT / BITS_PER_UNIT);
   if(GET_CODE (operands[2]) == CONST_INT){
@@ -8263,7 +7716,6 @@ static struct qdsp6_insn_info *qdsp6_predicate_insn(
                                  struct qdsp6_insn_info *insn_info,
                                  struct qdsp6_insn_info *jump_insn_info,
                                  bool invert_condition);
-static int qdsp6_dot_newify_reg(rtx *x, void *y);
 static struct qdsp6_insn_info *qdsp6_dot_newify_insn(
                                  struct qdsp6_insn_info *insn_info);
 static rtx  qdsp6_bb_real_head_insn(basic_block bb);
@@ -8371,14 +7823,17 @@ static void qdsp6_free_packing_info(void);
 
 
 static bool final_packing = false;
+
+/* _LSY_ Allow in non final pass to
+allocate compare and jum.new in the same   packet */  
+static bool let_cmp_jump_pack_together	= false;  
 static state_t qdsp6_state;
 
+/* _LSY_ Keep an alternative list to analyze better schedule. */ 
 static GTY(()) struct qdsp6_packet_info *qdsp6_head_packet;
 static GTY(()) struct qdsp6_packet_info *qdsp6_tail_packet;
 static GTY(()) struct qdsp6_bb_aux_info *qdsp6_head_bb_aux;
 static GTY(()) struct qdsp6_transformed_insn_stack *qdsp6_insn_stack;
-
-
 
 
 void
@@ -8422,6 +7877,9 @@ qdsp6_print_insn_info(FILE *file, struct qdsp6_insn_info *insn_info)
     if(QDSP6_CALL_P (insn_info)){
       fputs("call", file);
     }
+    if(QDSP6_EMULATION_CALL_P (insn_info)){
+      fputs("emulation_call", file);
+    }
     if(QDSP6_ENDLOOP_P (insn_info)){
       fputs("endloop", file);
     }
@@ -8433,27 +7891,20 @@ qdsp6_print_insn_info(FILE *file, struct qdsp6_insn_info *insn_info)
 
   fputs(";; flags: (", file);
   first = true;
-  if(QDSP6_EMULATION_CALL_P (insn_info)){
-    fputs("emulation_call", file);
-    first = false;
-  }
   if(QDSP6_VOLATILE_P (insn_info)){
-    if(!first){
-      fputs(", ", file);
-    }
     fputs("volatile", file);
     first = false;
   }
   if(QDSP6_MEM_P (insn_info)){
     if(!first){
-      fputs(", ", file);
+      fputc(',', file);
     }
     fputs("mem", file);
     first = false;
   }
   if(QDSP6_WANDERED_P (insn_info)){
     if(!first){
-      fputs(", ", file);
+      fputc(',', file);
     }
     fputs("wandered", file);
   }
@@ -8636,7 +8087,7 @@ qdsp6_wandered_too_far_p(rtx insn)
     case CODE_FOR_cond_jump:
     case CODE_FOR_loop0:
     case CODE_FOR_loop1:
-    case CODE_FOR_gpr_cond_jump:
+  case CODE_FOR_gpr_cond_jump:
       if(get_attr_length(insn) > 4){
         return true;
       }
@@ -8647,9 +8098,6 @@ qdsp6_wandered_too_far_p(rtx insn)
       return false;
   }
 }
-
-
-
 
 /* Return true if TEST is a valid relational operator for a conditional jump */
 static int
@@ -8663,35 +8111,20 @@ qdsp6_cond_jump_compare_operator (rtx test)
     return (code == NE || code == EQ);
 }
 
-
-
-
 static int
 qdsp6_get_flags(rtx insn)
 {
   int flags;
-  rtx pattern;
   rtx test;
 
   flags = 0;
 
-  pattern = PATTERN (insn);
-  if(GET_CODE (pattern) == PARALLEL){
-    pattern = XVECEXP (pattern, 0, 0);
+  if(GET_CODE (PATTERN (insn)) == COND_EXEC){
+    test = COND_EXEC_TEST (PATTERN (insn));
   }
-
-  if(GET_CODE (pattern) == COND_EXEC){
-    test = COND_EXEC_TEST (pattern);
-  }
-  else if(JUMP_P (insn) && GET_CODE (pattern) == SET
-          && GET_CODE (SET_SRC (pattern)) == IF_THEN_ELSE){
-
-    test = XEXP (SET_SRC (pattern), 0);
-
-    if(C_REG_P (XEXP (test, 0))){
-      flags |= QDSP6_ENDLOOP;
-      test = NULL_RTX;
-    }
+  else if(JUMP_P (insn) && GET_CODE (PATTERN (insn)) == SET
+          && GET_CODE (SET_SRC (PATTERN (insn))) == IF_THEN_ELSE){
+    test = XEXP (SET_SRC (PATTERN (insn)), 0);
   }
   else {
     test = NULL_RTX;
@@ -8726,10 +8159,10 @@ qdsp6_get_flags(rtx insn)
     flags |= QDSP6_UNCONDITIONAL;
   }
 
-  if(JUMP_P (insn) && !(flags & QDSP6_ENDLOOP)){
-    if(GET_CODE (pattern) == SET){
-      if(GET_CODE (SET_SRC (pattern)) == IF_THEN_ELSE){
-        if(GET_CODE (XEXP (SET_SRC (pattern), 1)) == LABEL_REF){
+  if(JUMP_P (insn)){
+    if(GET_CODE (PATTERN (insn)) == SET){
+      if(GET_CODE (SET_SRC (PATTERN (insn))) == IF_THEN_ELSE){
+        if(GET_CODE (XEXP (SET_SRC (PATTERN (insn)), 1)) == LABEL_REF){
           flags |= QDSP6_DIRECT_JUMP;
         }
         else {
@@ -8737,13 +8170,16 @@ qdsp6_get_flags(rtx insn)
         }
       }
       else {
-        if(GET_CODE (SET_SRC (pattern)) == LABEL_REF){
+        if(GET_CODE (SET_SRC (PATTERN (insn))) == LABEL_REF){
           flags |= QDSP6_DIRECT_JUMP;
         }
         else {
           flags |= QDSP6_INDIRECT_JUMP;
         }
       }
+    }
+    else {
+      flags |= QDSP6_ENDLOOP;
     }
   }
   else if(CALL_P (insn)){
@@ -8839,23 +8275,23 @@ qdsp6_record_reads(rtx *y, void *info)
       for_each_rtx(&COND_EXEC_CODE (x), qdsp6_record_reads, insn_info);
       return -1;
     case SET:
-    case POST_MODIFY:
-      if(GET_CODE (XEXP (x, 1)) != CALL){
-        for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
+      if(GET_CODE (SET_SRC (x)) != CALL){
+        for_each_rtx(&SET_DEST (x), qdsp6_record_writes, insn_info);
       }
-      for_each_rtx(&XEXP (x, 1), qdsp6_record_reads, insn_info);
+      for_each_rtx(&SET_SRC (x), qdsp6_record_reads, insn_info);
       return -1;
     case CALL:
       gcc_assert(MEM_P (XEXP (x, 0)));
       for_each_rtx(&XEXP (XEXP (x, 0), 0), qdsp6_record_reads, insn_info);
       return -1;
-    case CLOBBER:
-      for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
-      return -1;
     case POST_DEC:
     case POST_INC:
+	  /* _LSY_ Need to record reads for post inc as well...? */ 
+	  for_each_rtx(&XEXP (x, 0), qdsp6_record_reads, insn_info);
+	case CLOBBER: 
+    case POST_MODIFY:
       for_each_rtx(&XEXP (x, 0), qdsp6_record_writes, insn_info);
-      return 0;
+      return -1;
     case MEM:
       mem_access = ggc_alloc_cleared(sizeof(struct qdsp6_mem_access));
       mem_access->mem = x;
@@ -8873,15 +8309,6 @@ qdsp6_record_reads(rtx *y, void *info)
       for(; regno < next_hard_regno; regno++){
         reg_access = ggc_alloc_cleared(sizeof(struct qdsp6_reg_access));
         reg_access->regno = PN_REGNO_P (regno) ? regno - DOT_NEW_OFFSET : regno;
-        reg_access->flags = insn_info->flags;
-        reg_access->next = insn_info->reg_reads;
-        insn_info->reg_reads = reg_access;
-      }
-      return 0;
-    case RETURN:
-      if(!QDSP6_CALL_P (insn_info)){
-        reg_access = ggc_alloc_cleared(sizeof(struct qdsp6_reg_access));
-        reg_access->regno = LINK_REGNUM;
         reg_access->flags = insn_info->flags;
         reg_access->next = insn_info->reg_reads;
         insn_info->reg_reads = reg_access;
@@ -9319,7 +8746,6 @@ qdsp6_control_conflict_p(
 
 
 
-
 static bool
 qdsp6_predicable(struct qdsp6_insn_info *insn_info)
 {
@@ -9388,19 +8814,9 @@ qdsp6_dot_newable(struct qdsp6_insn_info *insn_info)
     return false;
   }
 
-  /* Before V4, the only control insns that could be .new predicated were direct
-     jumps. In V4, all control instructions can be .new predicated except calls
-     and register-condition jumps. */
-  if(QDSP6_CONTROL_P (insn_info)
-     && (QDSP6_REGCOND_JUMP_P (insn_info)
-         || QDSP6_CALL_P (insn_info)
-         || (!TARGET_V4_FEATURES && !QDSP6_DIRECT_JUMP_P (insn_info)))){
+  /* The only control insns that can be .new predicated are direct jumps. */
+  if(QDSP6_CONTROL_P (insn_info) && !QDSP6_DIRECT_JUMP_P (insn_info)){
     return false;
-  }
-
-  /* In V4, all non-control predicable instructions are .new predicable. */
-  if(TARGET_V4_FEATURES){
-    return true;
   }
 
   x = PATTERN (insn_info->insn);
@@ -9470,9 +8886,6 @@ qdsp6_prologue_insn_p(struct qdsp6_insn_info *insn_info)
 
 
 
-
-#define QDSP6_LOOP_INSN(INSN) (   INSN_CODE (INSN->insn) == CODE_FOR_loop0 \
-                               || INSN_CODE (INSN->insn) == CODE_FOR_loop1)
 
 static void
 qdsp6_insns_truly_dependent(
@@ -9566,6 +8979,8 @@ qdsp6_insns_truly_dependent(
         }
         if(QDSP6_CONFLICT_P (write, read)){
           if(PO_REGNO_P (read->regno)
+             && (!QDSP6_CONTROL_P (reader) || final_packing || 
+			 let_cmp_jump_pack_together)	/* _LSY_ let cond/jump merge */  
              && qdsp6_dot_newable(reader)){
             *dependence |= QDSP6_DEP_DOT_NEWABLE;
           }
@@ -9861,48 +9276,34 @@ qdsp6_predicate_insn(
 
 
 
-static int
-qdsp6_dot_newify_reg(rtx *x, void *y)
-{
-  rtx old_reg = (rtx) y;
-
-  if(REG_P (*x) && REGNO (*x) == REGNO (old_reg)){
-    *x = gen_rtx_REG (GET_MODE (old_reg), REGNO (old_reg) + DOT_NEW_OFFSET);
-  }
-  return 0;
-}
-
-
-
-
 static struct qdsp6_insn_info *
 qdsp6_dot_newify_insn(struct qdsp6_insn_info *insn_info)
 {
   rtx pattern;
+  rtx test;
   rtx old_reg;
 
   gcc_assert(QDSP6_CONDITIONAL_P (insn_info));
 
   pattern = PATTERN (insn_info->insn);
-  if(GET_CODE (pattern) == PARALLEL){
-    pattern = XVECEXP (pattern, 0, 0);
-  }
-
   if(GET_CODE (pattern) == COND_EXEC){
-    old_reg = XEXP (COND_EXEC_TEST (pattern), 0);
+    test = COND_EXEC_TEST (pattern);
   }
   else {
     gcc_assert(JUMP_P (insn_info->insn));
-    old_reg = XEXP (XEXP (SET_SRC (pattern), 0), 0);
+    test = XEXP (SET_SRC (pattern), 0);
   }
 
+  old_reg = XEXP (test, 0);
   gcc_assert(PO_REG_P (old_reg));
+  XEXP (test, 0) = gen_rtx_REG (GET_MODE (old_reg),
+                                REGNO (old_reg) + DOT_NEW_OFFSET);
 
-  if(final_packing){
-    for_each_rtx(&pattern, qdsp6_dot_newify_reg, old_reg);
+  insn_info = qdsp6_get_insn_info(insn_info->insn);
+
+  if(!final_packing){
+    XEXP (test, 0) = old_reg;
   }
-
-  insn_info->flags |= QDSP6_DOT_NEW;
 
   return insn_info;
 }
@@ -9968,13 +9369,11 @@ qdsp6_pack_insns(void)
   if(!final_packing){
     bb = ENTRY_BLOCK_PTR->next_bb;
     do{
-      if(bb){ 
-        bb_head_insn = qdsp6_bb_real_head_insn(bb);
-        bb_end_insn = qdsp6_bb_real_end_insn(bb);
-        if(!(bb_head_insn && bb_end_insn)){
-          bb = bb->next_bb;
-        }
-      }
+	if(bb){ 
+        	bb_head_insn = qdsp6_bb_real_head_insn(bb);
+        	bb_end_insn = qdsp6_bb_real_end_insn(bb);
+        	if(!(bb_head_insn && bb_end_insn))      bb = bb->next_bb;
+	}
     }while(bb && !(bb_head_insn && bb_end_insn));
     gcc_assert(bb_head_insn && bb_end_insn);
   }
@@ -10061,10 +9460,6 @@ qdsp6_pack_insns(void)
   }
 
 }
-
-
-
-
 static int
 check_call_reorder_feasibility(struct qdsp6_insn_info *insn_info){  
 
@@ -10086,9 +9481,6 @@ check_call_reorder_feasibility(struct qdsp6_insn_info *insn_info){
     }
 	return QDSP6_DEP_NONE;
 }
-
-
-
 
 /* This function is  used by tail merging
    Looks at the relationship of two instructions
@@ -10180,9 +9572,6 @@ qdsp6_instructions_dependent (rtx from,rtx to){
 
   return QDSP6_DEP_NONE;
 }
-
-
-
 
 static void
 qdsp6_push_insn(struct qdsp6_insn_info *insn, struct qdsp6_packet_info *packet)
@@ -10382,8 +9771,6 @@ qdsp6_sanity_check_cfg_packet_info(void)
 }
 
 
-
-
 static unsigned int 
 qdsp6_count_packets(void)
 {
@@ -10393,9 +9780,6 @@ qdsp6_count_packets(void)
   for(packet = qdsp6_head_packet; packet; packet = packet->next) 	total++; 
   return total; 
 }
-
-
-
 
 static void
 qdsp6_pull_up_insns(void)
@@ -10730,30 +10114,31 @@ qdsp6_free_packing_info(void)
   dfa_finish();
 }
 
-
-
-
 static void
 qdsp6_packet_optimizations(void)
 {
-  if(!(TARGET_PACKETS && optimize)){
+
+  if(!(optimize && flag_schedule_insns_after_reload)){
     return;
   }
 
-  shorten_branches(get_insns());
+#if !GCC_3_4_6
+
+  let_cmp_jump_pack_together      = true;
   qdsp6_init_packing_info();
   qdsp6_pack_insns();
   qdsp6_pull_up_insns();
   qdsp6_free_packing_info();
+  let_cmp_jump_pack_together      = false;
+
+#endif /* !GCC_3_4_6 */
 }
-
-
 
 
 static void
 qdsp6_final_pack_insns(void)
 {
-  if(!(TARGET_PACKETS && optimize)){
+  if(!(optimize && flag_schedule_insns_after_reload)){
     return;
   }
 
