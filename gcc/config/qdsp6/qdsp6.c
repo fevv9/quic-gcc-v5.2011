@@ -65,6 +65,7 @@
 #include "langhooks.h"
 #include "df.h"
 #include "sched-int.h"
+#include "cfgloop.h"
 
 
 
@@ -4934,7 +4935,93 @@ qdsp6_fixup_cfg(void)
   }
 }
 
+/* ggan:
+ * Called in sms_schedule(), after loop_version.
+ */
+void
+qdsp6_duplicate_doloop_begin(basic_block condition_bb, struct loop *loop)
+{
+    
+    edge true_edge = NULL;
+    edge false_edge  = NULL;
+    rtx begin_loop_insn = NULL; 
+    rtx end_loop_insn = NULL;
+    rtx insn = NULL;
+    int opcode = 0;
+    int begin_tag = 0;
+    int end_tag = 0;
+    rtx new_begin_loop_insn = NULL;
 
+    gcc_assert (condition_bb != NULL);
+
+    /* Get TRUE edge and FALSE edge of the cond bb */
+    extract_cond_bb_edges (condition_bb, &true_edge, &false_edge);
+
+    gcc_assert (true_edge != NULL);
+    gcc_assert (false_edge != NULL);
+
+    /* Get the bb that has the doloop_begin insn */
+    basic_block loop_setup_bb = single_pred (condition_bb);
+
+    /* Get the loop body bb of the duplicated loop. Because it is a 
+     * single bb loop, so loop header bb is the loop body
+     */
+    basic_block new_loop_header = get_bb_copy (loop->header);
+    
+    /* Get the preheader bb of the duplicated loop */
+    basic_block new_loop_preheader = false_edge->dest;
+   
+    /* find out the endloop0 insn */
+    FOR_BB_INSNS_REVERSE(new_loop_header, insn) 
+    {
+        if (!INSN_P (insn)) continue;
+            
+        opcode = recog_memoized(insn);
+
+        /* SWP is only performed on Single BB Loop.
+         * It is not possible to have nested loops
+         */
+        if (opcode == CODE_FOR_endloop0)
+        {
+            end_loop_insn = insn;
+            break;
+        }
+    }		
+
+    gcc_assert (end_loop_insn != NULL);
+
+    /* find out the loop0 insn */
+    FOR_BB_INSNS_REVERSE(loop_setup_bb, insn) 
+    {
+        if (!INSN_P (insn)) continue;
+
+        if (INSN_CODE (insn) == CODE_FOR_doloop_begin0)
+        {
+            begin_loop_insn = insn;
+            break;
+        } 
+    }
+
+    gcc_assert (begin_loop_insn != NULL);
+
+    /* extract the tag for the original doloop */
+    begin_tag = INTVAL (SET_SRC (XVECEXP (PATTERN (begin_loop_insn), 0, 1)));
+    end_tag = INTVAL (XVECEXP (XVECEXP (PATTERN (end_loop_insn), 0, 2), 0, 1));
+    gcc_assert (begin_tag == end_tag);
+
+    /* insert the copy of the loop0 insn into the new preheader bb */
+    new_begin_loop_insn = emit_copy_of_insn_after (begin_loop_insn, BB_END(new_loop_preheader));
+
+#define DOLOOP_TAG_OFFSET   100000
+
+    /* adjust the tag to make sure it is unique 
+     * currently, we just offset the original tag by 100000
+     */
+    SET_SRC (XVECEXP (PATTERN (new_begin_loop_insn), 0, 1)) = GEN_INT (end_tag + DOLOOP_TAG_OFFSET);
+    XVECEXP (XVECEXP (PATTERN (end_loop_insn), 0, 2), 0, 1) = GEN_INT (end_tag + DOLOOP_TAG_OFFSET);
+
+    return;              
+}
 
 
 static void

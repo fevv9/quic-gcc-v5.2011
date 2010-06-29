@@ -363,7 +363,15 @@ add_inter_loop_mem_dep (ddg_ptr g, ddg_node_ptr from, ddg_node_ptr to)
       else if (from->cuid != to->cuid)
 	{
   	  create_ddg_dep_no_link (g, from, to, ANTI_DEP, MEM_DEP, 1);
-  	  create_ddg_dep_no_link (g, to, from, TRUE_DEP, MEM_DEP, 1);
+      
+      /* ggan 05/05/2010 Bugzillar: #4065
+       * 
+       * Do not create inter loop memory dependence edge
+       * This would cause error regmove insn to be generated.
+       * The regmove would convert MAY alias to MUST alias
+       */
+
+  	  /* create_ddg_dep_no_link (g, to, from, TRUE_DEP, MEM_DEP, 1); */
 	}
     }
 
