@@ -1,8 +1,4 @@
-/*****************************************************************
-# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
-# All Rights Reserved.
-# Modified by Qualcomm Innovation Center, Inc. on $Date$
-*****************************************************************/
+
 
  /* QDSP6 specific functions
    Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.

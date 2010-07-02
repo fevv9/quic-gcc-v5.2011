@@ -1,8 +1,4 @@
-/*****************************************************************
-# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
-# All Rights Reserved.
-# Modified by Qualcomm Innovation Center, Inc. on $Date$
-*****************************************************************/
+
 /* C++ Parser.
    Copyright (C) 2000, 2001, 2002, 2003, 2004,
    2005, 2007, 2008, 2009  Free Software Foundation, Inc.
