@@ -3648,6 +3648,19 @@ qdsp6_asm_select_rtx_section(
 )
 {
   if(GET_MODE_SIZE (mode) > 0 && GET_MODE_SIZE (mode) <= g_switch_value){
+      if(TARGET_SECTION_SORTING){ 
+	char *sname;
+
+      	switch(GET_MODE_SIZE (mode))
+	{
+          case 1:  sname = ".sdata.1";	 break; 
+          case 2: sname = ".sdata.2";   break;
+          case 4: sname = ".sdata.4";   break;
+          case 8: sname = ".sdata.8";   break;	
+          default: sname = ".sdata";     break; 
+  	}
+	return get_named_section (NULL_TREE, sname, 0);
+      } 
     return sdata_section;
   }
   else {
