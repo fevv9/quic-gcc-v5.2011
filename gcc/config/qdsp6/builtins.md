@@ -1,8 +1,3 @@
-;; ##################################################################
-;; # Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
-;; # All Rights Reserved.
-;; # Modified by Qualcomm Innovation Center, Inc. on $Date$
-;; ##################################################################
 (define_constants [
   (UNSPEC_QDSP6_Q6C2_cmpeq 1000)
   (UNSPEC_QDSP6_Q6C2_cmpgt 1001)
