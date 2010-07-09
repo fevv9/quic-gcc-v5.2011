@@ -1,9 +1,4 @@
 #!/bin/bash
-##################################################################
-# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
-# All Rights Reserved.
-# Modified by Qualcomm Innovation Center, Inc. on $Date$
-##################################################################
 
 # set value for --prefix option
 if [ "$1" != "" ]; then
@@ -35,5 +30,4 @@ bash `dirname $0`/configure \
   --disable-sjlj-exceptions \
   --disable-nls \
   --disable-libssp \
-  ${EXP_FLAGS} \
   --with-dinkumware

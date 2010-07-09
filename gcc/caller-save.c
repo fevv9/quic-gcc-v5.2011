@@ -1,8 +1,4 @@
-/*****************************************************************
-# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
-# All Rights Reserved.
-# Modified by Qualcomm Innovation Center, Inc. on $Date$
-*****************************************************************/
+
 /* Save and restore call-clobbered registers which are live across a call.
    Copyright (C) 1989, 1992, 1994, 1995, 1997, 1998, 1999, 2000,
    2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
@@ -931,14 +927,14 @@ add_stored_regs (rtx reg, const_rtx setter, void *data)
     { 
       rtx mem_operand = XEXP (reg, 0);
       if (GET_CODE (mem_operand) == POST_INC || 
-          GET_CODE (mem_operand) == PRE_INC ||
-          GET_CODE (mem_operand) == POST_DEC ||
-          GET_CODE (mem_operand) == PRE_DEC || 
-          GET_CODE (mem_operand) == POST_MODIFY ||
-          GET_CODE (mem_operand) == PRE_MODIFY)
-        {
-          return add_stored_regs(XEXP (mem_operand, 0), setter, data);
-        }
+	  GET_CODE (mem_operand) == PRE_INC ||
+	  GET_CODE (mem_operand) == POST_DEC ||
+	  GET_CODE (mem_operand) == PRE_DEC || 
+	  GET_CODE (mem_operand) == POST_MODIFY ||
+	  GET_CODE (mem_operand) == PRE_MODIFY)
+	{
+	  return add_stored_regs(XEXP (mem_operand, 0), setter, data);
+	}
     }
 #endif /* AUTO_INC_DEC */
 

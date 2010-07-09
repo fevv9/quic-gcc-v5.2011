@@ -1,8 +1,4 @@
-/*****************************************************************
-# Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
-# All Rights Reserved.
-# Modified by Qualcomm Innovation Center, Inc. on $Date$
-*****************************************************************/
+
 /* Prototypes for qdsp6.c functions used in the md file & elsewhere.
    Copyright (C) 1999, 2000, 2002 Free Software Foundation, Inc.
 
@@ -27,22 +23,19 @@ extern void qdsp6_override_options(void);
 extern void qdsp6_optimization_options(int, int);
 extern void qdsp6_init_expanders(void);
 extern void qdsp6_conditional_register_usage(void);
-extern bool qdsp6_cannot_change_mode_class(
-  enum machine_mode,
-  enum machine_mode,
-  enum reg_class);
 extern bool qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT, char, const char *);
 extern HOST_WIDE_INT qdsp6_initial_elimination_offset(int, int);
-extern bool qdsp6_store_by_pieces_p(unsigned HOST_WIDE_INT, unsigned int);
 extern const char *qdsp6_asm_output_opcode(FILE *, const char *);
 extern void qdsp6_expand_prologue(void);
 extern void qdsp6_expand_epilogue(bool);
 extern bool qdsp6_direct_return(void);
 extern void qdsp6_hardware_loop (void);
 
+extern int  qdsp6_GP_or_reg_operand_c (rtx , enum machine_mode); 
+extern int  qdsp6_nonimmediate_operand_with_GP_c (rtx , enum machine_mode); 
+extern int  qdsp6_instructions_dependent (rtx ,rtx ); 
 #ifdef TREE_CODE
 extern int  qdsp6_data_alignment(tree, int);
-extern int  qdsp6_constant_alignment(tree, int);
 extern int  qdsp6_local_alignment(tree, int);
 #if GCC_3_4_6
 extern bool qdsp6_must_pass_in_stack(enum machine_mode, tree);
@@ -67,7 +60,7 @@ extern void qdsp6_asm_output_aligned_decl_local(
 extern enum reg_class qdsp6_secondary_reload_class(rtx, enum reg_class);
 #endif /* GCC_3_4_6 */
 extern rtx  qdsp6_return_addr_rtx(int, rtx);
-extern bool qdsp6_legitimate_address_p(enum machine_mode, rtx, bool, const char *);
+extern bool qdsp6_legitimate_address_p(enum machine_mode, rtx, bool, bool);
 #if GCC_3_4_6
 extern bool qdsp6_reg_ok_for_base_p(rtx, bool);
 #endif /* GCC_3_4_6 */
@@ -81,9 +74,6 @@ extern bool qdsp6_expand_clrstr(rtx[]);
 extern bool qdsp6_expand_strlen(rtx[]);
 extern bool qdsp6_expand_cmpstr(rtx[]);
 extern rtx  qdsp6_expand_compare(enum rtx_code);
-extern int  qdsp6_GP_or_reg_operand_c(rtx, enum machine_mode);
-extern int  qdsp6_nonimmediate_operand_with_GP_c(rtx, enum machine_mode);
-extern int  qdsp6_instructions_dependent(rtx, rtx);
 #endif /* RTX_CODE */
 
 #if defined(TREE_CODE) && defined(RTX_CODE)

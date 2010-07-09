@@ -1,8 +1,3 @@
-;; ##################################################################
-;; # Copyright (c) $Date$ Qualcomm Innovation Center, Inc..
-;; # All Rights Reserved.
-;; # Modified by Qualcomm Innovation Center, Inc. on $Date$
-;; ##################################################################
 ;;--------------;;
 ;; Mode Macros  ;;
 ;;--------------;;
@@ -23,52 +18,9 @@
 ;; Vector Moves ;;
 ;;--------------;;
 
-;;;---------;;
-;;; movv8bi ;;
-;;;---------;;
-;
-;(define_expand "movv8bi"
-;  [(set (match_operand:V8BI 0 "nonimmediate_operand" "")
-;        (match_operand:V8BI 1 "general_operand" ""))]
-;  ""
-;  {
-;    if(GET_CODE (operands[0]) != REG){
-;      operands[1] = force_reg(V8BImode, operands[1]);
-;    }
-;  }
-;)
-;
-;(define_insn "movv8bi_czero"
-;  [(set (match_operand:V8BI 0 "gr_register_operand" "=Rp, Rg")
-;        (match_operand:V8BI 1 "zero_constant"       "Iu0,Iu0"))]
-;  ""
-;  "@
-;   %0 = cmp.gt(r0,r0)  // movv8bi_czero
-;   %0 = #0             // movv8bi_czero"
-;  [(set_attr "type" "A,A")]
-;)
-;
-;(define_insn "movv8bi_cvec"
-;  [(set (match_operand:V8BI 0 "gr_register_operand" "=Rg")
-;        (match_operand:V8BI 1 "immediate_operand"  "Is16"))]
-;  ""
-;  "%0 = #%1        // movv8bi_cvec"
-;  [(set_attr "type" "A")]
-;)
-;
-;(define_insn "movv8bi_real"
-;  [(set (match_operand:V8BI 0 "nonimmediate_operand" "=Rg,Rg, m,Rp,Rp,Rg")
-;        (match_operand:V8BI 1 "general_operand"       "Rg, m,Rg,Rp,Rg,Rp"))]
-;  ""
-;  "@
-;   %0 = %1
-;   %0 = memb(%1)
-;   memb(%0) = %1
-;   %0 = or(%1,%1)
-;   %0 = %1
-;   %0 = %1"
-;  [(set_attr "type" "A,Load,Store,S,S,S")]
-;)
+;;;-------------------;;
+;;; mov vector types  ;;
+;;;-------------------;;
 
 (define_expand "mov<mode>"
   [(set (match_operand:IVEC64 0 "nonimmediate_operand" "")
@@ -149,58 +101,7 @@
   [(set_attr "type" "A,Load,Store")]
 )
 
-
-;;(define_insn "vec_realign_load_helper_predmove"
-;;  [(set (match_operand:V8BI 0 "pr_register_operand" "=Rp")
-;;        (unspec:V8BI [(match_operand:SI 1 "gr_register_operand" "Rg")] UNSPEC_REALIGN_SETUP))]
-;;  ""
-;;  "%0 = %1"
-;;  [(set_attr "type" "S")]
-;;)
-
-;;(define_expand "vec_realign_load_<mode>"
-;;  [(set (match_operand:IVEC64 0 "gr_register_operand" "")
-;;        (unspec:IVEC64 [(match_operand 1 "gr_register_operand" "")
-;;                        (match_operand 2 "gr_register_operand" "")
-;;                        (match_operand 3 "nonmemory_operand" "")] UNSPEC_REALIGN_LOAD))]
-;;  ""
-;;  {
-;;     rtx reg = gen_reg_rtx(V8BImode);
-;;     fprintf(stderr,"vec_realign_load_<mode> expander.  Args:");
-;;     debug_rtx(operands[0]);
-;;     debug_rtx(operands[1]);
-;;     debug_rtx(operands[2]);
-;;     debug_rtx(operands[3]);
-;;     operands[0] = force_reg(<MODE>mode,operands[0]);
-;;     operands[1] = force_reg(<MODE>mode,operands[1]);
-;;     operands[2] = force_reg(<MODE>mode,operands[2]);
-;;     emit_insn(gen_rtx_SET(V8BImode,reg,gen_rtx_UNSPEC(V8BImode,gen_rtvec(1,operands[3]),UNSPEC_REALIGN_SETUP)));
-;;     operands[3] = reg;
-;;  }
-;;)
-
-;;(define_expand "vec_realign_load_<mode>"
-;;  [(set (match_operand:IVEC64 0 "gr_register_operand" "")
-;;        (unspec:IVEC64 [(match_operand:IVEC64 1 "gr_register_operand" "")
-;;                        (match_operand:IVEC64 2 "gr_register_operand" "")
-;;                        (match_operand:QI 3 "pr_register_operand" "")] UNSPEC_REALIGN_LOAD))]
-;;  ""
-;;  {
-;;  }
-;;)
-
-;;(define_insn "vec_realign_load_<mode>_real"
-;;  [(set (match_operand:IVEC64 0 "register_operand" "=Rg,Rg")
-;;        (unspec:IVEC64 [(match_operand:IVEC64 1 "gr_register_operand" "Rg,Rg")
-;;                        (match_operand:IVEC64 2 "gr_register_operand" "Rg,Rg")
-;;                        (match_operand:V8BI 3 "pr_register_operand" "Rp,Iu3")] UNSPEC_REALIGN_LOAD))]
-;;  ""
-;;  "@
-;;   %P0 = valignb(%P2,%P1,%3) // %0 %1 %2 %3 Realign <mode>
-;;   %P0 = valignb(%P2,%P1,#%3) // %0 %1 %2 %3 Realign <mode>"
-;;   [(set_attr "type" "S")]
-;;)
-
+;; _LSY_ could it be RpRnp?? ,Iu3, QI 
 (define_insn "vec_realign_load_<mode>"
   [(set (match_operand:IVEC64 0 "register_operand" "=Rg,Rg")
         (unspec:IVEC64 [(match_operand:IVEC64 1 "gr_register_operand" "Rg,Rg")
@@ -209,10 +110,9 @@
   ""
   "@
    %P0 = valignb(%P2,%P1,%3) // %0 %1 %2 %3 Realign <mode>
-   %P0 = valignb(%P2,%P1,#%3) // %0 %1 %2 %3 Realign <mode>"
-   [(set_attr "type" "S")]
+   %P0 = valignb(%P2,%P1,#%3) // %0 %1 %2 %3 Realign with Immediate <mode>"
+   [(set_attr "type" "S,S")]
 )
-
 
 (define_insn "splatv8qi"
   [(set (match_operand:V8QI 0 "gr_register_operand" "=Rg")
@@ -793,7 +693,7 @@
   ""
   {
   rtx vzero = gen_reg_rtx(<MODE>mode);
-  emit_insn(gen_mov<mode>_zero64(vzero,const0_rtx));
+  emit_insn(gen_mov<mode>_zero64(vzero,CONST0_RTX(<MODE>mode))); // _LSY_ const0_rtx));
   emit_insn(gen_sub<mode>3(operands[0],vzero,operands[1]));
   DONE;
   }
