@@ -9608,6 +9608,180 @@
   [(set_attr "type" "A,A,Load")]
 )
 
+;;;---------------------------------
+;;; 32 bit floating point arithmetic
+;;;---------------------------------
+;
+;;;----------
+;;; add[sd]f3
+;;;----------
+;
+;(define_insn "addsf3"
+;  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+;        (plus:SF (match_operand:SF 1 "gr_register_operand" "r")
+;                 (match_operand:SF 2 "gr_register_operand" "r")))]
+;  ""
+;  "%0 = sfadd(%1, %2)"
+;)
+;
+;(define_insn "adddf3"
+;  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+;        (plus:DF (match_operand:DF 1 "gr_register_operand" "r")
+;                 (match_operand:DF 2 "gr_register_operand" "r")))]
+;  ""
+;  "%0 = dfadd(%1, %2)"
+;)
+;
+;;;----------
+;;; sub[sd]f3
+;;;----------
+;
+;(define_insn "subsf3"
+;  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+;        (minus:SF (match_operand:SF 1 "gr_register_operand" "r")
+;                 (match_operand:SF 2 "gr_register_operand" "r")))]
+;  ""
+;  "%0 = sfsub(%1, %2)"
+;)
+;
+;(define_insn "subdf3"
+;  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+;        (minus:DF (match_operand:DF 1 "gr_register_operand" "r")
+;                 (match_operand:DF 2 "gr_register_operand" "r")))]
+;  ""
+;  "%0 = dfsub(%1, %2)"
+;)
+;
+;
+;;; ----------
+;;; umax[sd]f3
+;;; ----------
+;
+;(define_insn "umaxsf3"
+;  [(set (match_operand:SF 0 "gr_register_operand"         "=Rg")
+;        (umax:SF (match_operand:SF 1 "gr_register_operand" "Rg")
+;                 (match_operand:SF 2 "gr_register_operand" "Rg")))]
+;  ""
+;  "%0 = sfmaxu(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;(define_insn "umaxdf3"
+;  [(set (match_operand:DF 0 "gr_register_operand"         "=Rg")
+;        (umax:DF (match_operand:DF 1 "gr_register_operand" "Rg")
+;                 (match_operand:DF 2 "gr_register_operand" "Rg")))]
+;  ""
+;  "%0 = dfmaxu(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;;; ----------
+;;; umin[sd]f3
+;;; ----------
+;
+;(define_insn "uminsf3"
+;  [(set (match_operand:SF 0 "gr_register_operand"         "=Rg")
+;        (umin:SF (match_operand:SF 1 "gr_register_operand" "Rg")
+;                 (match_operand:SF 2 "gr_register_operand" "Rg")))]
+;  ""
+;  "%0 = sfminu(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;(define_insn "umindf3"
+;  [(set (match_operand:DF 0 "gr_register_operand"         "=Rg")
+;        (umin:DF (match_operand:DF 1 "gr_register_operand" "Rg")
+;                 (match_operand:DF 2 "gr_register_operand" "Rg")))]
+;  ""
+;  "%0 = dfminu(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;;; --------
+;;; mul[sd]3
+;;; --------
+;
+;(define_insn "mulsf3"
+;  [(set (match_operand:SF 0 "register_operand" "=r")
+;        (mult:SF (match_operand:SF 1 "register_operand" "r")
+;                 (match_operand:SF 2 "register_operand" "r")))]
+;  ""
+;  "%0 = sfmpy(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;(define_insn "muldf3"
+;  [(set (match_operand:DF 0 "register_operand" "=r")
+;        (mult:DF (match_operand:DF 1 "register_operand" "r")
+;                 (match_operand:DF 2 "register_operand" "r")))]
+;  ""
+;  "%0 = dfmpy(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;;; -----------
+;;; cmp[fd]
+;;; -----------
+;
+;(define_expand "cmpsf"
+;  [(match_operand:SF 0 "gr_register_operand" "")
+;   (match_operand:SF 1 "gr_register_operand" "")] 
+;  ""
+;  {
+;    cfun->machine->compare_op0 = operands[0];
+;    cfun->machine->compare_op1 = operands[1];
+;    DONE;
+;  }
+;)
+;
+;
+;(define_expand "cmpdf"
+;  [(match_operand:DF 0 "gr_register_operand" "")
+;   (match_operand:DF 1 "gr_register_operand" "")] 
+;  ""
+;  {
+;    cfun->machine->compare_op0 = operands[0];
+;    cfun->machine->compare_op1 = operands[1];
+;    DONE;
+;  }
+;)
+;
+;(define_insn "cmpsf_gt"
+;  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+;        (gt:BI (match_operand:SF 1 "gr_register_operand" "Rg")
+;               (match_operand:SF 2 "gr_register_operand" "Rg")))]
+;  ""
+;  "%0 = sfcmp.gt(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;(define_insn "cmpdf_gt"
+;  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+;        (gt:BI (match_operand:DF 1 "gr_register_operand" "Rg")
+;               (match_operand:DF 2 "gr_register_operand" "Rg")))]
+;  ""
+;  "%0 = dfcmp.gt(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;(define_insn "cmpsf_eq"
+;  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+;        (eq:BI (match_operand:SF 1 "gr_register_operand" "Rg")
+;               (match_operand:SF 2 "gr_register_operand" "Rg")))]
+;  ""
+;  "%0 = sfcmp.eq(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+;
+;(define_insn "cmpdf_eq"
+;  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+;        (eq:BI (match_operand:DF 1 "gr_register_operand" "Rg")
+;               (match_operand:DF 2 "gr_register_operand" "Rg")))]
+;  ""
+;  "%0 = dfcmp.eq(%1,%2)"
+;  [(set_attr "type" "X")]
+;)
+
 (define_insn_and_split "cond_combinesi"
   [(cond_exec
      (match_operator:BI 4 "predicate_operator"
