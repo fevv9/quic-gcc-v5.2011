@@ -925,7 +925,10 @@ qdsp6_cannot_change_mode_class(
    ImN means signed magnitude integers in [-(2^(N-1) - 1), 2^(N-1) - 1]
 
    J[sunm]N_M means I[sunm]N shifted left M bits
-
+   
+   K-1 means -1
+   K0  means  0
+   K1  means  1
    K16 means 16
    K32 means 32
    Ku7p1 integers in [1, 128]
@@ -1005,6 +1008,15 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
       return low <= value && value <= high && scale_bits == 0;
 
     case 'K':
+      if(QDSP6_CONSTRAINT_P(str, -1)){
+        return value == -1;
+      }
+      if(QDSP6_CONSTRAINT_P(str, 0)){
+        return value == 0;
+      }
+      if(QDSP6_CONSTRAINT_P(str, 1)){
+        return value == 1;
+      }
       if(QDSP6_CONSTRAINT_P(str, 16)){
         return value == 16;
       }
@@ -2084,6 +2096,55 @@ qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p)
 }
 
 
+/* bool */
+/* qdsp6_base_offset_helper (enum machine_mode mode, rtx x) */
+/* { */
+/*     rtx xop1 = XEXP (x, 1); */
+/*     rtx xop0 = XEXP (x, 0); */
+
+/*   if (GET_CODE (x) == PLUS */
+/*       && ((REG_P (xop0) && qdsp6_reg_ok_for_base_p(xop0, reg_ok_strict_p)) */
+/*           || (allow_immediate_base && allow_extension */
+/*               && CONSTANT_P (xop0) && !CONSTANT_P (xop1)))){ */
+/*     rtx offset, index, scale; */
+
+/*     if(   GET_CODE (xop1) == PLUS */
+/*        || GET_CODE (xop1) == MULT */
+/*        || GET_CODE (xop1) == ASHIFT){ */
+/*       xop1op0 = XEXP (xop1, 0); */
+/*       xop1op1 = XEXP (xop1, 1); */
+/*       if(GET_CODE (xop1) != ASHIFT && !REG_P (xop1op0)){ */
+/*         xop1op0 = XEXP (xop1, 1); */
+/*         xop1op1 = XEXP (xop1, 0); */
+/*       } */
+/*     } */
+/*     offset = xop1; */
+/*     index = xop1op0; */
+/*     scale = xop1op1; */
+    
+/*     /\* base+offset address *\/ */
+/*     if(GET_CODE (offset) == CONST_INT){ */
+/*       return qdsp6_legit_addr_const_p(INTVAL (offset), mode, offset_bits); */
+/*     } */
+/*   } */
+/* } */
+
+/* bool */
+/* qdsp6_base_offset_p (enum machine_mode mode, rtx x) */
+/* { */
+/*   HOST_WIDE_INT dummy; */
+/*   return(qdsp6_base_offset_helper (mode, x, dummy)); */
+/* } */
+
+/* HOST_WIDE_INT qdsp6_get_offset_value (enum machine_mode mode, rtx x) */
+/* { */
+/*   HOST_WIDE_INT offset; */
+/*   gcc_assert(qdsp6_base_offset_helper (mode, x, offset)); */
+/*   return(offset); */
+/* } */
+  
+
+
 
 
 /* Used by macro GO_IF_LEGITIMATE_ADDRESS
@@ -2094,6 +2155,7 @@ qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p)
    values for the constraint string are:
 
    m       basic loads and stores, allowing an immediate extender
+   dm      stores and loads for duplex operators
    noext   basic loads and stores
    cond    conditional loads and stores
    econd   conditional loads and stores, allowing an immediate extender
@@ -2130,7 +2192,43 @@ qdsp6_legitimate_address_p(
     allow_extension = true;
   }
 
-  if(!strcmp(constraint, "m") || !strcmp(constraint, "noext")){
+  /* 
+     dm: duplex-memory
+     dmsb: duplex-memory-signed-byte
+     dmfd: duplex-memory-stack-frame-double-word
+  */
+  if (TARGET_V4_FEATURES && !strcmp (constraint, "dm")) {
+    /* For memw(r29 + #u5:2) and memd(r29+#u5:3) */
+    if (GET_CODE (x) == PLUS) {
+      xop0 = XEXP (x, 0);
+      xop1 = XEXP (x, 1);
+      if (REG_P (xop0)
+          && REGNO (xop0) == STACK_POINTER_REGNUM
+          && GET_CODE (xop1) == CONST_INT) {
+        offset_bits = 5;
+      }
+    }
+    /* For memw(Rs+#u4:2) */
+    else {
+      offset_bits = 4;
+    }
+  }
+  else if (TARGET_V4_FEATURES && !strcmp (constraint, "dmsb")) {
+    /* For Rd = memb(Rs+#u3:0) */
+    offset_bits = 3;
+  }
+  else if (TARGET_V4_FEATURES && !strcmp (constraint, "dmfd") &&
+           GET_CODE (x) == PLUS) {
+    xop0 = XEXP (x, 0);
+    xop1 = XEXP (x, 1);
+    if (REG_P (xop0)
+        && REGNO (xop0) == STACK_POINTER_REGNUM 
+        && GET_CODE (xop1) == CONST_INT) {
+      /* For memd(r29+#s6:3) */
+      offset_bits = -6;
+    }
+  }
+  else if(!strcmp(constraint, "m") || !strcmp(constraint, "noext")){
     if(TARGET_V4_FEATURES){
       allow_absolute = true;
       allow_immediate_base = true;
@@ -4284,9 +4382,16 @@ qdsp6_asm_output_opcode(FILE *f, const char *ptr)
   if(final_info->start_packet){
     fputs("{\n\t", f);
   }
+
+  if (final_info->duplex) {
+    fputs("//duplex\n\t", f);
+  }
+
   if(final_info->indent_insn){
     fputc('\t', f);
   }
+  
+
 
   memset(opoutput, 0, sizeof(opoutput));
   /* Output the assembly insn.  Copied from output_asm_insn(). */
@@ -4433,6 +4538,8 @@ qdsp6_final_prescan_insn(
 
   final_info = &cfun->machine->final_info;
 
+  final_info->duplex = (get_attr_duplex(insn) == DUPLEX_YES);
+    
   final_info->insn_ops = ops;
   final_info->start_packet = false;
   final_info->end_packet = false;
@@ -10043,6 +10150,34 @@ qdsp6_bb_real_end_insn(basic_block bb)
   return insn;
 }
 
+
+/* qdsp6_pack_duplex_insns: Operates after instructions have been packetized.
+   Look for duplex opportunities across packets. Move instructions across 
+   packets to create more duplexes */
+static void qdsp6_pack_duplex_insns(void)
+{
+  basic_block bb;
+  struct qdsp6_packet_info *packet;
+  struct qdsp6_insn_info *insn;
+  int i;
+
+  FOR_EACH_BB (bb){
+    packet = BB_HEAD_PACKET (bb);
+    while(packet && packet->prev != BB_END_PACKET (bb)){
+      for(i = 0; i < packet->num_insns; i++){
+        insn = packet->insns[i];
+        
+        
+        
+      }
+      if(!packet->next){
+        gcc_assert(packet == BB_END_PACKET (bb));
+      }
+      packet = packet->next;
+    }
+  }
+
+}
 
 
 

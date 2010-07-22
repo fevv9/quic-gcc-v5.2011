@@ -633,7 +633,8 @@ enum reg_class {
   QDSP6_CONSTRAINT_LEN(STR, si) \
   QDSP6_CONSTRAINT_LEN(STR, csi) \
   QDSP6_CONSTRAINT_LEN(STR, memop) \
-  QDSP6_CONSTRAINT_LEN(STR, ememop)
+  QDSP6_CONSTRAINT_LEN(STR, ememop) \
+  QDSP6_CONSTRAINT_LEN(STR, dm)
 
 /* used by CONSTRAINT_LEN */
 #define CONSTRAINT_LEN_FOR_A(CHAR, STR) \
@@ -723,6 +724,7 @@ enum reg_class {
     : QDSP6_CONSTRAINT_P (STR, csi)    ? EXTRA_CONSTRAINT_FOR_A(VALUE, csi) \
     : QDSP6_CONSTRAINT_P (STR, memop)  ? EXTRA_CONSTRAINT_FOR_A(VALUE, memop) \
     : QDSP6_CONSTRAINT_P (STR, ememop) ? EXTRA_CONSTRAINT_FOR_A(VALUE, ememop) \
+    : QDSP6_CONSTRAINT_P (STR, dm)     ? EXTRA_CONSTRAINT_FOR_A(VALUE, dm) \
     : 0 \
   : 0)
 
@@ -734,7 +736,8 @@ enum reg_class {
        || QDSP6_CONSTRAINT_P (STR, si) \
        || QDSP6_CONSTRAINT_P (STR, csi) \
        || QDSP6_CONSTRAINT_P (STR, memop) \
-       || QDSP6_CONSTRAINT_P (STR, ememop)))
+       || QDSP6_CONSTRAINT_P (STR, ememop) \
+       || QDSP6_CONSTRAINT_P (STR, dm)))
 
 
 /*----------------
@@ -1454,6 +1457,7 @@ struct qdsp6_final_info GTY(()) {
   rtx endloop_label;
   bool dot_new_predicate_p;
   bool dot_new_gpr_p;
+  bool duplex;
 };
 
 struct machine_function GTY(()) {
