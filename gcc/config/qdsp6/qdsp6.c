@@ -239,6 +239,7 @@ static void qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p);
 
 static void qdsp6_packet_optimizations(void);
 static void qdsp6_final_pack_insns(void);
+static void qdsp6_pack_duplex_insns(void);
 
 static unsigned HOST_WIDE_INT  sdata_symbolic_operand_smallest_accessable_size(rtx);
 
@@ -10151,6 +10152,51 @@ qdsp6_bb_real_end_insn(basic_block bb)
 }
 
 
+/* Iterate through all duplex instructions in packet1 and
+   check whether we can move a duplex instruction to packet2 */
+static void
+qdsp6_pair_duplex_insn(struct qdsp6_packet_info* packet1, struct qdsp6_packet_info* packet2)
+{ 
+  int i;
+  for(i = 0; i < packet1->num_insns; i++)
+    {
+      struct qdsp6_insn_info *insn = packet1->insns[i];
+      if ((get_attr_duplex(insn->insn) == DUPLEX_YES) && 
+          qdsp6_insn_fits_in_packet(insn, packet2)) 
+        {
+          printf("From packet [before]:\n");
+          qdsp6_print_packet(stdout, packet1);
+          printf("To packet [before]:\n");
+          qdsp6_print_packet(stdout, packet2);
+          qdsp6_move_insn(insn, packet1, insn, packet2);
+          printf("Created a duplex by moving an instruction across packets\n");
+          printf("From packet:\n");
+          qdsp6_print_packet(stdout, packet1);
+          printf("To packet:\n");
+          qdsp6_print_packet(stdout, packet2);
+          return;
+        }
+    }
+}
+
+
+static int
+qdsp6_count_duplex_insns(struct qdsp6_packet_info *packet)
+{
+  int i, count = 0;
+  for(i = 0; i < packet->num_insns; i++)
+    {
+      struct qdsp6_insn_info *insn = packet->insns[i];
+      if (NOTE_P(insn->insn)) 
+        {
+          continue;
+        }
+      count += (get_attr_duplex(insn->insn) == DUPLEX_YES);
+    }
+  return(count);
+}
+
+
 /* qdsp6_pack_duplex_insns: Operates after instructions have been packetized.
    Look for duplex opportunities across packets. Move instructions across 
    packets to create more duplexes */
@@ -10161,22 +10207,59 @@ static void qdsp6_pack_duplex_insns(void)
   struct qdsp6_insn_info *insn;
   int i;
 
-  FOR_EACH_BB (bb){
-    packet = BB_HEAD_PACKET (bb);
-    while(packet && packet->prev != BB_END_PACKET (bb)){
-      for(i = 0; i < packet->num_insns; i++){
-        insn = packet->insns[i];
-        
-        
-        
-      }
-      if(!packet->next){
-        gcc_assert(packet == BB_END_PACKET (bb));
-      }
-      packet = packet->next;
+  for(packet = qdsp6_head_packet; packet; packet = packet->next)
+    {
+      while(packet && packet->next)
+        {
+          struct qdsp6_packet_info *this_packet = packet;
+          struct qdsp6_packet_info *next_packet = packet->next;
+          int duplex_this_packet = qdsp6_count_duplex_insns(packet);
+          int duplex_next_packet = qdsp6_count_duplex_insns(packet->next);
+          
+          /* TODO: Magic numbers */
+          bool unpaired_this_packet = (duplex_this_packet % 2 == 1);
+          bool unpaired_next_packet = (duplex_next_packet % 2 == 1);
+          bool split_packet = (duplex_this_packet == 4);
+          
+          /* First check if this packet contains two duplex instructions.
+             If so, we want to split the packet */
+          if (split_packet) 
+            {
+              /* Create a new packet and move the 3rd and 4th instruction to that
+                 packet */
+              struct qdsp6_insn_info *third_insn = packet->insns[2], 
+                *fourth_insn = packet->insns[3];
+              struct qdsp6_packet_info *new_packet = 
+                ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
+              qdsp6_remove_insn_from_packet(this_packet, third_insn);
+              qdsp6_remove_insn_from_packet(this_packet, fourth_insn);
+              qdsp6_add_insn_to_packet(new_packet, third_insn);
+              qdsp6_add_insn_to_packet(new_packet, fourth_insn);
+              
+              /* Splice new packet in between this_packet and next_packet */
+              this_packet->next = new_packet;
+              new_packet->next = next_packet;
+              next_packet->prev = new_packet;
+              printf("Split a packet to create a duplex instruction\n");
+            }
+          /* Then check if there are unpaired instructions in both this packet
+             and the next */
+          else if (unpaired_this_packet && unpaired_next_packet) 
+            {
+              /* If there are unpaired instructions, try to move a duplex instruction 
+                 between this_packet and next_packet (in both directions) to pair the 
+                 instructions */
+              qdsp6_pair_duplex_insn(this_packet, next_packet);
+              qdsp6_pair_duplex_insn(next_packet, this_packet);
+            }
+          
+          if(!packet->next)
+            {
+              gcc_assert(packet == BB_END_PACKET (bb));
+            }
+          packet = packet->next;
+        }
     }
-  }
-
 }
 
 
@@ -10991,6 +11074,10 @@ qdsp6_final_pack_insns(void)
   final_packing = true;
   qdsp6_init_packing_info();
   qdsp6_pack_insns();
+  if(TARGET_V4_FEATURES && TARGET_DUPLEX_SCHEDULING) 
+    {
+      qdsp6_pack_duplex_insns();
+    }
   qdsp6_free_packing_info();
   final_packing = false;
 }
