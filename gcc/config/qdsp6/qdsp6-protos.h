@@ -1,4 +1,3 @@
-
 /* Prototypes for qdsp6.c functions used in the md file & elsewhere.
    Copyright (C) 1999, 2000, 2002 Free Software Foundation, Inc.
 
@@ -70,13 +69,10 @@ extern bool qdsp6_reg_ok_for_base_p(rtx, bool);
 extern void qdsp6_final_prescan_insn(rtx, rtx *, int);
 extern void qdsp6_print_operand(FILE *, rtx, int);
 extern void qdsp6_print_operand_address(FILE *, rtx);
-extern bool qdsp6_expand_movstr(rtx[]);
+extern rtx  qdsp6_expand_compare(enum rtx_code);
 extern bool qdsp6_expand_movmem(rtx[]);
 extern bool qdsp6_expand_setmem(rtx[]);
-extern bool qdsp6_expand_clrstr(rtx[]);
-extern bool qdsp6_expand_strlen(rtx[]);
-extern bool qdsp6_expand_cmpstr(rtx[]);
-extern rtx  qdsp6_expand_compare(enum rtx_code);
+extern rtx  qdsp6_branch_hint(rtx);
 extern int  qdsp6_GP_or_reg_operand_c(rtx, enum machine_mode);
 extern int  qdsp6_nonimmediate_operand_with_GP_c(rtx, enum machine_mode);
 extern int  qdsp6_instructions_dependent(rtx, rtx);

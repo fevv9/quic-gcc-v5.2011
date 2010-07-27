@@ -1,4 +1,3 @@
-
 /* Definitions of QDSP6 target
    Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
 
@@ -402,16 +401,59 @@ Layout of Source Language Data Types
 #define DEFAULT_SHORT_ENUMS 1
 #endif /* GCC_3_4_6 */
 
-/* Function pointers on QDSP6 should always be even. */
+/* GCC uses the following internal structure to represent a 
+   pointer-to-member-function:
+
+   struct {
+    union {
+        void (*fn)();
+        ptrdiff_t vtable_index;
+    };
+    ptrdiff_t delta;
+   };
+
+   Generally GCC must use one bit to indicate whether the function that will be
+   called through a pointer-to-member-function is virtual. 
+   Normally, we assume that the low-order bit of a function pointer must always
+   be zero (word aligned). Then, by ensuring that the vtable_index is odd, 
+   we can distinguish which variant of the union is in use. But, on some 
+   platforms function pointers can be odd, and so this doesn't work. In that 
+   case, we use the low-order bit of the delta field, and shift the remainder 
+   of the delta field to the left. 
+   On QDSP6 use of delta field is not _needed_ but produces a better code for 
+   several scenarios. Particularly for an empty class with function 
+   definitions:
+
+   (from bug 3711)
+
+   struct S {
+       int func(char)      { return 100; }
+   } s;
+
+   int main(void)
+   {
+      int (S::*pfc)(char)    = &S::func;
+      (s.*pfc)(0);
+   }
+
+   GCC will use default alignment of "char" for 's', but might use memw/mov_si
+   to access nonexistent vtable in "front" of s, resulting in potential conflict.
+
+   When delta field is used via TARGET_PTRMEMFUNC_VBIT_LOCATION, compiler is 
+   capable to determine that there is _no_ vtable to access in this case, and 
+   simply optimizes out the access code. If a vtable does exist, it will be word 
+   aligned by definition.
+   */  
+#define TARGET_PTRMEMFUNC_VBIT_LOCATION ptrmemfunc_vbit_in_delta
 
 
 /*--------------------------------
 Basic Characteristics of Registers
 --------------------------------*/
 
-/* 32 GPRs, 4 .old and 4 .new predicate regs, 8 CRs (sa0/lc0, sa1/lc1, m0/m1,
-   usr, ugp), and fake frame pointer and argument pointer registers */
-#define FIRST_PSEUDO_REGISTER (32 + 4 * 2 + 8 + 2)
+/* 32 GPRs, 4 predicate regs, 8 CRs (sa0/lc0, sa1/lc1, m0/m1, usr, ugp), and
+   fake frame pointer and argument pointer registers */
+#define FIRST_PSEUDO_REGISTER (32 + 4 + 8 + 2)
 
 #define FIXED_REGISTERS \
   { \
@@ -420,7 +462,6 @@ Basic Characteristics of Registers
     0, 0, 0, 0, 0, 0, 0, 0, /* 16 - 23 */ \
     0, 0, 0, 0, 0, 1, 1, 0, /* 24 - 31 */ \
     0, 0, 0, 0,             /* p0 - p3 */ \
-    1, 1, 1, 1,             /* p0 - p3 .new */ \
     1, 1, 1, 1, 1, 1, 1, 1, /* sa0, lc0, sa1, lc1, m0, m1, usr, ugp */ \
     1, 1,                   /* fake _fp and _ap */ \
   }
@@ -432,7 +473,6 @@ Basic Characteristics of Registers
     1, 1, 1, 1, 1, 1, 1, 1, /* 16 - 23 */ \
     0, 0, 0, 0, 1, 1, 1, 1, /* 24 - 31 */ \
     1, 1, 1, 1,             /* p0 - p3 */ \
-    1, 1, 1, 1,             /* p0 - p3 .new */ \
     1, 1, 1, 1, 1, 1, 1, 1, /* sa0, lc0, sa1, lc1, m0, m1, usr, ugp */ \
     1, 1,                   /* fake _fp and _ap */ \
   }
@@ -491,9 +531,7 @@ Register Classes
 enum reg_class {
   NO_REGS,
   GENERAL_REGS,           /* registers r0 through r31 */
-  PREDICATE_DOT_OLD_REGS, /* predicates p0 through p3 */
-  PREDICATE_DOT_NEW_REGS, /* predicates p0 through p3 .new */
-  PREDICATE_REGS,         /* predicates p0 through p3 and their .new forms */
+  PREDICATE_REGS,         /* predicates p0 through p3 */
   CONTROL_REGS,           /* sa0, lc0, sa1, lc1, m0, m1, usr, ugp */
   FAKE_REGS,              /* _fp, _ap */
   ALL_REGS,
@@ -506,8 +544,6 @@ enum reg_class {
   {                           \
     "NO_REGS",                \
     "GENERAL_REGS",           \
-    "PREDICATE_DOT_OLD_REGS", \
-    "PREDICATE_DOT_NEW_REGS", \
     "PREDICATE_REGS",         \
     "CONTROL_REGS",           \
     "FAKE_REGS",              \
@@ -520,26 +556,21 @@ enum reg_class {
     {0x00000000, 0x00000},       \
     /* GENERAL_REGS */           \
     {0xffffffff, 0x00000},       \
-    /* PREDICATE_DOT_OLD_REGS */ \
-    {0x00000000, 0x0000f},       \
-    /* PREDICATE_DOT_NEW_REGS */ \
-    {0x00000000, 0x000f0},       \
     /* PREDICATE_REGS */         \
-    {0x00000000, 0x000ff},       \
+    {0x00000000, 0x0000f},       \
     /* CONTROL_REGS */           \
-    {0x00000000, 0x0ff00},       \
+    {0x00000000, 0x00ff0},       \
     /* FAKE_REGS */              \
-    {0x00000000, 0x30000},       \
+    {0x00000000, 0x03000},       \
     /* ALL_REGS */               \
-    {0xffffffff, 0x3ffff},       \
+    {0xffffffff, 0x03fff},       \
   }
 
 #define REGNO_REG_CLASS(REGNO) \
   ( (REGNO) <  32 ? GENERAL_REGS \
-  : (REGNO) < (32 + 4) ? PREDICATE_DOT_OLD_REGS \
-  : (REGNO) < (32 + 4 + 4) ? PREDICATE_DOT_NEW_REGS \
-  : (REGNO) < (32 + 4 + 4 + 8) ? CONTROL_REGS \
-  : (REGNO) < (32 + 4 + 4 + 8 + 2) ? FAKE_REGS \
+  : (REGNO) < (32 + 4) ? PREDICATE_REGS \
+  : (REGNO) < (32 + 4 + 8) ? CONTROL_REGS \
+  : (REGNO) < (32 + 4 + 8 + 2) ? FAKE_REGS \
   : ALL_REGS)
 
 /* In base+offset and base+index addressing, the base must be a general purpose
@@ -560,7 +591,6 @@ enum reg_class {
    cheaper than load or store of the registers.  The macro value is
    array of register classes with LIM_REG_CLASSES used as the end
    marker.  */
-/* _LSY_ GENERAL_REGS, PREDICATE_DOT_OLD_REGS, PREDICATE_DOT_NEW_REGS, */  
 #define IRA_COVER_CLASSES \
 {                 \
   ALL_REGS,       \
@@ -573,8 +603,6 @@ enum reg_class {
 #define CONSTRAINT_LEN_FOR_R(CHAR, STR) \
   ( (STR)[1] == 'g' ? 2 \
   : (STR)[1] == 'p' ? 2 \
-  : (STR)[1] == 'n' ? ( (STR)[2] == 'p' ? 3 \
-                      : DEFAULT_CONSTRAINT_LEN(CHAR, STR)) \
   : (STR)[1] == 'c' ? 2 \
   : DEFAULT_CONSTRAINT_LEN(CHAR, STR))
 
@@ -650,14 +678,11 @@ enum reg_class {
 
 /* Rg  means general purpose register (r0-r31)
    Rp  means predicate register (p0-p3)
-   Rnp means .new form of a predicate register (p0.new-p3.new)
    Rc  means control register (sa0, lc0, sa1, lc1, m0, m1) */
 #define REG_CLASS_FROM_CONSTRAINT(CHAR, STR) \
   ( (CHAR) != 'R' ? NO_REGS \
   : (STR)[1] == 'g' ? GENERAL_REGS \
-  : (STR)[1] == 'p' ? PREDICATE_DOT_OLD_REGS \
-  : (STR)[1] == 'n' ? ( (STR)[2] == 'p' ? PREDICATE_DOT_NEW_REGS \
-                      : NO_REGS) \
+  : (STR)[1] == 'p' ? PREDICATE_REGS \
   : (STR)[1] == 'c' ? CONTROL_REGS \
   : NO_REGS)
 
@@ -784,17 +809,17 @@ Registers That Address the Stack Frame
 #define STACK_POINTER_REGNUM 29
 
 /* Fake frame pointer register that will always be eliminated */
-#define FRAME_POINTER_REGNUM 48
+#define FRAME_POINTER_REGNUM 44
 
 #define HARD_FRAME_POINTER_REGNUM 30
 
 /* Fake argument pointer register that will always be eliminated */
-#define ARG_POINTER_REGNUM 49
+#define ARG_POINTER_REGNUM 45
 
 /* needs to be caller-save and not arg? */
 #define STATIC_CHAIN_REGNUM 28
 
-/*#define DWARF_FRAME_REGISTERS*/ /* ??? 6? */
+/*#define DWARF_FRAME_REGISTERS*/ /* ??? 14? */
 
 #define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (LINK_REGNUM)
 
@@ -1016,22 +1041,17 @@ Anchored Addresses
 Describing Relative Costs of Operations
 -------------------------------------*/
 
-#define PREDICATE_CLASS(CLASS) \
-  (   (CLASS) == PREDICATE_REGS \
-   || (CLASS) == PREDICATE_DOT_OLD_REGS \
-   || (CLASS) == PREDICATE_DOT_NEW_REGS)
-
 /* Non general purpose transfers have slot restrictions. */
-#define REGISTER_MOVE_COST(MODE, FROM, TO)             \
-  ( FROM == GENERAL_REGS  ? ( TO == GENERAL_REGS  ? 2  \
-                            : PREDICATE_CLASS(TO) ? 3  \
-                            :     /*CONTROL_REGS*/  3) \
-  : PREDICATE_CLASS(FROM) ? ( TO == GENERAL_REGS  ? 3  \
-                            : PREDICATE_CLASS(TO) ? 6  \
-                            :     /*CONTROL_REGS*/  6) \
-  :       /*CONTROL_REGS*/  ( TO == GENERAL_REGS  ? 3  \
-                            : PREDICATE_CLASS(TO) ? 6  \
-                            :     /*CONTROL_REGS*/  6))
+#define REGISTER_MOVE_COST(MODE, FROM, TO)               \
+  ( FROM == GENERAL_REGS   ? ( TO == GENERAL_REGS   ? 2  \
+                             : TO == PREDICATE_REGS ? 3  \
+                             :     /*CONTROL_REGS*/   3) \
+  : FROM == PREDICATE_REGS ? ( TO == GENERAL_REGS   ? 3  \
+                             : TO == PREDICATE_REGS ? 6  \
+                             :     /*CONTROL_REGS*/   6) \
+  :       /*CONTROL_REGS*/   ( TO == GENERAL_REGS   ? 3  \
+                             : TO == PREDICATE_REGS ? 6  \
+                             :     /*CONTROL_REGS*/   6))
 
 /* Loads and stores are cheap on QDSP6.  Yay, IMT. */
 #define MEMORY_MOVE_COST(MODE, CLASS, IN) 4
@@ -1115,8 +1135,7 @@ Output of Assembler Instructions
     "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", \
     "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31", \
     /* predicate registers */                               \
-    "p0",     "p1",     "p2",     "p3",                     \
-    "p0.new", "p1.new", "p2.new", "p3.new",                 \
+    "p0", "p1", "p2", "p3",                                 \
     /* control registers */                                 \
     "sa0", "lc0", "sa1", "lc1", "m0", "m1", "usr", "ugp",   \
     /* fake frame pointer and argument pointer */           \
@@ -1331,6 +1350,7 @@ enum qdsp6_falign {
   QDSP6_NO_FALIGN,
   QDSP6_FALIGN_LOOPS,
   QDSP6_FALIGN_LABELS,
+  QDSP6_FALIGN_ALL,
   QDSP6_FALIGN_UNSPECIFIED
 };
 
@@ -1345,21 +1365,15 @@ extern bool qdsp6_dual_memory_accesses;
 
 /* ranges for the various kinds of registers */
 #define G_REGNO_P(REGNO) (IN_RANGE ((REGNO), 0, 31))
-#define PO_REGNO_P(REGNO) (IN_RANGE ((REGNO), 32, 35))
-#define PN_REGNO_P(REGNO) (IN_RANGE ((REGNO), 36, 39))
-#define P_REGNO_P(REGNO) (IN_RANGE ((REGNO), 32, 39))
-#define C_REGNO_P(REGNO) (IN_RANGE ((REGNO), 40, 47))
+#define P_REGNO_P(REGNO) (IN_RANGE ((REGNO), 32, 35))
+#define C_REGNO_P(REGNO) (IN_RANGE ((REGNO), 36, 43))
 
 #define G_REG_P(RTX) (REG_P (RTX) && G_REGNO_P (REGNO (RTX)))
-#define PO_REG_P(RTX) (REG_P (RTX) && PO_REGNO_P (REGNO (RTX)))
-#define PN_REG_P(RTX) (REG_P (RTX) && PN_REGNO_P (REGNO (RTX)))
 #define P_REG_P(RTX) (REG_P (RTX) && P_REGNO_P (REGNO (RTX)))
 #define C_REG_P(RTX) (REG_P (RTX) && C_REGNO_P (REGNO (RTX)))
 
 #define G_REG(REGNO) ((REGNO) + 0)
 #define P_REG(REGNO) ((REGNO) + 32)
-
-#define DOT_NEW_OFFSET (P0_DOT_NEW_REGNUM - P0_REGNUM)
 
 /* Fixed register assignments: */
 
@@ -1451,6 +1465,8 @@ struct qdsp6_final_info GTY(()) {
   bool print_endloop0;
   /* whether the current insn is an endloop1 */
   bool print_endloop1;
+  /* whether to falign the following packet */
+  bool print_falign;
   /* whether the current packet ends an inner hardware loop */
   bool endloop0;
   /* the label at the start of a hardware loop */
@@ -1468,6 +1484,122 @@ struct machine_function GTY(()) {
   int calls_builtin_return_address;
   int has_hardware_loops;
 };
+
+struct qdsp6_reg_access GTY((chain_next ("%h.next"))) {
+  rtx reg;
+  unsigned int regno;
+  int flags;
+  struct qdsp6_reg_access *next;
+};
+
+struct qdsp6_mem_access GTY((chain_next ("%h.next"))) {
+  rtx mem;
+  int flags;
+  struct qdsp6_mem_access *next;
+};
+
+struct qdsp6_insn_info GTY((chain_next ("%h.stack"))) {
+  rtx insn;
+  struct qdsp6_reg_access *reg_reads;
+  struct qdsp6_reg_access *reg_writes;
+  struct qdsp6_mem_access *loads;
+  struct qdsp6_mem_access *stores;
+  int flags;
+  struct qdsp6_insn_info *stack;
+  struct qdsp6_packet_info *transformed_at_packet;
+};
+
+struct qdsp6_packet_info GTY((chain_prev ("%h.prev"), chain_next ("%h.next"))) {
+  struct qdsp6_insn_info *insns[QDSP6_MAX_INSNS_PER_PACKET];
+  int num_insns;
+  rtx location;
+  struct qdsp6_packet_info *prev;
+  struct qdsp6_packet_info *next;
+};
+
+#include "hard-reg-set.h"
+
+struct qdsp6_bb_aux_info {
+  HARD_REG_SET live_out;
+  struct qdsp6_packet_info *head_packet;
+  struct qdsp6_packet_info *end_packet;
+  struct qdsp6_bb_aux_info *next;
+};
+
+#define QDSP6_BB_AUX(BB) ((struct qdsp6_bb_aux_info *) (BB->aux))
+#define BB_LIVE_OUT(BB) (QDSP6_BB_AUX (BB)->live_out)
+#define BB_HEAD_PACKET(BB) (QDSP6_BB_AUX (BB)->head_packet)
+#define BB_END_PACKET(BB) (QDSP6_BB_AUX (BB)->end_packet)
+
+enum qdsp6_dependence_type {
+  QDSP6_DEP_REGISTER,
+  QDSP6_DEP_MEMORY,
+  QDSP6_DEP_CONTROL,
+  QDSP6_DEP_VOLATILE
+};
+
+struct qdsp6_dependence GTY((chain_next ("%h.next"))) {
+  enum qdsp6_dependence_type type;
+  rtx set;
+  rtx use;
+  struct qdsp6_dependence *next;
+};
+
+
+
+
+#define QDSP6_MASK(WIDTH, LOW) (((1 << (WIDTH)) - 1) << (LOW))
+
+#define QDSP6_PREDICATE_MASK QDSP6_MASK(2, 0)
+#define QDSP6_IF_TRUE        QDSP6_MASK(1, 2)
+#define QDSP6_IF_FALSE       QDSP6_MASK(1, 3)
+#define QDSP6_GPR_CONDITION  QDSP6_MASK(1, 4)
+#define QDSP6_SENSE_MASK     (QDSP6_IF_TRUE | QDSP6_IF_FALSE)
+#define QDSP6_UNCONDITIONAL  QDSP6_SENSE_MASK
+#define QDSP6_CONDITION_MASK \
+  (QDSP6_GPR_CONDITION | QDSP6_SENSE_MASK | QDSP6_PREDICATE_MASK)
+
+#define QDSP6_DIRECT_JUMP    QDSP6_MASK(1, 5)
+#define QDSP6_INDIRECT_JUMP  QDSP6_MASK(1, 6)
+#define QDSP6_ENDLOOP        QDSP6_MASK(1, 7)
+#define QDSP6_CALL           QDSP6_MASK(1, 8)
+#define QDSP6_EMULATION_CALL QDSP6_MASK(1, 9)
+#define QDSP6_JUMP \
+  (QDSP6_DIRECT_JUMP | QDSP6_INDIRECT_JUMP | QDSP6_ENDLOOP)
+#define QDSP6_CONTROL        (QDSP6_CALL | QDSP6_JUMP)
+
+#define QDSP6_MEM            QDSP6_MASK(1, 10)
+#define QDSP6_VOLATILE       QDSP6_MASK(1, 11)
+#define QDSP6_NEW_PREDICATE  QDSP6_MASK(1, 12)
+#define QDSP6_NEW_GPR        QDSP6_MASK(1, 13)
+
+#define QDSP6_MOVED          QDSP6_MASK(1, 14)
+
+#define QDSP6_CONDITION(INSN)       ((INSN)->flags & QDSP6_CONDITION_MASK)
+#define QDSP6_PREDICATE(INSN)       ((INSN)->flags & QDSP6_PREDICATE_MASK)
+#define QDSP6_SENSE(INSN)           ((INSN)->flags & QDSP6_SENSE_MASK)
+#define QDSP6_GPR_CONDITION_P(INSN) (((INSN)->flags & QDSP6_GPR_CONDITION) != 0)
+#define QDSP6_CONFLICT_P(ACCESS0, ACCESS1) \
+  (QDSP6_SENSE (ACCESS0) & QDSP6_SENSE (ACCESS1) \
+   || QDSP6_PREDICATE (ACCESS0) != QDSP6_PREDICATE (ACCESS1))
+#define QDSP6_CONDITIONAL_P(INSN) \
+  (QDSP6_SENSE (INSN) != QDSP6_UNCONDITIONAL || QDSP6_GPR_CONDITION_P (INSN))
+
+#define QDSP6_DIRECT_JUMP_P(INSN)    (((INSN)->flags & QDSP6_DIRECT_JUMP) != 0)
+#define QDSP6_INDIRECT_JUMP_P(INSN)  (((INSN)->flags & QDSP6_INDIRECT_JUMP) != 0)
+#define QDSP6_ENDLOOP_P(INSN)        (((INSN)->flags & QDSP6_ENDLOOP) != 0)
+#define QDSP6_CALL_P(INSN)           (((INSN)->flags & QDSP6_CALL) != 0)
+#define QDSP6_EMULATION_CALL_P(INSN) (((INSN)->flags & QDSP6_EMULATION_CALL) != 0)
+#define QDSP6_JUMP_P(INSN)           (((INSN)->flags & QDSP6_JUMP) != 0)
+#define QDSP6_CONTROL_P(INSN)        (((INSN)->flags & QDSP6_CONTROL) != 0)
+
+#define QDSP6_MEM_P(INSN)           (((INSN)->flags & QDSP6_MEM) != 0)
+#define QDSP6_VOLATILE_P(INSN)      (((INSN)->flags & QDSP6_VOLATILE) != 0)
+#define QDSP6_NEW_PREDICATE_P(INSN) (((INSN)->flags & QDSP6_NEW_PREDICATE) != 0)
+#define QDSP6_NEW_GPR_P(INSN)       (((INSN)->flags & QDSP6_NEW_GPR) != 0)
+
+#define QDSP6_MOVED_P(INSN)  (((INSN)->flags & QDSP6_MOVED) != 0)
+
 #endif /* !USED_FOR_TARGET */
 
 #endif /* !GCC_QDSP6_H */
