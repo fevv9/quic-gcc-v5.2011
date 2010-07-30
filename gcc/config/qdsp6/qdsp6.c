@@ -2396,29 +2396,6 @@ qdsp6_load_pic_register() {
   emit_insn(gen_subsi3(pic_offset_table_rtx, pic_offset_table_rtx, temp_reg));
 }
 
-
-/*
- * For an indirect call instruction, modify the register operand for PIC mode
- */
-rtx
-legitimize_call_pic_address(rtx orig, enum machine_mode mode, rtx reg) 
-{
-  if (MEM_P (orig) && REG_P (XEXP (orig, 0)))
-    {
-      rtx temp_physical_reg, dest_reg;
-      require_pic_register();
-
-      /* Return orig = pic_reg + orig */
-      dest_reg = XEXP (orig, 0);
-      emit_insn(gen_addsi3(dest_reg, pic_offset_table_rtx, dest_reg));
-      return gen_rtx_MEM(GET_MODE(orig), dest_reg);
-    }
-  else
-    {
-      return legitimize_pic_address(orig, mode, reg);
-    }
-}
-
 /*
  * Helper function for qdsp6_legitimize_address() for PIC compilation
  * Make addresses conform to PIC mode

@@ -3919,9 +3919,9 @@
     }
     else {
       if (flag_pic) {
-        operands[0] = legitimize_call_pic_address(operands[0], SImode,
-                                                  (can_create_pseudo_p()
-                                                   ? NULL_RTX : operands[0]));
+        operands[0] = legitimize_pic_address(operands[0], SImode,
+                                             (can_create_pseudo_p()
+                                              ? NULL_RTX : operands[0]));
       }
     }
   }

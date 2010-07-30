@@ -91,6 +91,5 @@ extern rtx  qdsp6_function_value(tree, tree, bool);
 
 /* PIC support */
 extern rtx legitimize_pic_address(rtx, enum machine_mode, rtx);
-extern rtx legitimize_call_pic_address(rtx, enum machine_mode, rtx);
 extern rtx qdsp6_legitimize_address (rtx, rtx, enum machine_mode);
 extern void require_pic_register (void);
