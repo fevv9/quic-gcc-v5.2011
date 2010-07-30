@@ -1,0 +1,38 @@
+#!/bin/bash
+
+##################################################################
+# Copyright (c) \$Date\$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on \$Date\$
+##################################################################
+
+# set value for --prefix option
+if [ "$1" != "" ]; then
+  PREFIX=$1
+else
+  PLATFORM=`uname`
+  if [ "${PLATFORM}" = "CYGWIN_NT-5.1" ]; then
+    PREFIX=/usr/local/qdsp6/gnu
+  else
+    if [ "${PLATFORM}" = "Linux" ]; then
+      PREFIX=${HOME}/qdsp6/gnu
+    else
+      echo platform ${PLATFORM} not supported
+      exit 1
+    fi
+  fi
+fi
+
+CFLAGS='-g -O0' \
+CXXFLAGS='-g -O0' \
+TARGET_CFLAGS='-g -O0' \
+bash `dirname $0`/configure \
+  --prefix=${PREFIX} \
+  --target=qdsp6 \
+  --enable-languages=c \
+  --without-fp \
+  --disable-nls \
+  --disable-libssp \
+  --with-newlib \
+  --disable-bootstrap \
+  --enable-shared
