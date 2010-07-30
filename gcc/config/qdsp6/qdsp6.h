@@ -981,6 +981,15 @@ Addressing Modes
     goto LABEL; \
   }
 
+extern int symbol_mentioned_p (rtx x);
+extern int label_mentioned_p (rtx x);
+
+#define PIC_OFFSET_TABLE_REGNUM 24
+
+#define LEGITIMATE_PIC_OPERAND_P(X)   \
+  qdsp6_legitimate_pic_operand_p(X)
+
+
 #if GCC_3_4_6
 #define REG_OK_FOR_BASE_P(X) \
   qdsp6_reg_ok_for_base_p(X, REG_OK_STRICT_P)
@@ -990,9 +999,12 @@ Addressing Modes
 #define REG_OK_FOR_INDEX_P(X) 0
 #endif /* GCC_3_4_6 */
 
-#if GCC_3_4_6
-#define LEGITIMIZE_ADDRESS(X, OLDX, MODE, WIN)
-#endif /* GCC_3_4_6 */
+/* Position Independent Code support */
+#define LEGITIMIZE_ADDRESS(X, OLDX, MODE, WIN)    \
+   {                                              \
+     (X) = qdsp6_legitimize_address(X, OLDX, MODE);  \
+     GO_IF_LEGITIMATE_ADDRESS(MODE, X, WIN)       \
+   }
 
 #define GO_IF_MODE_DEPENDENT_ADDRESS(ADDR, LABEL) \
   if(GET_CODE (ADDR) == POST_INC || GET_CODE (ADDR) == POST_DEC){ \

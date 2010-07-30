@@ -186,6 +186,7 @@ static section *qdsp6_asm_select_rtx_section(
 #endif /* !GCC_3_4_6 */
 static section * qdsp6_select_section (tree decl, int reloc, unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED); 
 static bool qdsp6_in_small_data_p(const_tree exp);
+static void qpds6_load_pic_register (void);
 static void qdsp6_unique_section (tree decl, int reloc); 
 static void qdsp6_elf_asm_named_section (const char *name, unsigned int flags,tree decl ATTRIBUTE_UNUSED); 
 
@@ -627,6 +628,11 @@ qdsp6_override_options(void)
     g_switch_value = 2 * UNITS_PER_WORD;
   }
 
+  /* Make -fpic imply -G 0 */
+  if (flag_pic) {
+    g_switch_value = 0;
+  }
+
   if(TARGET_COMPRESSED){
     flag_schedule_insns = 0;
     flag_schedule_insns_after_reload = 0;
@@ -878,6 +884,12 @@ qdsp6_conditional_register_usage(void)
         call_used_regs[i] = 0;
       }
     }
+  }
+
+  /* For PIC, we reserve a register for the GOT pointer */
+  if (flag_pic) {
+    fixed_regs[PIC_OFFSET_TABLE_REGNUM] = 1;
+    call_used_regs[PIC_OFFSET_TABLE_REGNUM] = 1;
   }
 }
 
@@ -2285,6 +2297,261 @@ qdsp6_legitimate_address_p(
   return false;
 }
 
+/*                                           
+ ---------------------------------------------
+    Begin Position Independent Code Support  
+ ---------------------------------------------
+*/                                          
+
+/* 
+ *  Helper function for qdsp6_legitimate_pic_operand_p()
+ *  Return TRUE if X references a symbol  
+ *  Simple proposition for now; can be expanded
+ */
+int
+symbol_mentioned_p (rtx x)
+{
+  return (GET_CODE (x) == SYMBOL_REF);
+}
+
+
+/* 
+ *  Helper function for qdsp6_legitimate_pic_operand_p()
+ *  Return TRUE if X references a label  
+ *  Simple proposition for now; can be expanded
+ */
+int
+label_mentioned_p (rtx x)
+{
+  return (GET_CODE (x) == LABEL_REF);
+}
+
+
+/*
+ * Implements macro LEGITIMATE_PIC_OPERAND_P
+ */
+bool
+qdsp6_legitimate_pic_operand_p(rtx operand) 
+{
+  /* Taken from the ARM code.  It recogonizes the case when a pic symbol
+   * is used within an expression, which we disallow because the symbol
+   * will not be generated with a @GOT/GOTOFF extension.
+   */
+  if (symbol_mentioned_p (operand) 
+	 || (GET_CODE (operand) == CONST
+	     && GET_CODE (XEXP (operand, 0)) == PLUS
+	     && symbol_mentioned_p (XEXP (XEXP (operand, 0), 0)))) {
+    return 0;
+  }
+
+  return (!(symbol_mentioned_p (operand)
+	    || label_mentioned_p (operand)
+	    || (GET_CODE (operand) == SYMBOL_REF
+		&& CONSTANT_POOL_ADDRESS_P (operand)
+		&& (symbol_mentioned_p (get_pool_constant (operand))
+		    || label_mentioned_p (get_pool_constant (operand))))));
+}
+
+
+/*
+ * Mark that the compiled function accesses the PIC register. This implies that
+ * code must be added in the prologue to set up the PIC register
+ */
+void
+require_pic_register (void)
+{
+  /* Set gcc global flag */
+  crtl->uses_pic_offset_table = 1;
+}
+
+
+/*
+  There must be a better way to do this. We need a register to use as a temporary
+  while saving and restoring gp. We cannot create a new virtual register since
+  the save and restore code is invoked after reload has finished. 
+  The temporary register must be a caller-saved register and not an argument
+  register
+*/
+#define NON_ARG_CALLER_SAVE_REGISTER_1 10
+
+/*
+ * Setup the pic register in the function prologue.  This function
+ * assumes the pic option has been set.
+ */
+static void
+qdsp6_load_pic_register() {
+  
+  rtx dummy_pic, pic_reg, label, seq;
+  
+  /* Materialize GOT base for PIC */
+
+  label = gen_label_rtx();    
+  rtx temp_reg = gen_rtx_REG (SImode, NON_ARG_CALLER_SAVE_REGISTER_1);
+  /* emit insn sequence for computing the GOT base */
+  emit_insn(gen_compute_got_base(pic_offset_table_rtx, label));
+  emit_insn(gen_pic_movsi_hi_gotoff(temp_reg, 
+				    gen_rtx_LABEL_REF(SImode, label)));
+  emit_insn(gen_pic_movsi_lo_gotoff(temp_reg, temp_reg,
+				    gen_rtx_LABEL_REF(SImode, label)));
+  emit_insn(gen_subsi3(pic_offset_table_rtx, pic_offset_table_rtx, temp_reg));
+}
+
+
+/*
+ * For an indirect call instruction, modify the register operand for PIC mode
+ */
+rtx
+legitimize_call_pic_address(rtx orig, enum machine_mode mode, rtx reg) 
+{
+  if (MEM_P (orig) && REG_P (XEXP (orig, 0)))
+    {
+      rtx temp_physical_reg, dest_reg;
+      require_pic_register();
+
+      /* Return orig = pic_reg + orig */
+      dest_reg = XEXP (orig, 0);
+      emit_insn(gen_addsi3(dest_reg, pic_offset_table_rtx, dest_reg));
+      return gen_rtx_MEM(GET_MODE(orig), dest_reg);
+    }
+  else
+    {
+      return legitimize_pic_address(orig, mode, reg);
+    }
+}
+
+/*
+ * Helper function for qdsp6_legitimize_address() for PIC compilation
+ * Make addresses conform to PIC mode
+ */
+rtx
+legitimize_pic_address(rtx orig, enum machine_mode mode, rtx reg) 
+{
+
+  if (GET_CODE (orig) == SYMBOL_REF
+      || GET_CODE (orig) == LABEL_REF)
+    {
+      rtx pic_ref, address, dummy_pic, add_reg;
+      rtx insn;
+      rtx temp_physical_reg;
+ 
+      /* module_owns: set if this module owns the data (orig) */
+      int module_owns = 0;
+      int subregs = 0;
+
+      /* Record that we generate a pic reference  */
+      require_pic_register ();
+
+      /* TODO: why do we need the following 2 if clauses? */
+      if (reg == 0)
+	{
+	  gcc_assert (can_create_pseudo_p());
+	  reg = gen_reg_rtx (Pmode);
+
+	  subregs = 1;
+	}
+
+      if (subregs) 
+	{
+	  address = gen_reg_rtx (Pmode);
+	}
+      else
+	{
+	  address = reg;
+	}
+
+
+      /* 
+       * Normalize the address to a PIC address via @GOT or @GOTOFF
+       */
+
+      /* Check if the module owns this data. The module always owns a label */
+      module_owns = (GET_CODE (orig) == LABEL_REF) || SYMBOL_REF_LOCAL_P(orig);
+
+      /* 1. Load GOT-relative address */
+      if (module_owns) {
+	/* rx.h = #HI(addr@GOTOFF); rx.l = #LO(addr@GOTOFF) */
+	emit_insn (gen_pic_movsi_hi_gotoff(address, orig));
+	emit_insn (gen_pic_movsi_lo_gotoff(address, address, orig));
+	/* address = CONST32(#address@GOTOFF) */
+      }
+      else {
+	if (flag_pic == 1) {
+	  /* rx = #addr@GOT */
+	  emit_insn (gen_pic_movsi(address, gen_rtx_CONST(SImode, orig)));
+	} 
+	else {
+	  /* rx.h = #HI(addr@GOT); rx.l = #LO(addr@GOT) */
+	  emit_insn(gen_pic_movsi_hi_got(address, orig));
+	  emit_insn(gen_pic_movsi_lo_got(address, address, orig));
+	  /* address = CONST32(#address@GOT) */
+	}
+      }
+
+      /* 2. Add the absolute address of the GOT to the GOT-relative address */
+      /* reg = add(address, pic_reg) */
+      //      emit_insn(gen_addsi3(reg, pic_offset_table_rtx, address));
+      if (module_owns) {
+	/* If the module owns this data, then we are done. reg holds the
+	   gotoff-adjusted address */
+	pic_ref = gen_rtx_PLUS(Pmode, pic_offset_table_rtx, address);
+      }
+      else {
+       	/* reg = memw(address) */
+	// emit_move_insn(reg, gen_rtx_MEM(SImode, reg));
+	pic_ref = gen_const_mem (Pmode, 
+				 gen_rtx_PLUS (Pmode, pic_offset_table_rtx,
+					       address));
+      }
+      insn = emit_move_insn (reg, pic_ref);
+      set_unique_reg_note (insn, REG_EQUAL, orig);
+
+      return reg;
+    }
+  else if (CONSTANT_P(orig)) 
+    {
+     /* Taken from arm code */
+     if (GET_CODE (orig) == CONST)
+       {  
+         if (GET_CODE (XEXP (orig, 0)) == PLUS)
+	   {
+	     rtx base, offset;
+	     base = legitimize_pic_address (XEXP (XEXP (orig, 0), 0), Pmode, reg);
+	     offset = legitimize_pic_address (XEXP (XEXP (orig, 0), 1), Pmode,
+					      base == reg ? 0 : reg);
+	     return gen_rtx_PLUS (Pmode, base, offset);
+	   }
+       } 
+    }
+
+  return orig;
+}
+
+
+/*
+ * Implements macro LEGITIMIZE_ADDRESS
+ * Disabled for now. We may need to enable this
+ */
+rtx
+qdsp6_legitimize_address (rtx x, rtx old_x, enum machine_mode mode)
+{
+
+  if (flag_pic) 
+    {
+      rtx pic_x = legitimize_pic_address(old_x, mode, NULL_RTX);
+      if (old_x != pic_x) 
+	{
+	  x = pic_x;
+	}
+    }
+  return(x);
+}
+
+
+/*                                           
+ ---------------------------------------------
+    End Position Independent Code Support  
+ ---------------------------------------------
+*/                                          
 
 
 
@@ -7267,6 +7534,10 @@ qdsp6_expand_prologue(void)
     offset -= UNITS_PER_WORD;
     emit_move_insn(gen_rtx_MEM (SImode, plus_constant(base_reg, offset)),
                    gen_rtx_REG (SImode, frame->saved_singles[i]));
+  }
+
+  if (flag_pic && crtl->uses_pic_offset_table) {
+    qdsp6_load_pic_register ();
   }
 
 }

@@ -333,6 +333,8 @@
                                     (match_operand 0 "s12_const_int_operand"))))))
 )
 
+(define_predicate "sym_or_lab_operand"
+  (match_code "symbol_ref,label_ref"))
 
 ;;-----------;;
 ;; Operators ;;
