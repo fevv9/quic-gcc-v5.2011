@@ -1021,7 +1021,7 @@
        [(match_operand:BI 3 "pr_register_operand"      "RpRnp, RpRnp,RpRnp, RpRnp,RpRnp,RpRnp,RpRnp, RpRnp,RpRnp,RpRnp")
         (const_int 0)])
      (set (match_operand:SI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg, Acsi, Acsi,Acond,Aecond,  Rg,   Rg,   Rg")
-          (match_operand:SI 1 "conditional_src_operand"   "Rg,Acond,Aecond,  Is6,    i,   Rg,    Rg,  K0, Is12,    i")))]
+          (match_operand:SI 1 "conditional_src_operand"   "Rg,Acond,Aecond,  Is6,    i,   Rg,    Rg,  Iu00, Is12,    i")))]
   "!memory_operand(operands[0], SImode)
    || gr_register_operand(operands[1], SImode)
    || (TARGET_V4_FEATURES
@@ -1485,8 +1485,9 @@
    [(set (reg:SI SP_REGNUM)
         (plus:SI (reg:SI SP_REGNUM)
                  (match_operand 0 "nonmemory_operand" "Iu8")))]
-   "TARGET_V4_FEATURES"
-   "%0 = add(%1,#%2)"
+   "TARGET_V4_FEATURES
+    && u8_const_int_operand(operands[0], SImode)"
+   "%0 = add(r29,#%0)"
   [(set_attr "type" "A")
    (set_attr "duplex" "yes")]
 )
@@ -1495,7 +1496,7 @@
 (define_insn_and_split "addsi3_real_v4"
   [(set (match_operand:SI 0 "nonimmediate_operand"         "=Rg,Rg,Rg,Rg,Rg,Rg,Amemop,Aememop,Amemop,Aememop,Amemop,Aememop")
         (plus:SI (match_operand:SI 1 "nonimmediate_operand""Rg, Rg,Rg, Rg,Rg,Rg,     0,      0,     0,      0,     0,      0")
-                 (match_operand:SI 2 "nonmemory_operand"   "K1,K-1,Is7,Is16, i,Rg,   Iu5,    Iu5,   In5,    In5,    Rg,     Rg")))]
+                 (match_operand:SI 2 "nonmemory_operand"   "K01,K-1,Is7,Is16, i,Rg,   Iu5,    Iu5,   In5,    In5,    Rg,     Rg")))]
   "TARGET_V4_FEATURES
    && (!immediate_operand(operands[2], SImode)
        || s16_const_int_operand(operands[2], SImode)
@@ -1879,7 +1880,7 @@
 (define_insn_and_split "andsi3_real_v4"
   [(set (match_operand:SI 0 "nonimmediate_operand"        "=Rg,  Rg,       Rg,Rg,Rg,   Amemop,  Aememop,Amemop,Aememop")
         (and:SI (match_operand:SI 1 "nonimmediate_operand" "Rg,  Rg,       Rg,Rg,Rg,        0,        0,     0,      0")
-                (match_operand:SI 2 "nonmemory_operand"    "K1,Is10,Konenot32, i,Rg,Konenot32,Konenot32,    Rg,     Rg")))]
+                (match_operand:SI 2 "nonmemory_operand"    "K01,Is10,Konenot32, i,Rg,Konenot32,Konenot32,    Rg,     Rg")))]
   "TARGET_V4_FEATURES
    && (!immediate_operand(operands[2], SImode)
        || s10_const_int_operand(operands[2], SImode)
@@ -4225,19 +4226,8 @@
              (mem:SI (reg:SI FP_REGNUM)))]))]
   "qdsp6_direct_return()"
   {
-    rtx prediction;
-    if(which_alternative == 0){
-      return "if (%C0) dealloc_return";
-    }
-    else {
-      prediction = find_reg_note (insn, REG_BR_PROB, 0);
-      if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
-        return "if (%C0) dealloc_return:t";
-      }
-      else {
-        return "if (%C0) dealloc_return:nt";
-      }
-    }
+    operands[2] = qdsp6_branch_hint(insn);
+    return "if (%C0) dealloc_return%h2";
   }
   [(set_attr "type" "NewValue")
    (set_attr "duplex" "yes")]
@@ -9623,9 +9613,9 @@
 
 (define_insn_and_split "combinesi_v4"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg, Rg, Rg, Rg, Rg,Rg, Rg, Rg,Rg,Rg")
-        (match_operand:SI 1 "nonmemory_operand"    "Rg,Iu2,Is8,Is8,  i, Rg,Rg, K0,Is8, i, i"))
+        (match_operand:SI 1 "nonmemory_operand"    "Rg,Iu2,Is8,Is8,  i, Rg,Rg, 00,Is8, i, i"))
    (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg, Rg, Rg, Rg, Rg,Rg, Rg, Rg,Rg,Rg")
-        (match_operand:SI 3 "nonmemory_operand"    "Rg,Iu2,Is8,  i,Is8,Is8, i, K0, Rg,Rg, i"))]
+        (match_operand:SI 3 "nonmemory_operand"    "Rg,Iu2,Is8,  i,Is8,Is8, i, 00, Rg,Rg, i"))]
   "reload_completed && TARGET_V4_FEATURES"
   {
     HOST_WIDE_INT high, low;

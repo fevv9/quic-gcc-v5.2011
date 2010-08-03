@@ -639,6 +639,8 @@ enum reg_class {
 
 /* See qdsp6_const_ok_for_constraint_p for meanings. */
 #define QDSP6_KOOKY_KONSTANT_LENS(STR) \
+  QDSP6_CONSTRAINT_LEN(STR, -1) \
+  QDSP6_CONSTRAINT_LEN(STR, 01) \
   QDSP6_CONSTRAINT_LEN(STR, 16) \
   QDSP6_CONSTRAINT_LEN(STR, 32) \
   QDSP6_CONSTRAINT_LEN(STR, u7p1) \

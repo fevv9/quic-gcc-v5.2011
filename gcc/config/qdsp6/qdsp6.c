@@ -984,8 +984,7 @@ qdsp6_cannot_change_mode_class(
    J[sunm]N_M means I[sunm]N shifted left M bits
    
    K-1 means -1
-   K0  means  0
-   K1  means  1
+   K1 means 01
    K16 means 16
    K32 means 32
    Ku7p1 integers in [1, 128]
@@ -1068,13 +1067,10 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
       if(QDSP6_CONSTRAINT_P(str, -1)){
         return value == -1;
       }
-      if(QDSP6_CONSTRAINT_P(str, 0)){
-        return value == 0;
-      }
-      if(QDSP6_CONSTRAINT_P(str, 1)){
+      else if(QDSP6_CONSTRAINT_P(str, 01)){
         return value == 1;
       }
-      if(QDSP6_CONSTRAINT_P(str, 16)){
+      else if(QDSP6_CONSTRAINT_P(str, 16)){
         return value == 16;
       }
       else if(QDSP6_CONSTRAINT_P(str, 32)){
@@ -10006,18 +10002,27 @@ qdsp6_move_insn_up_p(struct qdsp6_insn_info* insn,
 
   /* The following types of dependences prevent an instruction I from succ_packet
      from being moved into pred_packet: 
-     1. A control dependence between an instruction in pred_packet and I
-     2. A true dependence between an instruction in pred_packet and I
-     3. An output dependence between an instruction in pred_packet and I
-     4. If I produces a value used by a dot-new consumer in succ_packet
-     5. An "true-dependence" between I and an instruction in succ_packet
+     1. If I is a control flow instruction
+     2. A control dependence between an instruction in pred_packet and I
+     3. A true dependence between an instruction in pred_packet and I
+     4. An output dependence between an instruction in pred_packet and I
+     5. If I produces a value used by a dot-new consumer in succ_packet
+     6. If I consumes a dot-new value produced by an instruction in succ_packet
+     7. An "true-dependence" between I and an instruction in succ_packet
         This is really an anti-dependence between an instruction in succ_packet
         and I but the depencency checker ignores the parallel semantics of a 
         packet. Hence we check if there is a "true-dependence" between an 
         instruction in succ_packet and I
   */
 
-  /* First, iterate over pred_packet and check for cases 1, 2, and 3 */
+  /* Case 1 */
+  if (QDSP6_CONTROL_P (insn))
+    {
+      return false;
+    }
+
+
+  /* First, iterate over pred_packet and check for cases 2, 3, and 4 */
   for (i = 0; i < pred_packet->num_insns; ++i)
     {
       struct qdsp6_insn_info *pred_insn = pred_packet->insns[i];
@@ -10043,7 +10048,7 @@ qdsp6_move_insn_up_p(struct qdsp6_insn_info* insn,
     }
 
 
-  /* Then, iterate over succ_packet and check for cases 4 and 5 */
+  /* Then, iterate over succ_packet and check for cases 5, 6, and 7 */
   for (i = 0; i < succ_packet->num_insns; ++i)
     {
       struct qdsp6_insn_info *succ_insn = succ_packet->insns[i];
@@ -10054,13 +10059,45 @@ qdsp6_move_insn_up_p(struct qdsp6_insn_info* insn,
           continue;
         }
 
+      /* Case 5 */
+      dependencies = qdsp6_true_dependencies(succ_insn, insn);
+      for(dep = dependencies; dep; dep = dep->next)
+        {
+         if (dep->type == QDSP6_DEP_REGISTER) {
+            /* Check for dependence due to p.new */
+           printf("np = %d   p_r = %d\n", QDSP6_NEW_PREDICATE_P (insn),
+                  P_REGNO_P(REGNO(dep->use)));
+
+           if (QDSP6_NEW_PREDICATE_P (insn) && P_REGNO_P (REGNO (dep->use)))
+              {
+                return false;
+              }
+         }
+        }
+
+      /* Cases 6 and 7 */
       dependencies = qdsp6_true_dependencies(insn, succ_insn);
       for(dep = dependencies; dep; dep = dep->next)
         {
-          /*          if (QDSP6_NEW_PREDICATE_P (dep->use) || QDSP6_NEW_GPR_P (dep->use))
-            {
-              return false;
-              }*/
+         if (dep->type == QDSP6_DEP_REGISTER) {
+            /* Check for dependence due to p.new */
+           if (QDSP6_NEW_PREDICATE_P (succ_insn) && P_REGNO_P(REGNO(dep->use)))
+              {
+                return false;
+              }
+            /* Check for dependence due to r.new */
+            if (QDSP6_NEW_GPR_P (succ_insn))
+              {
+                rtx pattern, new_value;
+                pattern = copy_rtx(PATTERN (succ_insn->insn));
+                for_each_rtx(&pattern, qdsp6_find_new_value, &new_value);
+                /* new_value is wrapped in an unspec; hence look at XVECEXP(new_value, 0, 0) */
+                if (XVECEXP(new_value, 0, 0) == dep->use)
+                  {
+                    return false;
+                  }
+              }
+          }
         }
       
       dependencies = qdsp6_true_dependencies(insn, succ_insn);
@@ -10091,15 +10128,21 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
   struct qdsp6_dependence *dependencies = NULL, *dep = NULL;
 
   /* The following types of dependences prevent an instruction I from pred_packet
-     from being moved into succ_packet: 
-     1. A control instruction in pred_packet
-     2. If I produces a value used by a dot-new consumer in pred_packet
-     3. A true dependence between I and an instruction in succ_packet
-     4. An output dependence between I and an instruction in succ_packet
+     from being moved into succ_packet:
+     1. If I is a control flow instruction and succ_packet is non-empty
+     2. A control instruction in pred_packet
+     3. If I produces a value used by a dot-new consumer in pred_packet
+     4. A true dependence between I and an instruction in succ_packet
+     5. An output dependence between I and an instruction in succ_packet
   */
 
-  
-  /* First, iterate over pred_packet and check for cases 1 and 2 */
+   /* Case 1 */
+  if (QDSP6_CONTROL_P (insn) && (succ_packet->num_insns > 0))
+    {
+      return false;
+    }
+ 
+  /* First, iterate over pred_packet and check for cases 2 and 3 */
   for (i = 0; i < pred_packet->num_insns; ++i)
     {
       struct qdsp6_insn_info *pred_insn = pred_packet->insns[i];
@@ -10127,7 +10170,7 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
         {
           if (dep->type == QDSP6_DEP_REGISTER) {
             /* Check for dependence due to p.new */
-            if (QDSP6_NEW_PREDICATE_P (pred_insn))
+            if (QDSP6_NEW_PREDICATE_P (pred_insn) && P_REGNO_P(REGNO(dep->use)))
               {
                 return false;
               }
@@ -10137,7 +10180,8 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
                 rtx pattern, new_value;
                 pattern = copy_rtx(PATTERN (pred_insn->insn));
                 for_each_rtx(&pattern, qdsp6_find_new_value, &new_value);
-                if (new_value == dep->use)
+                /* new_value is wrapped in an unspec; hence look at XVECEXP(new_value, 0, 0) */
+                if (XVECEXP(new_value, 0, 0) == dep->use)
                   {
                     return false;
                   }
@@ -10146,7 +10190,7 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
         }
     }
 
-  /* Then, iterate over succ_packet and check for cases 3 and 4 */
+  /* Then, iterate over succ_packet and check for cases 4 and 5 */
   for (i = 0; i < succ_packet->num_insns; ++i)
     {
       struct qdsp6_insn_info *succ_insn = succ_packet->insns[i];
@@ -10165,52 +10209,83 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
 
   return true;
 }
+
+enum duplex_move_direction {
+  UP,
+  DOWN,
+  BOTH
+};
       
 /*
-  Given a predecessor packet and a successor packet, check if
-  we can move a duplex instruction from one of these packets
-  to another */
+  Given a predecessor packet and a successor packet and a direction
+  to move instructions, check if we can create a duplex by moving
+  from one of these packets to another */
 static bool
 qdsp6_pair_duplex_insn(struct qdsp6_packet_info* pred_packet, 
-                       struct qdsp6_packet_info* succ_packet)
+                       struct qdsp6_packet_info* succ_packet,
+                       enum duplex_move_direction dir)
 {
   int i, j;
 
-  /* 
-     First, check if we can move a duplex instruction from
-     pred_packet to succ_packet:
-     If pred_packet contains a duplex instruction that fits in 
-     the next packet and the dependences allow us to move the instruction 
-     into the next packet, conduct the move.
-  */ 
-  for(i = 0; i < pred_packet->num_insns; ++i)
+  if (dir == UP || dir == BOTH)
     {
-      struct qdsp6_insn_info *insn = pred_packet->insns[i];
-      if (get_attr_duplex(insn->insn) == DUPLEX_YES && 
-          qdsp6_insn_fits_in_packet_p(insn, succ_packet) &&
-          qdsp6_move_insn_down_p(insn, pred_packet, succ_packet))
+      /* 
+         First, check if we can move a duplex instruction from
+         pred_packet to succ_packet:
+         If pred_packet contains a duplex instruction that fits in 
+         the next packet and the dependences allow us to move the instruction 
+         into the next packet, conduct the move.
+      */ 
+      for(i = 0; i < pred_packet->num_insns; ++i)
         {
-          qdsp6_move_insn(insn, pred_packet, insn, succ_packet);
-          return (true);
+          struct qdsp6_insn_info *insn = pred_packet->insns[i];
+          if (get_attr_duplex(insn->insn) == DUPLEX_YES && 
+              qdsp6_insn_fits_in_packet_p(insn, succ_packet) &&
+              qdsp6_move_insn_down_p(insn, pred_packet, succ_packet))
+            {
+              printf("Packets before: \n");
+              qdsp6_print_packet(stdout, pred_packet);
+              qdsp6_print_packet(stdout, succ_packet);
+
+              qdsp6_move_insn(insn, pred_packet, insn, succ_packet);
+
+              printf("Packets after: \n");
+              qdsp6_print_packet(stdout, pred_packet);
+              qdsp6_print_packet(stdout, succ_packet);
+
+              return (true);
+            }
         }
     }
-  
-  /* 
-     Then, check if we can move a duplex instruction from
-     succ_packet to pred_packet:
-     If succ_packet contains a duplex instruction that fits in 
-     the previous packet and the dependences allow us to move the instruction 
-     into the previous packet, conduct the move.
-  */
-  for(i = 0; i < succ_packet->num_insns; ++i)
+
+  if (dir == DOWN || dir == BOTH)
     {
-      struct qdsp6_insn_info *insn = succ_packet->insns[i];
-      if (get_attr_duplex(insn->insn) == DUPLEX_YES && 
-          qdsp6_insn_fits_in_packet_p(insn, pred_packet) &&
-          qdsp6_move_insn_up_p(insn, pred_packet, succ_packet))
+      /* 
+         Then, check if we can move a duplex instruction from
+         succ_packet to pred_packet:
+         If succ_packet contains a duplex instruction that fits in 
+         the previous packet and the dependences allow us to move the instruction 
+         into the previous packet, conduct the move.
+      */
+      for(i = 0; i < succ_packet->num_insns; ++i)
         {
-          qdsp6_move_insn(insn, succ_packet, insn, pred_packet);
-          return (true);
+          struct qdsp6_insn_info *insn = succ_packet->insns[i];
+          if (get_attr_duplex(insn->insn) == DUPLEX_YES && 
+              qdsp6_insn_fits_in_packet_p(insn, pred_packet) &&
+              qdsp6_move_insn_up_p(insn, pred_packet, succ_packet))
+            {
+              printf("Packets before: \n");
+              qdsp6_print_packet(stdout, pred_packet);
+              qdsp6_print_packet(stdout, succ_packet);
+
+              qdsp6_move_insn(insn, succ_packet, insn, pred_packet);
+
+              printf("Packets after: \n");
+              qdsp6_print_packet(stdout, pred_packet);
+              qdsp6_print_packet(stdout, succ_packet);
+
+              return (true);
+            }
         }
     }
 
@@ -10262,6 +10337,16 @@ static void qdsp6_pack_duplex_insns(void)
           int duplex_this_packet = qdsp6_count_duplex_insns(packet);
           int duplex_next_packet = qdsp6_count_duplex_insns(packet->next);
           
+
+          /* Only consider moving instructions within the same basic block */
+          basic_block this_bb = BLOCK_FOR_INSN(this_packet->insns[0]->insn);
+          basic_block next_bb = BLOCK_FOR_INSN(next_packet->insns[0]->insn);
+          if (this_bb != next_bb)
+            {
+              packet = packet->next;
+              continue;
+            }
+
           /* TODO: Magic numbers */
           bool unpaired_this_packet = (duplex_this_packet % 2 == 1);
           bool unpaired_next_packet = (duplex_next_packet % 2 == 1);
@@ -10271,31 +10356,76 @@ static void qdsp6_pack_duplex_insns(void)
              If so, we want to split the packet */
           if (split_packet) 
             {
-              /* Create a new packet and move the 3rd and 4th instruction to that
+              /* Create a new packet and choose instructions to move to that
                  packet */
-              struct qdsp6_insn_info *third_insn = packet->insns[2], 
-                *fourth_insn = packet->insns[3];
               struct qdsp6_packet_info *new_packet = 
                 ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
-              qdsp6_remove_insn_from_packet(this_packet, third_insn);
-              qdsp6_remove_insn_from_packet(this_packet, fourth_insn);
-              qdsp6_add_insn_to_packet(new_packet, third_insn);
-              qdsp6_add_insn_to_packet(new_packet, fourth_insn);
-              
-              /* Splice new packet in between this_packet and next_packet */
-              this_packet->next = new_packet;
-              new_packet->next = next_packet;
-              next_packet->prev = new_packet;
-              printf("Split a packet to create a duplex instruction\n");
+              struct qdsp6_packet_info **movable_insns[2];
+              int num_movable_insns = 0;
+
+              for (i = 0; (i < this_packet->num_insns) && 
+                     (num_movable_insns < 2); ++i)
+                {
+                  if (qdsp6_move_insn_down_p(packet->insns[i], this_packet, 
+                                             new_packet))
+                    {
+                      movable_insns[num_movable_insns++] = packet->insns[i];
+                    }
+                }
+
+              if (num_movable_insns >= 2)
+                {
+                    
+                  struct qdsp6_insn_info *third_insn = packet->insns[2], 
+                    *fourth_insn = packet->insns[3];
+                  
+                  /* Splice new packet in between this_packet and next_packet */
+                  this_packet->next = new_packet;
+                  new_packet->next = next_packet;
+                  new_packet->prev = this_packet;
+                  next_packet->prev = new_packet;
+                  
+                  qdsp6_move_insn(third_insn, this_packet, third_insn, new_packet);
+                  qdsp6_move_insn(fourth_insn, this_packet, fourth_insn, new_packet);
+                  printf("Split a packet to create a duplex\n");
+                }
             }
-          /* Then check if there are unpaired instructions in both this packet
-             and the next */
-          else if (unpaired_this_packet && unpaired_next_packet) 
+
+          /* Then check if there are "extra" duplex instructions in this 
+             packet and an unpaired instruction in the next packet */
+          if ( (unpaired_this_packet && unpaired_next_packet) || 
+               ((duplex_this_packet > 2) && unpaired_next_packet) ||
+               ((duplex_next_packet > 2) && unpaired_this_packet) )
             {
-              /* If there are unpaired instructions, try to move a duplex instruction 
-                 between this_packet and next_packet (in both directions) to pair the 
-                 instructions */
-              qdsp6_pair_duplex_insn(this_packet, next_packet);
+              /* 
+                 If there are unpaired instructions in both packets, try to move a 
+                 duplex instruction between this_packet and next_packet (in both 
+                 directions) to pair the instructions.
+                 If there are extra duplexes in one packet, try to move from that
+                 packet to the other 
+              */
+              enum duplex_move_direction dir;
+              if (unpaired_this_packet && unpaired_next_packet)
+                {
+                  dir = BOTH;
+                }
+              else if (duplex_this_packet > 2) 
+                {
+                  dir = DOWN;
+                }
+              else if (duplex_next_packet > 2)
+                {
+                  dir = UP;
+                }
+              else 
+                {
+                  gcc_unreachable();
+                }
+              
+              if (qdsp6_pair_duplex_insn(this_packet, next_packet, dir))
+                {
+                  printf("Moved an instruction to create a duplex\n");
+                }
             }
           
           if(!packet->next)
