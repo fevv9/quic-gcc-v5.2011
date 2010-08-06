@@ -5301,6 +5301,9 @@ qdsp6_fixup_doloops(void)
 
     if(!INSN_P (tail)){
       tail = prev_real_insn(tail);
+      if (tail == NULL_RTX){
+	continue;
+      }
     }
 
     tail_code = recog_memoized(tail);
