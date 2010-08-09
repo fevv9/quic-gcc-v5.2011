@@ -1487,7 +1487,7 @@
                  (match_operand 0 "nonmemory_operand" "Iu8")))]
    "TARGET_V4_FEATURES
     && u8_const_int_operand(operands[0], SImode)"
-   "%0 = add(r29,#%0)"
+   "r29 = add(r29,#%0)"
   [(set_attr "type" "A")
    (set_attr "duplex" "yes")]
 )

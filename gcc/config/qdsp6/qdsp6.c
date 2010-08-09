@@ -264,7 +264,8 @@ static struct qdsp6_insn_info *qdsp6_get_insn_info(rtx insn);
 static struct qdsp6_packet_info *qdsp6_start_new_packet(void);
 static void qdsp6_add_insn_to_packet(
               struct qdsp6_packet_info *packet,
-              struct qdsp6_insn_info *insn_info);
+              struct qdsp6_insn_info *insn_info,
+              bool move_to_beginning);
 static void qdsp6_remove_insn_from_packet(
               struct qdsp6_packet_info *packet,
               struct qdsp6_insn_info *insn_info);
@@ -337,7 +338,8 @@ static void qdsp6_move_insn(
               struct qdsp6_insn_info *old_insn,
               struct qdsp6_packet_info *from_packet,
               struct qdsp6_insn_info *new_insn,
-              struct qdsp6_packet_info *to_packet);
+              struct qdsp6_packet_info *to_packet,
+              bool move_to_beginning);
 static void qdsp6_sanity_check_cfg_packet_info(void);
 static void qdsp6_pull_up_insns(void);
 static void qdsp6_init_packing_info(bool need_bb_info);
@@ -8942,7 +8944,8 @@ qdsp6_start_new_packet(void)
 static void
 qdsp6_add_insn_to_packet(
   struct qdsp6_packet_info *packet,
-  struct qdsp6_insn_info *insn_info
+  struct qdsp6_insn_info *insn_info,
+  bool move_to_beginning
 )
 {
   int i;
@@ -8951,6 +8954,17 @@ qdsp6_add_insn_to_packet(
 
   if(!packet->location){
     packet->location = insn_info->insn;
+  }
+
+  if (move_to_beginning){
+    for(i = packet->num_insns;
+        i > 0;
+        i--){
+      packet->insns[i] = packet->insns[i - 1];
+    }
+    packet->insns[0] = insn_info;
+    packet->num_insns++;
+    return;
   }
 
   if(QDSP6_JUMP_P (insn_info)){
@@ -9985,6 +9999,57 @@ qdsp6_safe_to_move_p(struct qdsp6_insn_info *insn, struct qdsp6_packet_info* fro
 }
 
 
+#define QDSP6_DUPLEX_REGISTERS_LOW_START 0
+#define QDSP6_DUPLEX_REGISTERS_LOW_END 7
+#define QDSP6_DUPLEX_REGISTERS_HIGH_START 16
+#define QDSP6_DUPLEX_REGISTERS_HIGH_END 23
+
+static bool
+qdsp6_duplex_register_p(int regno)
+{
+  return ((regno >= QDSP6_DUPLEX_REGISTERS_LOW_START &&
+          regno <= QDSP6_DUPLEX_REGISTERS_LOW_END) ||
+          (regno >= QDSP6_DUPLEX_REGISTERS_HIGH_START &&
+           regno <= QDSP6_DUPLEX_REGISTERS_HIGH_END));
+}
+
+
+/*
+  qdsp6_duplex_insn_p():
+  Given: an instruction insn
+  Returns true if the instruction is a duplex instruction
+*/
+static bool
+qdsp6_duplex_insn_p(struct qdsp6_insn_info* insn)
+{
+  struct qdsp6_reg_access *read;
+  struct qdsp6_reg_access *write;
+
+  if (get_attr_duplex(insn->insn) != DUPLEX_YES)
+    {
+      return (false);
+    }
+
+  for(read = insn->reg_reads; read; read = read->next) 
+    {
+      if (!qdsp6_duplex_register_p (read->regno))
+        {
+          return (false);
+        }
+    }
+
+  for(write = insn->reg_writes; write; write = write->next)
+    {
+      if (!qdsp6_duplex_register_p (write->regno))
+        {
+          return (false);
+        }
+    }
+
+  return (true);
+}
+
+
 /*
   qdsp6_move_insn_up_p():
   Given: an instruction insn
@@ -10065,9 +10130,6 @@ qdsp6_move_insn_up_p(struct qdsp6_insn_info* insn,
         {
          if (dep->type == QDSP6_DEP_REGISTER) {
             /* Check for dependence due to p.new */
-           printf("np = %d   p_r = %d\n", QDSP6_NEW_PREDICATE_P (insn),
-                  P_REGNO_P(REGNO(dep->use)));
-
            if (QDSP6_NEW_PREDICATE_P (insn) && P_REGNO_P (REGNO (dep->use)))
               {
                 return false;
@@ -10130,10 +10192,13 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
   /* The following types of dependences prevent an instruction I from pred_packet
      from being moved into succ_packet:
      1. If I is a control flow instruction and succ_packet is non-empty
-     2. A control instruction in pred_packet
-     3. If I produces a value used by a dot-new consumer in pred_packet
-     4. A true dependence between I and an instruction in succ_packet
-     5. An output dependence between I and an instruction in succ_packet
+     2. An anti-dependence between I and an instruction in pred_packet
+     3. A control instruction in pred_packet
+     4. If I produces a value used by a dot-new consumer in pred_packet
+     5. If I consumes a dot-new value produced by an instruction in pred_packet 
+     (TODO: This can be relaxed by dot-oldifying I)
+     6. A true dependence between I and an instruction in succ_packet
+     7. An output dependence between I and an instruction in succ_packet
   */
 
    /* Case 1 */
@@ -10142,7 +10207,7 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
       return false;
     }
  
-  /* First, iterate over pred_packet and check for cases 2 and 3 */
+  /* First, iterate over pred_packet and check for cases 2, 3, and 4 */
   for (i = 0; i < pred_packet->num_insns; ++i)
     {
       struct qdsp6_insn_info *pred_insn = pred_packet->insns[i];
@@ -10156,6 +10221,13 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
       /* Check for control instructions in pred_packet */
       if (QDSP6_JUMP_P (insn) || QDSP6_CALL_P (insn) || 
           QDSP6_EMULATION_CALL_P (insn))
+        {
+          return false;
+        }
+
+      /* Check for an anti-dependence in pred_packet */
+      dependencies = qdsp6_anti_dependencies(insn, pred_insn);
+      if (dependencies != NULL)
         {
           return false;
         }
@@ -10190,7 +10262,14 @@ qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn,
         }
     }
 
-  /* Then, iterate over succ_packet and check for cases 4 and 5 */
+
+  /* Case 5 */
+  if (QDSP6_NEW_PREDICATE_P (insn))
+    {
+      return false;
+    }
+
+  /* Then, iterate over succ_packet and check for cases 6 and 7 */
   for (i = 0; i < succ_packet->num_insns; ++i)
     {
       struct qdsp6_insn_info *succ_insn = succ_packet->insns[i];
@@ -10215,6 +10294,10 @@ enum duplex_move_direction {
   DOWN,
   BOTH
 };
+
+
+static int ctr = 0;
+
       
 /*
   Given a predecessor packet and a successor packet and a direction
@@ -10239,21 +10322,19 @@ qdsp6_pair_duplex_insn(struct qdsp6_packet_info* pred_packet,
       for(i = 0; i < pred_packet->num_insns; ++i)
         {
           struct qdsp6_insn_info *insn = pred_packet->insns[i];
-          if (get_attr_duplex(insn->insn) == DUPLEX_YES && 
+          if (qdsp6_duplex_insn_p(insn) && 
               qdsp6_insn_fits_in_packet_p(insn, succ_packet) &&
               qdsp6_move_insn_down_p(insn, pred_packet, succ_packet))
             {
-              printf("Packets before: \n");
-              qdsp6_print_packet(stdout, pred_packet);
-              qdsp6_print_packet(stdout, succ_packet);
+              ++ctr;
 
-              qdsp6_move_insn(insn, pred_packet, insn, succ_packet);
-
-              printf("Packets after: \n");
-              qdsp6_print_packet(stdout, pred_packet);
-              qdsp6_print_packet(stdout, succ_packet);
-
-              return (true);
+              /*              if ((atoi(debug_duplex) == -1) ||
+                  (atoi(debug_duplex) == ctr))
+                  {*/
+                  qdsp6_move_insn(insn, pred_packet, insn, succ_packet, true);
+                  return (true);
+                  /*                }*/
+                                  
             }
         }
     }
@@ -10270,21 +10351,18 @@ qdsp6_pair_duplex_insn(struct qdsp6_packet_info* pred_packet,
       for(i = 0; i < succ_packet->num_insns; ++i)
         {
           struct qdsp6_insn_info *insn = succ_packet->insns[i];
-          if (get_attr_duplex(insn->insn) == DUPLEX_YES && 
+          if (qdsp6_duplex_insn_p (insn) &&
               qdsp6_insn_fits_in_packet_p(insn, pred_packet) &&
               qdsp6_move_insn_up_p(insn, pred_packet, succ_packet))
             {
-              printf("Packets before: \n");
-              qdsp6_print_packet(stdout, pred_packet);
-              qdsp6_print_packet(stdout, succ_packet);
+              ++ctr;
 
-              qdsp6_move_insn(insn, succ_packet, insn, pred_packet);
-
-              printf("Packets after: \n");
-              qdsp6_print_packet(stdout, pred_packet);
-              qdsp6_print_packet(stdout, succ_packet);
-
-              return (true);
+              /*              if ((atoi(debug_duplex) == -1) ||
+                  (atoi(debug_duplex) == ctr))
+                  {*/
+                  qdsp6_move_insn(insn, succ_packet, insn, pred_packet, false);
+                  return (true);
+                  /*                }*/
             }
         }
     }
@@ -10299,6 +10377,7 @@ qdsp6_pair_duplex_insn(struct qdsp6_packet_info* pred_packet,
      started
   */
 
+  return (false);
 }
 
 static int
@@ -10312,7 +10391,7 @@ qdsp6_count_duplex_insns(struct qdsp6_packet_info *packet)
         {
           continue;
         }
-      count += (get_attr_duplex(insn->insn) == DUPLEX_YES);
+      count += (qdsp6_duplex_insn_p (insn));
     }
   return(count);
 }
@@ -10328,15 +10407,20 @@ static void qdsp6_pack_duplex_insns(void)
   struct qdsp6_insn_info *insn;
   int i;
 
-  for(packet = qdsp6_head_packet; packet; packet = packet->next)
-    {
-      while(packet && packet->next)
+  packet = qdsp6_head_packet; 
+  while(packet && packet->next)
         {
           struct qdsp6_packet_info *this_packet = packet;
           struct qdsp6_packet_info *next_packet = packet->next;
           int duplex_this_packet = qdsp6_count_duplex_insns(packet);
           int duplex_next_packet = qdsp6_count_duplex_insns(packet->next);
           
+
+          if ((this_packet->num_insns == 0) || (next_packet->num_insns == 0))
+            {
+              packet = packet->next;
+              continue;
+            }
 
           /* Only consider moving instructions within the same basic block */
           basic_block this_bb = BLOCK_FOR_INSN(this_packet->insns[0]->insn);
@@ -10376,18 +10460,24 @@ static void qdsp6_pack_duplex_insns(void)
               if (num_movable_insns >= 2)
                 {
                     
-                  struct qdsp6_insn_info *third_insn = packet->insns[2], 
-                    *fourth_insn = packet->insns[3];
-                  
-                  /* Splice new packet in between this_packet and next_packet */
-                  this_packet->next = new_packet;
-                  new_packet->next = next_packet;
-                  new_packet->prev = this_packet;
-                  next_packet->prev = new_packet;
-                  
-                  qdsp6_move_insn(third_insn, this_packet, third_insn, new_packet);
-                  qdsp6_move_insn(fourth_insn, this_packet, fourth_insn, new_packet);
-                  printf("Split a packet to create a duplex\n");
+                  struct qdsp6_insn_info *third_insn = movable_insns[0],
+                    *fourth_insn = movable_insns[1];
+                  ++ctr;
+                  /*                  if ((atoi(debug_duplex) == -1) ||
+                      (atoi(debug_duplex) == ctr))
+                      {*/
+  
+                      /* Splice new packet in between this_packet and next_packet */
+                      this_packet->next = new_packet;
+                      new_packet->next = next_packet;
+                      new_packet->prev = this_packet;
+                      next_packet->prev = new_packet;
+                      
+                      qdsp6_move_insn(third_insn, this_packet, third_insn, new_packet, false);
+                      qdsp6_move_insn(fourth_insn, this_packet, fourth_insn, new_packet, false);
+                      packet = new_packet;
+                      continue;
+                      /*                    }*/
                 }
             }
 
@@ -10424,7 +10514,7 @@ static void qdsp6_pack_duplex_insns(void)
               
               if (qdsp6_pair_duplex_insn(this_packet, next_packet, dir))
                 {
-                  printf("Moved an instruction to create a duplex\n");
+                  /*printf("Moved an instruction to create a duplex\n");*/
                 }
             }
           
@@ -10434,7 +10524,7 @@ static void qdsp6_pack_duplex_insns(void)
             }
           packet = packet->next;
         }
-    }
+    
 }
 
 
@@ -10589,7 +10679,7 @@ qdsp6_pack_insns(bool need_bb_info)
       packet = qdsp6_start_new_packet();
     }
 
-    qdsp6_add_insn_to_packet(packet, insn_info);
+    qdsp6_add_insn_to_packet(packet, insn_info, false);
 
     start_packet = false;
 
@@ -10747,7 +10837,8 @@ qdsp6_move_insn(
   struct qdsp6_insn_info *old_insn,
   struct qdsp6_packet_info *from_packet,
   struct qdsp6_insn_info *new_insn,
-  struct qdsp6_packet_info *to_packet
+  struct qdsp6_packet_info *to_packet,
+  bool move_to_beginning
 )
 {
   basic_block bb;
@@ -10756,7 +10847,7 @@ qdsp6_move_insn(
   gcc_assert(to_packet != from_packet);
 
   qdsp6_remove_insn_from_packet(from_packet, old_insn);
-  qdsp6_add_insn_to_packet(to_packet, new_insn);
+  qdsp6_add_insn_to_packet(to_packet, new_insn, move_to_beginning);
 
   if(old_insn->insn == new_insn->insn){
     if(PREV_INSN (old_insn->insn)){
@@ -10776,7 +10867,16 @@ qdsp6_move_insn(
 
 
   if(to_packet->num_insns > 1){
-    if(to_packet->insns[to_packet->num_insns - 1] == new_insn){
+    if (move_to_beginning){
+      adjacent_insn = to_packet->insns[1]->insn;
+      if(PREV_INSN (adjacent_insn) != new_insn->insn){
+        PREV_INSN(new_insn->insn) = PREV_INSN (adjacent_insn);
+        NEXT_INSN (PREV_INSN (adjacent_insn)) = new_insn->insn;
+        NEXT_INSN(new_insn->insn) = adjacent_insn;
+        PREV_INSN (adjacent_insn) = new_insn->insn;
+      }        
+    }
+    else if(to_packet->insns[to_packet->num_insns - 1] == new_insn){
       adjacent_insn = to_packet->insns[to_packet->num_insns - 2]->insn;
       if(NEXT_INSN (adjacent_insn) != new_insn->insn){
         PREV_INSN (new_insn->insn) = adjacent_insn;
@@ -10999,7 +11099,7 @@ qdsp6_pull_up_insns(void)
               }
             }
             qdsp6_remove_insn_from_packet(packet, original_insn);
-            qdsp6_add_insn_to_packet(target_packet, insn);
+            qdsp6_add_insn_to_packet(target_packet, insn, false);
             break;
           }
 
@@ -11078,7 +11178,7 @@ qdsp6_pull_up_insns(void)
           }
 
           if(target_packet != packet){
-            qdsp6_move_insn(original_insn, packet, insn, target_packet);
+            qdsp6_move_insn(original_insn, packet, insn, target_packet, false);
             i--;
           }
           insn->stack = NULL;
