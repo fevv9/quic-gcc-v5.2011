@@ -382,392 +382,386 @@
   (UNSPEC_QDSP6_Q6A2_addsat 1380)
   (UNSPEC_QDSP6_Q6A2_subsat 1381)
   (UNSPEC_QDSP6_Q6A2_addi 1382)
-  (UNSPEC_QDSP6_Q6C4_addipc 1383)
-  (UNSPEC_QDSP6_Q6A2_addh_l16_ll 1384)
-  (UNSPEC_QDSP6_Q6A2_addh_l16_hl 1385)
-  (UNSPEC_QDSP6_Q6A2_addh_l16_sat_ll 1386)
-  (UNSPEC_QDSP6_Q6A2_addh_l16_sat_hl 1387)
-  (UNSPEC_QDSP6_Q6A2_subh_l16_ll 1388)
-  (UNSPEC_QDSP6_Q6A2_subh_l16_hl 1389)
-  (UNSPEC_QDSP6_Q6A2_subh_l16_sat_ll 1390)
-  (UNSPEC_QDSP6_Q6A2_subh_l16_sat_hl 1391)
-  (UNSPEC_QDSP6_Q6A2_addh_h16_ll 1392)
-  (UNSPEC_QDSP6_Q6A2_addh_h16_lh 1393)
-  (UNSPEC_QDSP6_Q6A2_addh_h16_hl 1394)
-  (UNSPEC_QDSP6_Q6A2_addh_h16_hh 1395)
-  (UNSPEC_QDSP6_Q6A2_addh_h16_sat_ll 1396)
-  (UNSPEC_QDSP6_Q6A2_addh_h16_sat_lh 1397)
-  (UNSPEC_QDSP6_Q6A2_addh_h16_sat_hl 1398)
-  (UNSPEC_QDSP6_Q6A2_addh_h16_sat_hh 1399)
-  (UNSPEC_QDSP6_Q6A2_subh_h16_ll 1400)
-  (UNSPEC_QDSP6_Q6A2_subh_h16_lh 1401)
-  (UNSPEC_QDSP6_Q6A2_subh_h16_hl 1402)
-  (UNSPEC_QDSP6_Q6A2_subh_h16_hh 1403)
-  (UNSPEC_QDSP6_Q6A2_subh_h16_sat_ll 1404)
-  (UNSPEC_QDSP6_Q6A2_subh_h16_sat_lh 1405)
-  (UNSPEC_QDSP6_Q6A2_subh_h16_sat_hl 1406)
-  (UNSPEC_QDSP6_Q6A2_subh_h16_sat_hh 1407)
-  (UNSPEC_QDSP6_Q6A2_aslh 1408)
-  (UNSPEC_QDSP6_Q6A2_asrh 1409)
-  (UNSPEC_QDSP6_Q6A2_addp 1410)
-  (UNSPEC_QDSP6_Q6A2_addpsat 1411)
-  (UNSPEC_QDSP6_Q6A2_addsp 1412)
-  (UNSPEC_QDSP6_Q6A2_subp 1413)
-  (UNSPEC_QDSP6_Q6A4_addp_c 1414)
-  (UNSPEC_QDSP6_Q6A4_subp_c 1415)
-  (UNSPEC_QDSP6_Q6A2_neg 1416)
-  (UNSPEC_QDSP6_Q6A2_negsat 1417)
-  (UNSPEC_QDSP6_Q6A2_abs 1418)
-  (UNSPEC_QDSP6_Q6A2_abssat 1419)
-  (UNSPEC_QDSP6_Q6A2_vconj 1420)
-  (UNSPEC_QDSP6_Q6A2_negp 1421)
-  (UNSPEC_QDSP6_Q6A2_absp 1422)
-  (UNSPEC_QDSP6_Q6A2_max 1423)
-  (UNSPEC_QDSP6_Q6A2_maxu 1424)
-  (UNSPEC_QDSP6_Q6A2_min 1425)
-  (UNSPEC_QDSP6_Q6A2_minu 1426)
-  (UNSPEC_QDSP6_Q6A2_maxp 1427)
-  (UNSPEC_QDSP6_Q6A2_maxup 1428)
-  (UNSPEC_QDSP6_Q6A2_minp 1429)
-  (UNSPEC_QDSP6_Q6A2_minup 1430)
-  (UNSPEC_QDSP6_Q6A2_tfr 1431)
-  (UNSPEC_QDSP6_Q6A2_tfrsi 1432)
-  (UNSPEC_QDSP6_Q6A2_tfrp 1433)
-  (UNSPEC_QDSP6_Q6A2_tfrpi 1434)
-  (UNSPEC_QDSP6_Q6A2_zxtb 1435)
-  (UNSPEC_QDSP6_Q6A2_sxtb 1436)
-  (UNSPEC_QDSP6_Q6A2_zxth 1437)
-  (UNSPEC_QDSP6_Q6A2_sxth 1438)
-  (UNSPEC_QDSP6_Q6A2_combinew 1439)
-  (UNSPEC_QDSP6_Q6A4_combineri 1440)
-  (UNSPEC_QDSP6_Q6A4_combineir 1441)
-  (UNSPEC_QDSP6_Q6A2_combineii 1442)
-  (UNSPEC_QDSP6_Q6A2_combine_hh 1443)
-  (UNSPEC_QDSP6_Q6A2_combine_hl 1444)
-  (UNSPEC_QDSP6_Q6A2_combine_lh 1445)
-  (UNSPEC_QDSP6_Q6A2_combine_ll 1446)
-  (UNSPEC_QDSP6_Q6A2_tfril 1447)
-  (UNSPEC_QDSP6_Q6A2_tfrih 1448)
-  (UNSPEC_QDSP6_Q6A2_and 1449)
-  (UNSPEC_QDSP6_Q6A2_or 1450)
-  (UNSPEC_QDSP6_Q6A2_xor 1451)
-  (UNSPEC_QDSP6_Q6A2_not 1452)
-  (UNSPEC_QDSP6_Q6M2_xor_xacc 1453)
-  (UNSPEC_QDSP6_Q6M4_xor_xacc 1454)
-  (UNSPEC_QDSP6_Q6A4_andn 1455)
-  (UNSPEC_QDSP6_Q6A4_orn 1456)
-  (UNSPEC_QDSP6_Q6A4_andnp 1457)
-  (UNSPEC_QDSP6_Q6A4_ornp 1458)
-  (UNSPEC_QDSP6_Q6S4_addaddi 1459)
-  (UNSPEC_QDSP6_Q6S4_subaddi 1460)
-  (UNSPEC_QDSP6_Q6M4_and_and 1461)
-  (UNSPEC_QDSP6_Q6M4_and_andn 1462)
-  (UNSPEC_QDSP6_Q6M4_and_or 1463)
-  (UNSPEC_QDSP6_Q6M4_and_xor 1464)
-  (UNSPEC_QDSP6_Q6M4_or_and 1465)
-  (UNSPEC_QDSP6_Q6M4_or_andn 1466)
-  (UNSPEC_QDSP6_Q6M4_or_or 1467)
-  (UNSPEC_QDSP6_Q6M4_or_xor 1468)
-  (UNSPEC_QDSP6_Q6S4_or_andix 1469)
-  (UNSPEC_QDSP6_Q6S4_or_andi 1470)
-  (UNSPEC_QDSP6_Q6S4_or_ori 1471)
-  (UNSPEC_QDSP6_Q6M4_xor_and 1472)
-  (UNSPEC_QDSP6_Q6M4_xor_or 1473)
-  (UNSPEC_QDSP6_Q6M4_xor_andn 1474)
-  (UNSPEC_QDSP6_Q6A2_subri 1475)
-  (UNSPEC_QDSP6_Q6A2_andir 1476)
-  (UNSPEC_QDSP6_Q6A2_orir 1477)
-  (UNSPEC_QDSP6_Q6A2_andp 1478)
-  (UNSPEC_QDSP6_Q6A2_orp 1479)
-  (UNSPEC_QDSP6_Q6A2_xorp 1480)
-  (UNSPEC_QDSP6_Q6A2_notp 1481)
-  (UNSPEC_QDSP6_Q6A2_sxtw 1482)
-  (UNSPEC_QDSP6_Q6A2_sat 1483)
-  (UNSPEC_QDSP6_Q6A2_sath 1484)
-  (UNSPEC_QDSP6_Q6A2_satuh 1485)
-  (UNSPEC_QDSP6_Q6A2_satub 1486)
-  (UNSPEC_QDSP6_Q6A2_satb 1487)
-  (UNSPEC_QDSP6_Q6A2_vaddub 1488)
-  (UNSPEC_QDSP6_Q6A2_vaddb_map 1489)
-  (UNSPEC_QDSP6_Q6A2_vaddubs 1490)
-  (UNSPEC_QDSP6_Q6A2_vaddh 1491)
-  (UNSPEC_QDSP6_Q6A2_vaddhs 1492)
-  (UNSPEC_QDSP6_Q6A2_vadduhs 1493)
-  (UNSPEC_QDSP6_Q6A2_vaddw 1494)
-  (UNSPEC_QDSP6_Q6A2_vaddws 1495)
-  (UNSPEC_QDSP6_Q6S4_vxaddsubw 1496)
-  (UNSPEC_QDSP6_Q6S4_vxsubaddw 1497)
-  (UNSPEC_QDSP6_Q6S4_vxaddsubh 1498)
-  (UNSPEC_QDSP6_Q6S4_vxsubaddh 1499)
-  (UNSPEC_QDSP6_Q6S4_vxaddsubhr 1500)
-  (UNSPEC_QDSP6_Q6S4_vxsubaddhr 1501)
-  (UNSPEC_QDSP6_Q6A2_svavgh 1502)
-  (UNSPEC_QDSP6_Q6A2_svavghs 1503)
-  (UNSPEC_QDSP6_Q6A2_svnavgh 1504)
-  (UNSPEC_QDSP6_Q6A2_svaddh 1505)
-  (UNSPEC_QDSP6_Q6A2_svaddhs 1506)
-  (UNSPEC_QDSP6_Q6A2_svadduhs 1507)
-  (UNSPEC_QDSP6_Q6A2_svsubh 1508)
-  (UNSPEC_QDSP6_Q6A2_svsubhs 1509)
-  (UNSPEC_QDSP6_Q6A2_svsubuhs 1510)
-  (UNSPEC_QDSP6_Q6A2_vraddub 1511)
-  (UNSPEC_QDSP6_Q6A2_vraddub_acc 1512)
-  (UNSPEC_QDSP6_Q6M2_vraddh 1513)
-  (UNSPEC_QDSP6_Q6M2_vradduh 1514)
-  (UNSPEC_QDSP6_Q6A2_vsubub 1515)
-  (UNSPEC_QDSP6_Q6A2_vsubb_map 1516)
-  (UNSPEC_QDSP6_Q6A2_vsububs 1517)
-  (UNSPEC_QDSP6_Q6A2_vsubh 1518)
-  (UNSPEC_QDSP6_Q6A2_vsubhs 1519)
-  (UNSPEC_QDSP6_Q6A2_vsubuhs 1520)
-  (UNSPEC_QDSP6_Q6A2_vsubw 1521)
-  (UNSPEC_QDSP6_Q6A2_vsubws 1522)
-  (UNSPEC_QDSP6_Q6A2_vabsh 1523)
-  (UNSPEC_QDSP6_Q6A2_vabshsat 1524)
-  (UNSPEC_QDSP6_Q6A2_vabsw 1525)
-  (UNSPEC_QDSP6_Q6A2_vabswsat 1526)
-  (UNSPEC_QDSP6_Q6M2_vabsdiffw 1527)
-  (UNSPEC_QDSP6_Q6M2_vabsdiffh 1528)
-  (UNSPEC_QDSP6_Q6A2_vrsadub 1529)
-  (UNSPEC_QDSP6_Q6A2_vrsadub_acc 1530)
-  (UNSPEC_QDSP6_Q6A2_vavgub 1531)
-  (UNSPEC_QDSP6_Q6A2_vavguh 1532)
-  (UNSPEC_QDSP6_Q6A2_vavgh 1533)
-  (UNSPEC_QDSP6_Q6A2_vnavgh 1534)
-  (UNSPEC_QDSP6_Q6A2_vavgw 1535)
-  (UNSPEC_QDSP6_Q6A2_vnavgw 1536)
-  (UNSPEC_QDSP6_Q6A2_vavgwr 1537)
-  (UNSPEC_QDSP6_Q6A2_vnavgwr 1538)
-  (UNSPEC_QDSP6_Q6A2_vavgwcr 1539)
-  (UNSPEC_QDSP6_Q6A2_vnavgwcr 1540)
-  (UNSPEC_QDSP6_Q6A2_vavghcr 1541)
-  (UNSPEC_QDSP6_Q6A2_vnavghcr 1542)
-  (UNSPEC_QDSP6_Q6A2_vavguw 1543)
-  (UNSPEC_QDSP6_Q6A2_vavguwr 1544)
-  (UNSPEC_QDSP6_Q6A2_vavgubr 1545)
-  (UNSPEC_QDSP6_Q6A2_vavguhr 1546)
-  (UNSPEC_QDSP6_Q6A2_vavghr 1547)
-  (UNSPEC_QDSP6_Q6A2_vnavghr 1548)
-  (UNSPEC_QDSP6_Q6A4_round_ri 1549)
-  (UNSPEC_QDSP6_Q6A4_round_rr 1550)
-  (UNSPEC_QDSP6_Q6A4_round_ri_sat 1551)
-  (UNSPEC_QDSP6_Q6A4_round_rr_sat 1552)
-  (UNSPEC_QDSP6_Q6A4_cround_ri 1553)
-  (UNSPEC_QDSP6_Q6A4_cround_rr 1554)
-  (UNSPEC_QDSP6_Q6A4_vrminh 1555)
-  (UNSPEC_QDSP6_Q6A4_vrmaxh 1556)
-  (UNSPEC_QDSP6_Q6A4_vrminuh 1557)
-  (UNSPEC_QDSP6_Q6A4_vrmaxuh 1558)
-  (UNSPEC_QDSP6_Q6A4_vrminw 1559)
-  (UNSPEC_QDSP6_Q6A4_vrmaxw 1560)
-  (UNSPEC_QDSP6_Q6A4_vrminuw 1561)
-  (UNSPEC_QDSP6_Q6A4_vrmaxuw 1562)
-  (UNSPEC_QDSP6_Q6A2_vminb 1563)
-  (UNSPEC_QDSP6_Q6A2_vmaxb 1564)
-  (UNSPEC_QDSP6_Q6A2_vminub 1565)
-  (UNSPEC_QDSP6_Q6A2_vmaxub 1566)
-  (UNSPEC_QDSP6_Q6A2_vminh 1567)
-  (UNSPEC_QDSP6_Q6A2_vmaxh 1568)
-  (UNSPEC_QDSP6_Q6A2_vminuh 1569)
-  (UNSPEC_QDSP6_Q6A2_vmaxuh 1570)
-  (UNSPEC_QDSP6_Q6A2_vminw 1571)
-  (UNSPEC_QDSP6_Q6A2_vmaxw 1572)
-  (UNSPEC_QDSP6_Q6A2_vminuw 1573)
-  (UNSPEC_QDSP6_Q6A2_vmaxuw 1574)
-  (UNSPEC_QDSP6_Q6A4_modwrapu 1575)
-  (UNSPEC_QDSP6_Q6S2_asr_r_r 1576)
-  (UNSPEC_QDSP6_Q6S2_asl_r_r 1577)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_r 1578)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_r 1579)
-  (UNSPEC_QDSP6_Q6S2_asr_r_p 1580)
-  (UNSPEC_QDSP6_Q6S2_asl_r_p 1581)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_p 1582)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_p 1583)
-  (UNSPEC_QDSP6_Q6S2_asr_r_r_acc 1584)
-  (UNSPEC_QDSP6_Q6S2_asl_r_r_acc 1585)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_r_acc 1586)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_r_acc 1587)
-  (UNSPEC_QDSP6_Q6S2_asr_r_p_acc 1588)
-  (UNSPEC_QDSP6_Q6S2_asl_r_p_acc 1589)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_p_acc 1590)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_p_acc 1591)
-  (UNSPEC_QDSP6_Q6S2_asr_r_r_nac 1592)
-  (UNSPEC_QDSP6_Q6S2_asl_r_r_nac 1593)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_r_nac 1594)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_r_nac 1595)
-  (UNSPEC_QDSP6_Q6S2_asr_r_p_nac 1596)
-  (UNSPEC_QDSP6_Q6S2_asl_r_p_nac 1597)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_p_nac 1598)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_p_nac 1599)
-  (UNSPEC_QDSP6_Q6S2_asr_r_r_and 1600)
-  (UNSPEC_QDSP6_Q6S2_asl_r_r_and 1601)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_r_and 1602)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_r_and 1603)
-  (UNSPEC_QDSP6_Q6S2_asr_r_r_or 1604)
-  (UNSPEC_QDSP6_Q6S2_asl_r_r_or 1605)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_r_or 1606)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_r_or 1607)
-  (UNSPEC_QDSP6_Q6S2_asr_r_p_and 1608)
-  (UNSPEC_QDSP6_Q6S2_asl_r_p_and 1609)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_p_and 1610)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_p_and 1611)
-  (UNSPEC_QDSP6_Q6S2_asr_r_p_or 1612)
-  (UNSPEC_QDSP6_Q6S2_asl_r_p_or 1613)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_p_or 1614)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_p_or 1615)
-  (UNSPEC_QDSP6_Q6S2_asr_r_p_xor 1616)
-  (UNSPEC_QDSP6_Q6S2_asl_r_p_xor 1617)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_p_xor 1618)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_p_xor 1619)
-  (UNSPEC_QDSP6_Q6S2_asr_r_r_sat 1620)
-  (UNSPEC_QDSP6_Q6S2_asl_r_r_sat 1621)
-  (UNSPEC_QDSP6_Q6S2_asr_i_r 1622)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_r 1623)
-  (UNSPEC_QDSP6_Q6S2_asl_i_r 1624)
-  (UNSPEC_QDSP6_Q6S2_asr_i_p 1625)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_p 1626)
-  (UNSPEC_QDSP6_Q6S2_asl_i_p 1627)
-  (UNSPEC_QDSP6_Q6S2_asr_i_r_acc 1628)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_r_acc 1629)
-  (UNSPEC_QDSP6_Q6S2_asl_i_r_acc 1630)
-  (UNSPEC_QDSP6_Q6S2_asr_i_p_acc 1631)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_p_acc 1632)
-  (UNSPEC_QDSP6_Q6S2_asl_i_p_acc 1633)
-  (UNSPEC_QDSP6_Q6S2_asr_i_r_nac 1634)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_r_nac 1635)
-  (UNSPEC_QDSP6_Q6S2_asl_i_r_nac 1636)
-  (UNSPEC_QDSP6_Q6S2_asr_i_p_nac 1637)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_p_nac 1638)
-  (UNSPEC_QDSP6_Q6S2_asl_i_p_nac 1639)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_r_xacc 1640)
-  (UNSPEC_QDSP6_Q6S2_asl_i_r_xacc 1641)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_p_xacc 1642)
-  (UNSPEC_QDSP6_Q6S2_asl_i_p_xacc 1643)
-  (UNSPEC_QDSP6_Q6S2_asr_i_r_and 1644)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_r_and 1645)
-  (UNSPEC_QDSP6_Q6S2_asl_i_r_and 1646)
-  (UNSPEC_QDSP6_Q6S2_asr_i_r_or 1647)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_r_or 1648)
-  (UNSPEC_QDSP6_Q6S2_asl_i_r_or 1649)
-  (UNSPEC_QDSP6_Q6S2_asr_i_p_and 1650)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_p_and 1651)
-  (UNSPEC_QDSP6_Q6S2_asl_i_p_and 1652)
-  (UNSPEC_QDSP6_Q6S2_asr_i_p_or 1653)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_p_or 1654)
-  (UNSPEC_QDSP6_Q6S2_asl_i_p_or 1655)
-  (UNSPEC_QDSP6_Q6S2_asl_i_r_sat 1656)
-  (UNSPEC_QDSP6_Q6S2_asr_i_r_rnd 1657)
-  (UNSPEC_QDSP6_Q6S2_asr_i_r_rnd_goodsyntax 1658)
-  (UNSPEC_QDSP6_Q6S4_lsli 1659)
-  (UNSPEC_QDSP6_Q6S2_addasl_rrri 1660)
-  (UNSPEC_QDSP6_Q6S4_andi_asl_ri 1661)
-  (UNSPEC_QDSP6_Q6S4_ori_asl_ri 1662)
-  (UNSPEC_QDSP6_Q6S4_addi_asl_ri 1663)
-  (UNSPEC_QDSP6_Q6S4_subi_asl_ri 1664)
-  (UNSPEC_QDSP6_Q6S4_andi_lsr_ri 1665)
-  (UNSPEC_QDSP6_Q6S4_ori_lsr_ri 1666)
-  (UNSPEC_QDSP6_Q6S4_addi_lsr_ri 1667)
-  (UNSPEC_QDSP6_Q6S4_subi_lsr_ri 1668)
-  (UNSPEC_QDSP6_Q6S2_valignib 1669)
-  (UNSPEC_QDSP6_Q6S2_valignrb 1670)
-  (UNSPEC_QDSP6_Q6S2_vspliceib 1671)
-  (UNSPEC_QDSP6_Q6S2_vsplicerb 1672)
-  (UNSPEC_QDSP6_Q6S2_vsplatrh 1673)
-  (UNSPEC_QDSP6_Q6S2_vsplatrb 1674)
-  (UNSPEC_QDSP6_Q6S2_insert 1675)
-  (UNSPEC_QDSP6_Q6S2_tableidxb_goodsyntax 1676)
-  (UNSPEC_QDSP6_Q6S2_tableidxh_goodsyntax 1677)
-  (UNSPEC_QDSP6_Q6S2_tableidxw_goodsyntax 1678)
-  (UNSPEC_QDSP6_Q6S2_tableidxd_goodsyntax 1679)
-  (UNSPEC_QDSP6_Q6A4_bitspliti 1680)
-  (UNSPEC_QDSP6_Q6A4_bitsplit 1681)
-  (UNSPEC_QDSP6_Q6S4_extract 1682)
-  (UNSPEC_QDSP6_Q6S2_extractu 1683)
-  (UNSPEC_QDSP6_Q6S2_insertp 1684)
-  (UNSPEC_QDSP6_Q6S4_extractp 1685)
-  (UNSPEC_QDSP6_Q6S2_extractup 1686)
-  (UNSPEC_QDSP6_Q6S2_insert_rp 1687)
-  (UNSPEC_QDSP6_Q6S4_extract_rp 1688)
-  (UNSPEC_QDSP6_Q6S2_extractu_rp 1689)
-  (UNSPEC_QDSP6_Q6S2_insertp_rp 1690)
-  (UNSPEC_QDSP6_Q6S4_extractp_rp 1691)
-  (UNSPEC_QDSP6_Q6S2_extractup_rp 1692)
-  (UNSPEC_QDSP6_Q6S2_tstbit_i 1693)
-  (UNSPEC_QDSP6_Q6S4_ntstbit_i 1694)
-  (UNSPEC_QDSP6_Q6S2_setbit_i 1695)
-  (UNSPEC_QDSP6_Q6S2_togglebit_i 1696)
-  (UNSPEC_QDSP6_Q6S2_clrbit_i 1697)
-  (UNSPEC_QDSP6_Q6S2_tstbit_r 1698)
-  (UNSPEC_QDSP6_Q6S4_ntstbit_r 1699)
-  (UNSPEC_QDSP6_Q6S2_setbit_r 1700)
-  (UNSPEC_QDSP6_Q6S2_togglebit_r 1701)
-  (UNSPEC_QDSP6_Q6S2_clrbit_r 1702)
-  (UNSPEC_QDSP6_Q6S2_asr_i_vh 1703)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_vh 1704)
-  (UNSPEC_QDSP6_Q6S2_asl_i_vh 1705)
-  (UNSPEC_QDSP6_Q6S2_asr_r_vh 1706)
-  (UNSPEC_QDSP6_Q6S2_asl_r_vh 1707)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_vh 1708)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_vh 1709)
-  (UNSPEC_QDSP6_Q6S2_asr_i_vw 1710)
-  (UNSPEC_QDSP6_Q6S2_asr_i_svw_trun 1711)
-  (UNSPEC_QDSP6_Q6S2_asr_r_svw_trun 1712)
-  (UNSPEC_QDSP6_Q6S2_lsr_i_vw 1713)
-  (UNSPEC_QDSP6_Q6S2_asl_i_vw 1714)
-  (UNSPEC_QDSP6_Q6S2_asr_r_vw 1715)
-  (UNSPEC_QDSP6_Q6S2_asl_r_vw 1716)
-  (UNSPEC_QDSP6_Q6S2_lsr_r_vw 1717)
-  (UNSPEC_QDSP6_Q6S2_lsl_r_vw 1718)
-  (UNSPEC_QDSP6_Q6S2_vrndpackwh 1719)
-  (UNSPEC_QDSP6_Q6S2_vrndpackwhs 1720)
-  (UNSPEC_QDSP6_Q6S2_vsxtbh 1721)
-  (UNSPEC_QDSP6_Q6S2_vzxtbh 1722)
-  (UNSPEC_QDSP6_Q6S2_vsathub 1723)
-  (UNSPEC_QDSP6_Q6S2_svsathub 1724)
-  (UNSPEC_QDSP6_Q6S2_svsathb 1725)
-  (UNSPEC_QDSP6_Q6S2_vsathb 1726)
-  (UNSPEC_QDSP6_Q6S2_vtrunohb 1727)
-  (UNSPEC_QDSP6_Q6S2_vtrunewh 1728)
-  (UNSPEC_QDSP6_Q6S2_vtrunowh 1729)
-  (UNSPEC_QDSP6_Q6S2_vtrunehb 1730)
-  (UNSPEC_QDSP6_Q6S2_vsxthw 1731)
-  (UNSPEC_QDSP6_Q6S2_vzxthw 1732)
-  (UNSPEC_QDSP6_Q6S2_vsatwh 1733)
-  (UNSPEC_QDSP6_Q6S2_vsatwuh 1734)
-  (UNSPEC_QDSP6_Q6S2_packhl 1735)
-  (UNSPEC_QDSP6_Q6A2_swiz 1736)
-  (UNSPEC_QDSP6_Q6S2_vsathub_nopack 1737)
-  (UNSPEC_QDSP6_Q6S2_vsathb_nopack 1738)
-  (UNSPEC_QDSP6_Q6S2_vsatwh_nopack 1739)
-  (UNSPEC_QDSP6_Q6S2_vsatwuh_nopack 1740)
-  (UNSPEC_QDSP6_Q6S2_shuffob 1741)
-  (UNSPEC_QDSP6_Q6S2_shuffeb 1742)
-  (UNSPEC_QDSP6_Q6S2_shuffoh 1743)
-  (UNSPEC_QDSP6_Q6S2_shuffeh 1744)
-  (UNSPEC_QDSP6_Q6S4_parity 1745)
-  (UNSPEC_QDSP6_Q6S2_parityp 1746)
-  (UNSPEC_QDSP6_Q6S2_lfsp 1747)
-  (UNSPEC_QDSP6_Q6S2_clbnorm 1748)
-  (UNSPEC_QDSP6_Q6S4_clbaddi 1749)
-  (UNSPEC_QDSP6_Q6S4_clbpnorm 1750)
-  (UNSPEC_QDSP6_Q6S4_clbpaddi 1751)
-  (UNSPEC_QDSP6_Q6S2_clb 1752)
-  (UNSPEC_QDSP6_Q6S2_cl0 1753)
-  (UNSPEC_QDSP6_Q6S2_cl1 1754)
-  (UNSPEC_QDSP6_Q6S2_clbp 1755)
-  (UNSPEC_QDSP6_Q6S2_cl0p 1756)
-  (UNSPEC_QDSP6_Q6S2_cl1p 1757)
-  (UNSPEC_QDSP6_Q6S2_brev 1758)
-  (UNSPEC_QDSP6_Q6S2_brevp 1759)
-  (UNSPEC_QDSP6_Q6S2_ct0 1760)
-  (UNSPEC_QDSP6_Q6S2_ct1 1761)
-  (UNSPEC_QDSP6_Q6S2_ct0p 1762)
-  (UNSPEC_QDSP6_Q6S2_ct1p 1763)
-  (UNSPEC_QDSP6_Q6S2_interleave 1764)
-  (UNSPEC_QDSP6_Q6S2_deinterleave 1765)
-  (UNSPEC_QDSP6_Q6dep_S2_packhl 1766)
-  (UNSPEC_QDSP6_Q6dep_A2_addsat 1767)
-  (UNSPEC_QDSP6_Q6dep_A2_subsat 1768)
+  (UNSPEC_QDSP6_Q6A2_addh_l16_ll 1383)
+  (UNSPEC_QDSP6_Q6A2_addh_l16_hl 1384)
+  (UNSPEC_QDSP6_Q6A2_addh_l16_sat_ll 1385)
+  (UNSPEC_QDSP6_Q6A2_addh_l16_sat_hl 1386)
+  (UNSPEC_QDSP6_Q6A2_subh_l16_ll 1387)
+  (UNSPEC_QDSP6_Q6A2_subh_l16_hl 1388)
+  (UNSPEC_QDSP6_Q6A2_subh_l16_sat_ll 1389)
+  (UNSPEC_QDSP6_Q6A2_subh_l16_sat_hl 1390)
+  (UNSPEC_QDSP6_Q6A2_addh_h16_ll 1391)
+  (UNSPEC_QDSP6_Q6A2_addh_h16_lh 1392)
+  (UNSPEC_QDSP6_Q6A2_addh_h16_hl 1393)
+  (UNSPEC_QDSP6_Q6A2_addh_h16_hh 1394)
+  (UNSPEC_QDSP6_Q6A2_addh_h16_sat_ll 1395)
+  (UNSPEC_QDSP6_Q6A2_addh_h16_sat_lh 1396)
+  (UNSPEC_QDSP6_Q6A2_addh_h16_sat_hl 1397)
+  (UNSPEC_QDSP6_Q6A2_addh_h16_sat_hh 1398)
+  (UNSPEC_QDSP6_Q6A2_subh_h16_ll 1399)
+  (UNSPEC_QDSP6_Q6A2_subh_h16_lh 1400)
+  (UNSPEC_QDSP6_Q6A2_subh_h16_hl 1401)
+  (UNSPEC_QDSP6_Q6A2_subh_h16_hh 1402)
+  (UNSPEC_QDSP6_Q6A2_subh_h16_sat_ll 1403)
+  (UNSPEC_QDSP6_Q6A2_subh_h16_sat_lh 1404)
+  (UNSPEC_QDSP6_Q6A2_subh_h16_sat_hl 1405)
+  (UNSPEC_QDSP6_Q6A2_subh_h16_sat_hh 1406)
+  (UNSPEC_QDSP6_Q6A2_aslh 1407)
+  (UNSPEC_QDSP6_Q6A2_asrh 1408)
+  (UNSPEC_QDSP6_Q6A2_addp 1409)
+  (UNSPEC_QDSP6_Q6A2_addpsat 1410)
+  (UNSPEC_QDSP6_Q6A2_addsp 1411)
+  (UNSPEC_QDSP6_Q6A2_subp 1412)
+  (UNSPEC_QDSP6_Q6A2_neg 1413)
+  (UNSPEC_QDSP6_Q6A2_negsat 1414)
+  (UNSPEC_QDSP6_Q6A2_abs 1415)
+  (UNSPEC_QDSP6_Q6A2_abssat 1416)
+  (UNSPEC_QDSP6_Q6A2_vconj 1417)
+  (UNSPEC_QDSP6_Q6A2_negp 1418)
+  (UNSPEC_QDSP6_Q6A2_absp 1419)
+  (UNSPEC_QDSP6_Q6A2_max 1420)
+  (UNSPEC_QDSP6_Q6A2_maxu 1421)
+  (UNSPEC_QDSP6_Q6A2_min 1422)
+  (UNSPEC_QDSP6_Q6A2_minu 1423)
+  (UNSPEC_QDSP6_Q6A2_maxp 1424)
+  (UNSPEC_QDSP6_Q6A2_maxup 1425)
+  (UNSPEC_QDSP6_Q6A2_minp 1426)
+  (UNSPEC_QDSP6_Q6A2_minup 1427)
+  (UNSPEC_QDSP6_Q6A2_tfr 1428)
+  (UNSPEC_QDSP6_Q6A2_tfrsi 1429)
+  (UNSPEC_QDSP6_Q6A2_tfrp 1430)
+  (UNSPEC_QDSP6_Q6A2_tfrpi 1431)
+  (UNSPEC_QDSP6_Q6A2_zxtb 1432)
+  (UNSPEC_QDSP6_Q6A2_sxtb 1433)
+  (UNSPEC_QDSP6_Q6A2_zxth 1434)
+  (UNSPEC_QDSP6_Q6A2_sxth 1435)
+  (UNSPEC_QDSP6_Q6A2_combinew 1436)
+  (UNSPEC_QDSP6_Q6A4_combineri 1437)
+  (UNSPEC_QDSP6_Q6A4_combineir 1438)
+  (UNSPEC_QDSP6_Q6A2_combineii 1439)
+  (UNSPEC_QDSP6_Q6A2_combine_hh 1440)
+  (UNSPEC_QDSP6_Q6A2_combine_hl 1441)
+  (UNSPEC_QDSP6_Q6A2_combine_lh 1442)
+  (UNSPEC_QDSP6_Q6A2_combine_ll 1443)
+  (UNSPEC_QDSP6_Q6A2_tfril 1444)
+  (UNSPEC_QDSP6_Q6A2_tfrih 1445)
+  (UNSPEC_QDSP6_Q6A2_and 1446)
+  (UNSPEC_QDSP6_Q6A2_or 1447)
+  (UNSPEC_QDSP6_Q6A2_xor 1448)
+  (UNSPEC_QDSP6_Q6A2_not 1449)
+  (UNSPEC_QDSP6_Q6M2_xor_xacc 1450)
+  (UNSPEC_QDSP6_Q6M4_xor_xacc 1451)
+  (UNSPEC_QDSP6_Q6A4_andn 1452)
+  (UNSPEC_QDSP6_Q6A4_orn 1453)
+  (UNSPEC_QDSP6_Q6A4_andnp 1454)
+  (UNSPEC_QDSP6_Q6A4_ornp 1455)
+  (UNSPEC_QDSP6_Q6S4_addaddi 1456)
+  (UNSPEC_QDSP6_Q6S4_subaddi 1457)
+  (UNSPEC_QDSP6_Q6M4_and_and 1458)
+  (UNSPEC_QDSP6_Q6M4_and_andn 1459)
+  (UNSPEC_QDSP6_Q6M4_and_or 1460)
+  (UNSPEC_QDSP6_Q6M4_and_xor 1461)
+  (UNSPEC_QDSP6_Q6M4_or_and 1462)
+  (UNSPEC_QDSP6_Q6M4_or_andn 1463)
+  (UNSPEC_QDSP6_Q6M4_or_or 1464)
+  (UNSPEC_QDSP6_Q6M4_or_xor 1465)
+  (UNSPEC_QDSP6_Q6S4_or_andix 1466)
+  (UNSPEC_QDSP6_Q6S4_or_andi 1467)
+  (UNSPEC_QDSP6_Q6S4_or_ori 1468)
+  (UNSPEC_QDSP6_Q6M4_xor_and 1469)
+  (UNSPEC_QDSP6_Q6M4_xor_or 1470)
+  (UNSPEC_QDSP6_Q6M4_xor_andn 1471)
+  (UNSPEC_QDSP6_Q6A2_subri 1472)
+  (UNSPEC_QDSP6_Q6A2_andir 1473)
+  (UNSPEC_QDSP6_Q6A2_orir 1474)
+  (UNSPEC_QDSP6_Q6A2_andp 1475)
+  (UNSPEC_QDSP6_Q6A2_orp 1476)
+  (UNSPEC_QDSP6_Q6A2_xorp 1477)
+  (UNSPEC_QDSP6_Q6A2_notp 1478)
+  (UNSPEC_QDSP6_Q6A2_sxtw 1479)
+  (UNSPEC_QDSP6_Q6A2_sat 1480)
+  (UNSPEC_QDSP6_Q6A2_sath 1481)
+  (UNSPEC_QDSP6_Q6A2_satuh 1482)
+  (UNSPEC_QDSP6_Q6A2_satub 1483)
+  (UNSPEC_QDSP6_Q6A2_satb 1484)
+  (UNSPEC_QDSP6_Q6A2_vaddub 1485)
+  (UNSPEC_QDSP6_Q6A2_vaddb_map 1486)
+  (UNSPEC_QDSP6_Q6A2_vaddubs 1487)
+  (UNSPEC_QDSP6_Q6A2_vaddh 1488)
+  (UNSPEC_QDSP6_Q6A2_vaddhs 1489)
+  (UNSPEC_QDSP6_Q6A2_vadduhs 1490)
+  (UNSPEC_QDSP6_Q6A2_vaddw 1491)
+  (UNSPEC_QDSP6_Q6A2_vaddws 1492)
+  (UNSPEC_QDSP6_Q6S4_vxaddsubw 1493)
+  (UNSPEC_QDSP6_Q6S4_vxsubaddw 1494)
+  (UNSPEC_QDSP6_Q6S4_vxaddsubh 1495)
+  (UNSPEC_QDSP6_Q6S4_vxsubaddh 1496)
+  (UNSPEC_QDSP6_Q6S4_vxaddsubhr 1497)
+  (UNSPEC_QDSP6_Q6S4_vxsubaddhr 1498)
+  (UNSPEC_QDSP6_Q6A2_svavgh 1499)
+  (UNSPEC_QDSP6_Q6A2_svavghs 1500)
+  (UNSPEC_QDSP6_Q6A2_svnavgh 1501)
+  (UNSPEC_QDSP6_Q6A2_svaddh 1502)
+  (UNSPEC_QDSP6_Q6A2_svaddhs 1503)
+  (UNSPEC_QDSP6_Q6A2_svadduhs 1504)
+  (UNSPEC_QDSP6_Q6A2_svsubh 1505)
+  (UNSPEC_QDSP6_Q6A2_svsubhs 1506)
+  (UNSPEC_QDSP6_Q6A2_svsubuhs 1507)
+  (UNSPEC_QDSP6_Q6A2_vraddub 1508)
+  (UNSPEC_QDSP6_Q6A2_vraddub_acc 1509)
+  (UNSPEC_QDSP6_Q6M2_vraddh 1510)
+  (UNSPEC_QDSP6_Q6M2_vradduh 1511)
+  (UNSPEC_QDSP6_Q6A2_vsubub 1512)
+  (UNSPEC_QDSP6_Q6A2_vsubb_map 1513)
+  (UNSPEC_QDSP6_Q6A2_vsububs 1514)
+  (UNSPEC_QDSP6_Q6A2_vsubh 1515)
+  (UNSPEC_QDSP6_Q6A2_vsubhs 1516)
+  (UNSPEC_QDSP6_Q6A2_vsubuhs 1517)
+  (UNSPEC_QDSP6_Q6A2_vsubw 1518)
+  (UNSPEC_QDSP6_Q6A2_vsubws 1519)
+  (UNSPEC_QDSP6_Q6A2_vabsh 1520)
+  (UNSPEC_QDSP6_Q6A2_vabshsat 1521)
+  (UNSPEC_QDSP6_Q6A2_vabsw 1522)
+  (UNSPEC_QDSP6_Q6A2_vabswsat 1523)
+  (UNSPEC_QDSP6_Q6M2_vabsdiffw 1524)
+  (UNSPEC_QDSP6_Q6M2_vabsdiffh 1525)
+  (UNSPEC_QDSP6_Q6A2_vrsadub 1526)
+  (UNSPEC_QDSP6_Q6A2_vrsadub_acc 1527)
+  (UNSPEC_QDSP6_Q6A2_vavgub 1528)
+  (UNSPEC_QDSP6_Q6A2_vavguh 1529)
+  (UNSPEC_QDSP6_Q6A2_vavgh 1530)
+  (UNSPEC_QDSP6_Q6A2_vnavgh 1531)
+  (UNSPEC_QDSP6_Q6A2_vavgw 1532)
+  (UNSPEC_QDSP6_Q6A2_vnavgw 1533)
+  (UNSPEC_QDSP6_Q6A2_vavgwr 1534)
+  (UNSPEC_QDSP6_Q6A2_vnavgwr 1535)
+  (UNSPEC_QDSP6_Q6A2_vavgwcr 1536)
+  (UNSPEC_QDSP6_Q6A2_vnavgwcr 1537)
+  (UNSPEC_QDSP6_Q6A2_vavghcr 1538)
+  (UNSPEC_QDSP6_Q6A2_vnavghcr 1539)
+  (UNSPEC_QDSP6_Q6A2_vavguw 1540)
+  (UNSPEC_QDSP6_Q6A2_vavguwr 1541)
+  (UNSPEC_QDSP6_Q6A2_vavgubr 1542)
+  (UNSPEC_QDSP6_Q6A2_vavguhr 1543)
+  (UNSPEC_QDSP6_Q6A2_vavghr 1544)
+  (UNSPEC_QDSP6_Q6A2_vnavghr 1545)
+  (UNSPEC_QDSP6_Q6A4_round_ri 1546)
+  (UNSPEC_QDSP6_Q6A4_round_rr 1547)
+  (UNSPEC_QDSP6_Q6A4_round_ri_sat 1548)
+  (UNSPEC_QDSP6_Q6A4_round_rr_sat 1549)
+  (UNSPEC_QDSP6_Q6A4_cround_ri 1550)
+  (UNSPEC_QDSP6_Q6A4_cround_rr 1551)
+  (UNSPEC_QDSP6_Q6A4_vrminh 1552)
+  (UNSPEC_QDSP6_Q6A4_vrmaxh 1553)
+  (UNSPEC_QDSP6_Q6A4_vrminuh 1554)
+  (UNSPEC_QDSP6_Q6A4_vrmaxuh 1555)
+  (UNSPEC_QDSP6_Q6A4_vrminw 1556)
+  (UNSPEC_QDSP6_Q6A4_vrmaxw 1557)
+  (UNSPEC_QDSP6_Q6A4_vrminuw 1558)
+  (UNSPEC_QDSP6_Q6A4_vrmaxuw 1559)
+  (UNSPEC_QDSP6_Q6A2_vminb 1560)
+  (UNSPEC_QDSP6_Q6A2_vmaxb 1561)
+  (UNSPEC_QDSP6_Q6A2_vminub 1562)
+  (UNSPEC_QDSP6_Q6A2_vmaxub 1563)
+  (UNSPEC_QDSP6_Q6A2_vminh 1564)
+  (UNSPEC_QDSP6_Q6A2_vmaxh 1565)
+  (UNSPEC_QDSP6_Q6A2_vminuh 1566)
+  (UNSPEC_QDSP6_Q6A2_vmaxuh 1567)
+  (UNSPEC_QDSP6_Q6A2_vminw 1568)
+  (UNSPEC_QDSP6_Q6A2_vmaxw 1569)
+  (UNSPEC_QDSP6_Q6A2_vminuw 1570)
+  (UNSPEC_QDSP6_Q6A2_vmaxuw 1571)
+  (UNSPEC_QDSP6_Q6A4_modwrapu 1572)
+  (UNSPEC_QDSP6_Q6S2_asr_r_r 1573)
+  (UNSPEC_QDSP6_Q6S2_asl_r_r 1574)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_r 1575)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_r 1576)
+  (UNSPEC_QDSP6_Q6S2_asr_r_p 1577)
+  (UNSPEC_QDSP6_Q6S2_asl_r_p 1578)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_p 1579)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_p 1580)
+  (UNSPEC_QDSP6_Q6S2_asr_r_r_acc 1581)
+  (UNSPEC_QDSP6_Q6S2_asl_r_r_acc 1582)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_r_acc 1583)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_r_acc 1584)
+  (UNSPEC_QDSP6_Q6S2_asr_r_p_acc 1585)
+  (UNSPEC_QDSP6_Q6S2_asl_r_p_acc 1586)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_p_acc 1587)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_p_acc 1588)
+  (UNSPEC_QDSP6_Q6S2_asr_r_r_nac 1589)
+  (UNSPEC_QDSP6_Q6S2_asl_r_r_nac 1590)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_r_nac 1591)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_r_nac 1592)
+  (UNSPEC_QDSP6_Q6S2_asr_r_p_nac 1593)
+  (UNSPEC_QDSP6_Q6S2_asl_r_p_nac 1594)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_p_nac 1595)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_p_nac 1596)
+  (UNSPEC_QDSP6_Q6S2_asr_r_r_and 1597)
+  (UNSPEC_QDSP6_Q6S2_asl_r_r_and 1598)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_r_and 1599)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_r_and 1600)
+  (UNSPEC_QDSP6_Q6S2_asr_r_r_or 1601)
+  (UNSPEC_QDSP6_Q6S2_asl_r_r_or 1602)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_r_or 1603)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_r_or 1604)
+  (UNSPEC_QDSP6_Q6S2_asr_r_p_and 1605)
+  (UNSPEC_QDSP6_Q6S2_asl_r_p_and 1606)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_p_and 1607)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_p_and 1608)
+  (UNSPEC_QDSP6_Q6S2_asr_r_p_or 1609)
+  (UNSPEC_QDSP6_Q6S2_asl_r_p_or 1610)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_p_or 1611)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_p_or 1612)
+  (UNSPEC_QDSP6_Q6S2_asr_r_p_xor 1613)
+  (UNSPEC_QDSP6_Q6S2_asl_r_p_xor 1614)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_p_xor 1615)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_p_xor 1616)
+  (UNSPEC_QDSP6_Q6S2_asr_r_r_sat 1617)
+  (UNSPEC_QDSP6_Q6S2_asl_r_r_sat 1618)
+  (UNSPEC_QDSP6_Q6S2_asr_i_r 1619)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_r 1620)
+  (UNSPEC_QDSP6_Q6S2_asl_i_r 1621)
+  (UNSPEC_QDSP6_Q6S2_asr_i_p 1622)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_p 1623)
+  (UNSPEC_QDSP6_Q6S2_asl_i_p 1624)
+  (UNSPEC_QDSP6_Q6S2_asr_i_r_acc 1625)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_r_acc 1626)
+  (UNSPEC_QDSP6_Q6S2_asl_i_r_acc 1627)
+  (UNSPEC_QDSP6_Q6S2_asr_i_p_acc 1628)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_p_acc 1629)
+  (UNSPEC_QDSP6_Q6S2_asl_i_p_acc 1630)
+  (UNSPEC_QDSP6_Q6S2_asr_i_r_nac 1631)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_r_nac 1632)
+  (UNSPEC_QDSP6_Q6S2_asl_i_r_nac 1633)
+  (UNSPEC_QDSP6_Q6S2_asr_i_p_nac 1634)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_p_nac 1635)
+  (UNSPEC_QDSP6_Q6S2_asl_i_p_nac 1636)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_r_xacc 1637)
+  (UNSPEC_QDSP6_Q6S2_asl_i_r_xacc 1638)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_p_xacc 1639)
+  (UNSPEC_QDSP6_Q6S2_asl_i_p_xacc 1640)
+  (UNSPEC_QDSP6_Q6S2_asr_i_r_and 1641)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_r_and 1642)
+  (UNSPEC_QDSP6_Q6S2_asl_i_r_and 1643)
+  (UNSPEC_QDSP6_Q6S2_asr_i_r_or 1644)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_r_or 1645)
+  (UNSPEC_QDSP6_Q6S2_asl_i_r_or 1646)
+  (UNSPEC_QDSP6_Q6S2_asr_i_p_and 1647)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_p_and 1648)
+  (UNSPEC_QDSP6_Q6S2_asl_i_p_and 1649)
+  (UNSPEC_QDSP6_Q6S2_asr_i_p_or 1650)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_p_or 1651)
+  (UNSPEC_QDSP6_Q6S2_asl_i_p_or 1652)
+  (UNSPEC_QDSP6_Q6S2_asl_i_r_sat 1653)
+  (UNSPEC_QDSP6_Q6S2_asr_i_r_rnd 1654)
+  (UNSPEC_QDSP6_Q6S2_asr_i_r_rnd_goodsyntax 1655)
+  (UNSPEC_QDSP6_Q6S4_lsli 1656)
+  (UNSPEC_QDSP6_Q6S2_addasl_rrri 1657)
+  (UNSPEC_QDSP6_Q6S4_andi_asl_ri 1658)
+  (UNSPEC_QDSP6_Q6S4_ori_asl_ri 1659)
+  (UNSPEC_QDSP6_Q6S4_addi_asl_ri 1660)
+  (UNSPEC_QDSP6_Q6S4_subi_asl_ri 1661)
+  (UNSPEC_QDSP6_Q6S4_andi_lsr_ri 1662)
+  (UNSPEC_QDSP6_Q6S4_ori_lsr_ri 1663)
+  (UNSPEC_QDSP6_Q6S4_addi_lsr_ri 1664)
+  (UNSPEC_QDSP6_Q6S4_subi_lsr_ri 1665)
+  (UNSPEC_QDSP6_Q6S2_valignib 1666)
+  (UNSPEC_QDSP6_Q6S2_valignrb 1667)
+  (UNSPEC_QDSP6_Q6S2_vspliceib 1668)
+  (UNSPEC_QDSP6_Q6S2_vsplicerb 1669)
+  (UNSPEC_QDSP6_Q6S2_vsplatrh 1670)
+  (UNSPEC_QDSP6_Q6S2_vsplatrb 1671)
+  (UNSPEC_QDSP6_Q6S2_insert 1672)
+  (UNSPEC_QDSP6_Q6S2_tableidxb_goodsyntax 1673)
+  (UNSPEC_QDSP6_Q6S2_tableidxh_goodsyntax 1674)
+  (UNSPEC_QDSP6_Q6S2_tableidxw_goodsyntax 1675)
+  (UNSPEC_QDSP6_Q6S2_tableidxd_goodsyntax 1676)
+  (UNSPEC_QDSP6_Q6A4_bitspliti 1677)
+  (UNSPEC_QDSP6_Q6A4_bitsplit 1678)
+  (UNSPEC_QDSP6_Q6S4_extract 1679)
+  (UNSPEC_QDSP6_Q6S2_extractu 1680)
+  (UNSPEC_QDSP6_Q6S2_insertp 1681)
+  (UNSPEC_QDSP6_Q6S4_extractp 1682)
+  (UNSPEC_QDSP6_Q6S2_extractup 1683)
+  (UNSPEC_QDSP6_Q6S2_insert_rp 1684)
+  (UNSPEC_QDSP6_Q6S4_extract_rp 1685)
+  (UNSPEC_QDSP6_Q6S2_extractu_rp 1686)
+  (UNSPEC_QDSP6_Q6S2_insertp_rp 1687)
+  (UNSPEC_QDSP6_Q6S4_extractp_rp 1688)
+  (UNSPEC_QDSP6_Q6S2_extractup_rp 1689)
+  (UNSPEC_QDSP6_Q6S2_tstbit_i 1690)
+  (UNSPEC_QDSP6_Q6S4_ntstbit_i 1691)
+  (UNSPEC_QDSP6_Q6S2_setbit_i 1692)
+  (UNSPEC_QDSP6_Q6S2_togglebit_i 1693)
+  (UNSPEC_QDSP6_Q6S2_clrbit_i 1694)
+  (UNSPEC_QDSP6_Q6S2_tstbit_r 1695)
+  (UNSPEC_QDSP6_Q6S4_ntstbit_r 1696)
+  (UNSPEC_QDSP6_Q6S2_setbit_r 1697)
+  (UNSPEC_QDSP6_Q6S2_togglebit_r 1698)
+  (UNSPEC_QDSP6_Q6S2_clrbit_r 1699)
+  (UNSPEC_QDSP6_Q6S2_asr_i_vh 1700)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_vh 1701)
+  (UNSPEC_QDSP6_Q6S2_asl_i_vh 1702)
+  (UNSPEC_QDSP6_Q6S2_asr_r_vh 1703)
+  (UNSPEC_QDSP6_Q6S2_asl_r_vh 1704)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_vh 1705)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_vh 1706)
+  (UNSPEC_QDSP6_Q6S2_asr_i_vw 1707)
+  (UNSPEC_QDSP6_Q6S2_asr_i_svw_trun 1708)
+  (UNSPEC_QDSP6_Q6S2_asr_r_svw_trun 1709)
+  (UNSPEC_QDSP6_Q6S2_lsr_i_vw 1710)
+  (UNSPEC_QDSP6_Q6S2_asl_i_vw 1711)
+  (UNSPEC_QDSP6_Q6S2_asr_r_vw 1712)
+  (UNSPEC_QDSP6_Q6S2_asl_r_vw 1713)
+  (UNSPEC_QDSP6_Q6S2_lsr_r_vw 1714)
+  (UNSPEC_QDSP6_Q6S2_lsl_r_vw 1715)
+  (UNSPEC_QDSP6_Q6S2_vrndpackwh 1716)
+  (UNSPEC_QDSP6_Q6S2_vrndpackwhs 1717)
+  (UNSPEC_QDSP6_Q6S2_vsxtbh 1718)
+  (UNSPEC_QDSP6_Q6S2_vzxtbh 1719)
+  (UNSPEC_QDSP6_Q6S2_vsathub 1720)
+  (UNSPEC_QDSP6_Q6S2_svsathub 1721)
+  (UNSPEC_QDSP6_Q6S2_svsathb 1722)
+  (UNSPEC_QDSP6_Q6S2_vsathb 1723)
+  (UNSPEC_QDSP6_Q6S2_vtrunohb 1724)
+  (UNSPEC_QDSP6_Q6S2_vtrunewh 1725)
+  (UNSPEC_QDSP6_Q6S2_vtrunowh 1726)
+  (UNSPEC_QDSP6_Q6S2_vtrunehb 1727)
+  (UNSPEC_QDSP6_Q6S2_vsxthw 1728)
+  (UNSPEC_QDSP6_Q6S2_vzxthw 1729)
+  (UNSPEC_QDSP6_Q6S2_vsatwh 1730)
+  (UNSPEC_QDSP6_Q6S2_vsatwuh 1731)
+  (UNSPEC_QDSP6_Q6S2_packhl 1732)
+  (UNSPEC_QDSP6_Q6A2_swiz 1733)
+  (UNSPEC_QDSP6_Q6S2_vsathub_nopack 1734)
+  (UNSPEC_QDSP6_Q6S2_vsathb_nopack 1735)
+  (UNSPEC_QDSP6_Q6S2_vsatwh_nopack 1736)
+  (UNSPEC_QDSP6_Q6S2_vsatwuh_nopack 1737)
+  (UNSPEC_QDSP6_Q6S2_shuffob 1738)
+  (UNSPEC_QDSP6_Q6S2_shuffeb 1739)
+  (UNSPEC_QDSP6_Q6S2_shuffoh 1740)
+  (UNSPEC_QDSP6_Q6S2_shuffeh 1741)
+  (UNSPEC_QDSP6_Q6S4_parity 1742)
+  (UNSPEC_QDSP6_Q6S2_parityp 1743)
+  (UNSPEC_QDSP6_Q6S2_lfsp 1744)
+  (UNSPEC_QDSP6_Q6S2_clbnorm 1745)
+  (UNSPEC_QDSP6_Q6S4_clbaddi 1746)
+  (UNSPEC_QDSP6_Q6S4_clbpnorm 1747)
+  (UNSPEC_QDSP6_Q6S4_clbpaddi 1748)
+  (UNSPEC_QDSP6_Q6S2_clb 1749)
+  (UNSPEC_QDSP6_Q6S2_cl0 1750)
+  (UNSPEC_QDSP6_Q6S2_cl1 1751)
+  (UNSPEC_QDSP6_Q6S2_clbp 1752)
+  (UNSPEC_QDSP6_Q6S2_cl0p 1753)
+  (UNSPEC_QDSP6_Q6S2_cl1p 1754)
+  (UNSPEC_QDSP6_Q6S2_brev 1755)
+  (UNSPEC_QDSP6_Q6S2_brevp 1756)
+  (UNSPEC_QDSP6_Q6S2_ct0 1757)
+  (UNSPEC_QDSP6_Q6S2_ct1 1758)
+  (UNSPEC_QDSP6_Q6S2_ct0p 1759)
+  (UNSPEC_QDSP6_Q6S2_ct1p 1760)
+  (UNSPEC_QDSP6_Q6S2_interleave 1761)
+  (UNSPEC_QDSP6_Q6S2_deinterleave 1762)
 ])
 
 
@@ -954,10 +948,10 @@
   "TARGET_V4_FEATURES"
   {
     if(GET_CODE (operands[2]) != CONST_INT){
-      error("non-constant integer passed to argument 2 of Q6_R_cmp_eq_RI intrinsic");
+      error("non-constant integer passed to argument 2 of Q6_R_not_cmp_eq_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_R_cmp_eq_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_not_cmp_eq_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
     }
   }
 )
@@ -1422,10 +1416,10 @@
   "TARGET_V4_FEATURES"
   {
     if(GET_CODE (operands[2]) != CONST_INT){
-      error("non-constant integer passed to argument 2 of Q6_p_bitsclr_RI intrinsic");
+      error("non-constant integer passed to argument 2 of Q6_p_not_bitsclr_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu6")){
-      error("argument 2 of Q6_p_bitsclr_RI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_bitsclr_RI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
     }
   }
 )
@@ -1452,10 +1446,10 @@
   "TARGET_V4_FEATURES"
   {
     if(GET_CODE (operands[2]) != CONST_INT){
-      error("non-constant integer passed to argument 2 of Q6_p_cmp_eq_RI intrinsic");
+      error("non-constant integer passed to argument 2 of Q6_p_not_cmp_eq_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is10")){
-      error("argument 2 of Q6_p_cmp_eq_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_cmp_eq_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
     }
   }
 )
@@ -1482,10 +1476,10 @@
   "TARGET_V4_FEATURES"
   {
     if(GET_CODE (operands[2]) != CONST_INT){
-      error("non-constant integer passed to argument 2 of Q6_p_cmp_gt_RI intrinsic");
+      error("non-constant integer passed to argument 2 of Q6_p_not_cmp_gt_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is10")){
-      error("argument 2 of Q6_p_cmp_gt_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_cmp_gt_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
     }
   }
 )
@@ -1512,10 +1506,10 @@
   "TARGET_V4_FEATURES"
   {
     if(GET_CODE (operands[2]) != CONST_INT){
-      error("non-constant integer passed to argument 2 of Q6_p_cmp_gtu_RI intrinsic");
+      error("non-constant integer passed to argument 2 of Q6_p_not_cmp_gtu_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu9")){
-      error("argument 2 of Q6_p_cmp_gtu_RI intrinsic cannot be encoded as u9 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_cmp_gtu_RI intrinsic cannot be encoded as u9 immediate -- FIXME: can it be extended?");
     }
   }
 )
@@ -2408,9 +2402,16 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_vcmpbgtui))]
   "TARGET_V4_FEATURES"
   {
+    if(GET_CODE (operands[2]) != CONST_INT){
+      error("non-constant integer passed to argument 2 of Q6_p_vcmpb_gtu_PI intrinsic");
+    }
+    if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
+      error("argument 2 of Q6_p_vcmpb_gtu_PI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+    }
   }
 )
 
@@ -2419,9 +2420,10 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_vcmpbgtui))]
   "TARGET_V4_FEATURES"
-  "%0=vcmpb.gtu(%P1,#u7)"
+  "%0=vcmpb.gtu(%P1,#%2)"
   [(set_attr "type" "X")]
 )
 
@@ -2562,9 +2564,16 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:SI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_cmpbgtui))]
   "TARGET_V4_FEATURES"
   {
+    if(GET_CODE (operands[2]) != CONST_INT){
+      error("non-constant integer passed to argument 2 of Q6_p_cmpb_gtu_RI intrinsic");
+    }
+    if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
+      error("argument 2 of Q6_p_cmpb_gtu_RI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+    }
   }
 )
 
@@ -2573,9 +2582,10 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:SI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_cmpbgtui))]
   "TARGET_V4_FEATURES"
-  "%0=cmpb.gtu(%1,#u7)"
+  "%0=cmpb.gtu(%1,#%2)"
   [(set_attr "type" "X")]
 )
 
@@ -2770,9 +2780,16 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_vcmphgtui))]
   "TARGET_V4_FEATURES"
   {
+    if(GET_CODE (operands[2]) != CONST_INT){
+      error("non-constant integer passed to argument 2 of Q6_p_vcmph_gtu_PI intrinsic");
+    }
+    if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
+      error("argument 2 of Q6_p_vcmph_gtu_PI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+    }
   }
 )
 
@@ -2781,9 +2798,10 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_vcmphgtui))]
   "TARGET_V4_FEATURES"
-  "%0=vcmph.gtu(%P1,#u7)"
+  "%0=vcmph.gtu(%P1,#%2)"
   [(set_attr "type" "X")]
 )
 
@@ -2924,9 +2942,16 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:SI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_cmphgtui))]
   "TARGET_V4_FEATURES"
   {
+    if(GET_CODE (operands[2]) != CONST_INT){
+      error("non-constant integer passed to argument 2 of Q6_p_cmph_gtu_RI intrinsic");
+    }
+    if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
+      error("argument 2 of Q6_p_cmph_gtu_RI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+    }
   }
 )
 
@@ -2935,9 +2960,10 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:SI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_cmphgtui))]
   "TARGET_V4_FEATURES"
-  "%0=cmph.gtu(%1,#u7)"
+  "%0=cmph.gtu(%1,#%2)"
   [(set_attr "type" "X")]
 )
 
@@ -3078,9 +3104,16 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_vcmpwgtui))]
   "TARGET_V4_FEATURES"
   {
+    if(GET_CODE (operands[2]) != CONST_INT){
+      error("non-constant integer passed to argument 2 of Q6_p_vcmpw_gtu_PI intrinsic");
+    }
+    if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
+      error("argument 2 of Q6_p_vcmpw_gtu_PI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+    }
   }
 )
 
@@ -3089,9 +3122,10 @@
   [(set (match_operand:QI 0 "pr_register_operand" "=Rp")
         (unspec:QI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
+          (match_operand:SI 2 "immediate_operand" "Iu7")
         ] UNSPEC_QDSP6_Q6A4_vcmpwgtui))]
   "TARGET_V4_FEATURES"
-  "%0=vcmpw.gtu(%P1,#u7)"
+  "%0=vcmpw.gtu(%P1,#%2)"
   [(set_attr "type" "X")]
 )
 
@@ -7910,10 +7944,10 @@
   "TARGET_V4_FEATURES"
   {
     if(GET_CODE (operands[2]) != CONST_INT){
-      error("non-constant integer passed to argument 2 of Q6_R_add_mpyi_RIR_2,Rs32)) intrinsic");
+      error("non-constant integer passed to argument 2 of Q6_R_add_mpyi_RIR intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'J', "Ju6_2")){
-      error("argument 2 of Q6_R_add_mpyi_RIR_2,Rs32)) intrinsic cannot be encoded as u6_2 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_add_mpyi_RIR intrinsic cannot be encoded as u6_2 immediate -- FIXME: can it be extended?");
     }
   }
 )
@@ -10728,9 +10762,16 @@
           (match_operand:DI 1 "gr_register_operand" "0")
           (match_operand:DI 2 "gr_register_operand" "Rg")
           (match_operand:SI 3 "gr_register_operand" "Rg")
+          (match_operand:SI 4 "immediate_operand" "Iu2")
         ] UNSPEC_QDSP6_Q6S4_vrcrotate_acc))]
   "TARGET_V4_FEATURES"
   {
+    if(GET_CODE (operands[4]) != CONST_INT){
+      error("non-constant integer passed to argument 4 of Q6_P_vrcrotateacc_PRI intrinsic");
+    }
+    if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[4]), 'I', "Iu2")){
+      error("argument 4 of Q6_P_vrcrotateacc_PRI intrinsic cannot be encoded as u2 immediate -- FIXME: can it be extended?");
+    }
   }
 )
 
@@ -10741,9 +10782,10 @@
           (match_operand:DI 1 "gr_register_operand" "0")
           (match_operand:DI 2 "gr_register_operand" "Rg")
           (match_operand:SI 3 "gr_register_operand" "Rg")
+          (match_operand:SI 4 "immediate_operand" "Iu2")
         ] UNSPEC_QDSP6_Q6S4_vrcrotate_acc))]
   "TARGET_V4_FEATURES"
-  "%P0+=vrcrotate(%P2,%3,#u2)"
+  "%P0+=vrcrotate(%P2,%3,#%4)"
   [(set_attr "type" "S")]
 )
 
@@ -10753,9 +10795,16 @@
         (unspec:DI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
           (match_operand:SI 2 "gr_register_operand" "Rg")
+          (match_operand:SI 3 "immediate_operand" "Iu2")
         ] UNSPEC_QDSP6_Q6S4_vrcrotate))]
   "TARGET_V4_FEATURES"
   {
+    if(GET_CODE (operands[3]) != CONST_INT){
+      error("non-constant integer passed to argument 3 of Q6_P_vrcrotate_PRI intrinsic");
+    }
+    if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu2")){
+      error("argument 3 of Q6_P_vrcrotate_PRI intrinsic cannot be encoded as u2 immediate -- FIXME: can it be extended?");
+    }
   }
 )
 
@@ -10765,9 +10814,10 @@
         (unspec:DI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
           (match_operand:SI 2 "gr_register_operand" "Rg")
+          (match_operand:SI 3 "immediate_operand" "Iu2")
         ] UNSPEC_QDSP6_Q6S4_vrcrotate))]
   "TARGET_V4_FEATURES"
-  "%P0=vrcrotate(%P1,%2,#u2)"
+  "%P0=vrcrotate(%P1,%2,#%3)"
   [(set_attr "type" "S")]
 )
 
@@ -11081,34 +11131,6 @@
   ""
   "%0=add(%1,#%2)"
   [(set_attr "type" "A")]
-)
-
-
-(define_expand "qdsp6_builtin_Q6C4_addipc"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (unspec:SI [
-          (match_operand:SI 1 "immediate_operand" "Iu6")
-        ] UNSPEC_QDSP6_Q6C4_addipc))]
-  "TARGET_V4_FEATURES"
-  {
-    if(GET_CODE (operands[1]) != CONST_INT){
-      error("non-constant integer passed to argument 1 of Q6_R_add_pc_I intrinsic");
-    }
-    if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu6")){
-      error("argument 1 of Q6_R_add_pc_I intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
-    }
-  }
-)
-
-
-(define_insn "qdsp6_unspec_Q6C4_addipc"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (unspec:SI [
-          (match_operand:SI 1 "immediate_operand" "Iu6")
-        ] UNSPEC_QDSP6_Q6C4_addipc))]
-  "TARGET_V4_FEATURES"
-  "%0=add(pc,#%1)"
-  [(set_attr "type" "CR")]
 )
 
 
@@ -11891,54 +11913,6 @@
   ""
   "%P0=sub(%P1,%P2)"
   [(set_attr "type" "X")]
-)
-
-
-(define_expand "qdsp6_builtin_Q6A4_addp_c"
-  [(set (match_operand:DI 0 "gr_register_operand" "=Rg")
-        (unspec:DI [
-          (match_operand:DI 1 "gr_register_operand" "Rg")
-          (match_operand:DI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6A4_addp_c))]
-  "TARGET_V4_FEATURES"
-  {
-  }
-)
-
-
-(define_insn "qdsp6_unspec_Q6A4_addp_c"
-  [(set (match_operand:DI 0 "gr_register_operand" "=Rg")
-        (unspec:DI [
-          (match_operand:DI 1 "gr_register_operand" "Rg")
-          (match_operand:DI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6A4_addp_c))]
-  "TARGET_V4_FEATURES"
-  "%P0=add(%P1,%P2,Px4):carry"
-  [(set_attr "type" "S")]
-)
-
-
-(define_expand "qdsp6_builtin_Q6A4_subp_c"
-  [(set (match_operand:DI 0 "gr_register_operand" "=Rg")
-        (unspec:DI [
-          (match_operand:DI 1 "gr_register_operand" "Rg")
-          (match_operand:DI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6A4_subp_c))]
-  "TARGET_V4_FEATURES"
-  {
-  }
-)
-
-
-(define_insn "qdsp6_unspec_Q6A4_subp_c"
-  [(set (match_operand:DI 0 "gr_register_operand" "=Rg")
-        (unspec:DI [
-          (match_operand:DI 1 "gr_register_operand" "Rg")
-          (match_operand:DI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6A4_subp_c))]
-  "TARGET_V4_FEATURES"
-  "%P0=sub(%P1,%P2,Px4):carry"
-  [(set_attr "type" "S")]
 )
 
 
@@ -19786,10 +19760,10 @@
   "TARGET_V4_FEATURES"
   {
     if(GET_CODE (operands[2]) != CONST_INT){
-      error("non-constant integer passed to argument 2 of Q6_p_tstbit_RI intrinsic");
+      error("non-constant integer passed to argument 2 of Q6_p_not_tstbit_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_p_tstbit_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_tstbit_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
     }
   }
 )
@@ -21554,76 +21528,4 @@
   "TARGET_V2_FEATURES"
   "%P0=deinterleave(%P1)"
   [(set_attr "type" "S")]
-)
-
-
-(define_expand "qdsp6_builtin_Q6dep_S2_packhl"
-  [(set (match_operand:DI 0 "gr_register_operand" "=Rg")
-        (unspec:DI [
-          (match_operand:SI 1 "gr_register_operand" "Rg")
-          (match_operand:SI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6dep_S2_packhl))]
-  "TARGET_V4_FEATURES"
-  {
-  }
-)
-
-
-(define_insn "qdsp6_unspec_Q6dep_S2_packhl"
-  [(set (match_operand:DI 0 "gr_register_operand" "=Rg")
-        (unspec:DI [
-          (match_operand:SI 1 "gr_register_operand" "Rg")
-          (match_operand:SI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6dep_S2_packhl))]
-  "TARGET_V4_FEATURES"
-  "%P0=packhl(%1,%2):deprecated"
-  [(set_attr "type" "X")]
-)
-
-
-(define_expand "qdsp6_builtin_Q6dep_A2_addsat"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (unspec:SI [
-          (match_operand:SI 1 "gr_register_operand" "Rg")
-          (match_operand:SI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6dep_A2_addsat))]
-  "TARGET_V4_FEATURES"
-  {
-  }
-)
-
-
-(define_insn "qdsp6_unspec_Q6dep_A2_addsat"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (unspec:SI [
-          (match_operand:SI 1 "gr_register_operand" "Rg")
-          (match_operand:SI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6dep_A2_addsat))]
-  "TARGET_V4_FEATURES"
-  "%0=add(%1,%2):sat:deprecated"
-  [(set_attr "type" "X")]
-)
-
-
-(define_expand "qdsp6_builtin_Q6dep_A2_subsat"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (unspec:SI [
-          (match_operand:SI 1 "gr_register_operand" "Rg")
-          (match_operand:SI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6dep_A2_subsat))]
-  "TARGET_V4_FEATURES"
-  {
-  }
-)
-
-
-(define_insn "qdsp6_unspec_Q6dep_A2_subsat"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (unspec:SI [
-          (match_operand:SI 1 "gr_register_operand" "Rg")
-          (match_operand:SI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_Q6dep_A2_subsat))]
-  "TARGET_V4_FEATURES"
-  "%0=sub(%1,%2):sat:deprecated"
-  [(set_attr "type" "X")]
 )
