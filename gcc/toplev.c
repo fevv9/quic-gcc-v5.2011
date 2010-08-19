@@ -2209,10 +2209,14 @@ do_compile (void)
 int
 toplev_main (unsigned int argc, const char **argv)
 {
-  save_argv = argv;
 
   /* Initialization of GCC's environment, and diagnostics.  */
   general_init (argv[0]);
+
+#if _WIN32
+  expandargv (&argc, &argv);
+#endif
+  save_argv = argv;
 
   /* Parse the options and do minimal processing; basically just
      enough to default flags appropriately.  */
