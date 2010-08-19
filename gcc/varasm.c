@@ -562,7 +562,14 @@ get_section (const char *name, unsigned int flags, tree decl)
   /* LSY If section sorting is enabled, update the name
      This should work even if the original name is an empty string */ 
   if(TARGET_SECTION_SORTING){ 
-	  if(decl != NULL_TREE){ 
+    /* sdata comparison is ugly way to fix this. we need to figure out a way 
+       to put this into the machine dependent portion of the compiler if
+       possible, or come up with a cleaner interface such that we can easily 
+       tell the kind of section we want to sort based on size.  Right now, 
+       this is very specific to our implementation.
+    */
+	  if(decl != NULL_TREE && (!strcmp(name, ".sdata") ||
+	     !strcmp(name, ".sbss"))){ 
 		unsigned int smallest_unit_size	= smallest_accessable_entity_in_declaration(decl); 
 		/* This is sanity check - smallest_unit_size rarely 
 		   exceeds 16 */
