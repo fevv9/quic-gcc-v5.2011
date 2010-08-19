@@ -2959,6 +2959,7 @@ execute (void)
 #endif /* DEBUG */
     }
 
+
 #ifdef ENABLE_VALGRIND_CHECKING
   /* Run the each command through valgrind.  To simplify prepending the
      path to valgrind and the option "-q" (for quiet operation unless
@@ -2999,11 +3000,26 @@ execute (void)
       int err;
       const char *string = commands[i].argv[0];
 
+#if _WIN32
+      {
+      char *arg_temp_file = NULL;
+      char **newargv = check_arg_size(commands[i].argv, &arg_temp_file);
+      if (arg_temp_file)
+        record_temp_file(arg_temp_file, 1, 1);
+
+      errmsg = pex_run (pex,
+			((i + 1 == n_commands ? PEX_LAST : 0)
+			 | (string == commands[i].prog ? PEX_SEARCH : 0)),
+			string, CONST_CAST (char **, newargv),
+			NULL, NULL, &err);
+      }
+#else
       errmsg = pex_run (pex,
 			((i + 1 == n_commands ? PEX_LAST : 0)
 			 | (string == commands[i].prog ? PEX_SEARCH : 0)),
 			string, CONST_CAST (char **, commands[i].argv),
 			NULL, NULL, &err);
+#endif
       if (errmsg != NULL)
 	{
 	  if (err == 0)
@@ -8081,3 +8097,4 @@ print_asm_header_spec_function (int arg ATTRIBUTE_UNUSED,
   fflush (stdout);
   return NULL;
 }
+
