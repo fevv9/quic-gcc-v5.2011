@@ -1922,6 +1922,7 @@ qdsp6-*-elf*)
 		tm_file="${tm_file} dbxelf.h elfos.h svr4.h qdsp6/elf.h qdsp6/dinkumware.h"
 	else
 		tm_file="${tm_file} dbxelf.h elfos.h svr4.h qdsp6/elf.h qdsp6/newlib.h"
+#		tm_file="${tm_file} dbxelf.h elfos.h svr4.h qdsp6/elf.h qdsp6/qlinux.h"
 	fi
 	tmake_file="${tmake_file} qdsp6/t-qdsp6 qdsp6/t-elf"
 	extra_parts="crti.o crtn.o crtbegin.o crtend.o"
@@ -1929,10 +1930,17 @@ qdsp6-*-elf*)
 	default_use_cxa_atexit=no
 	;;
 qdsp6-*-linux*)
-	tm_file="${tm_file} dbxelf.h elfos.h qdsp6/elf.h linux.h qdsp6/linux.h"
-	tmake_file="${tmake_file} qdsp6/t-qdsp6 qdsp6/t-linux"
-	extra_parts="crtbegin.o crtbeginT.o crtend.o"
+	if test x$with_newlib = xyes ; then
+		tm_file="${tm_file} dbxelf.h elfos.h svr4.h qdsp6/elf.h qdsp6/newlib.h"
+	else
+		tm_file="${tm_file} dbxelf.h elfos.h svr4.h qdsp6/elf.h qdsp6/linux.h"
+        fi
+	tmake_file="qdsp6/t-qdsp6 qdsp6/t-linux"
+	extra_parts="crti.o crtn.o crtbegin.o crtend.o"
 	need_64bit_hwint=yes
+	default_use_cxa_atexit=no
+	tm_defines=
+	extra_options="${cpu_type}/${cpu_type}.opt"
 	;;
 rs6000-ibm-aix4.[12]* | powerpc-ibm-aix4.[12]*)
 	tm_file="${tm_file} rs6000/aix.h rs6000/aix41.h rs6000/xcoff.h"
