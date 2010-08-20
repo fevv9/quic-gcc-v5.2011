@@ -7929,7 +7929,7 @@
           (match_operand:SI 3 "gr_register_operand" "Rg")
         ] UNSPEC_QDSP6_Q6M4_mpyrr_addr))]
   "TARGET_V4_FEATURES"
-  "%0=add(%2,mpyi(%0,%3))"
+  "%0=add(%1,mpyi(%0,%3))"
   [(set_attr "type" "M")]
 )
 
@@ -13413,7 +13413,7 @@
           (match_operand:SI 3 "immediate_operand" "Is10")
         ] UNSPEC_QDSP6_Q6S4_or_andix))]
   "TARGET_V4_FEATURES"
-  "%0=or(%2,and(%0,#%3))"
+  "%0=or(%1,and(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
@@ -18687,7 +18687,7 @@
           (match_operand:SI 3 "immediate_operand" "Iu5")
         ] UNSPEC_QDSP6_Q6S4_andi_asl_ri))]
   "TARGET_V4_FEATURES"
-  "%0=and(#%2,asl(%0,#%3))"
+  "%0=and(#%1,asl(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
@@ -18725,7 +18725,7 @@
           (match_operand:SI 3 "immediate_operand" "Iu5")
         ] UNSPEC_QDSP6_Q6S4_ori_asl_ri))]
   "TARGET_V4_FEATURES"
-  "%0=or(#%2,asl(%0,#%3))"
+  "%0=or(#%1,asl(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
@@ -18763,7 +18763,7 @@
           (match_operand:SI 3 "immediate_operand" "Iu5")
         ] UNSPEC_QDSP6_Q6S4_addi_asl_ri))]
   "TARGET_V4_FEATURES"
-  "%0=add(#%2,asl(%0,#%3))"
+  "%0=add(#%1,asl(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
@@ -18801,7 +18801,7 @@
           (match_operand:SI 3 "immediate_operand" "Iu5")
         ] UNSPEC_QDSP6_Q6S4_subi_asl_ri))]
   "TARGET_V4_FEATURES"
-  "%0=sub(#%2,asl(%0,#%3))"
+  "%0=sub(#%1,asl(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
@@ -18839,7 +18839,7 @@
           (match_operand:SI 3 "immediate_operand" "Iu5")
         ] UNSPEC_QDSP6_Q6S4_andi_lsr_ri))]
   "TARGET_V4_FEATURES"
-  "%0=and(#%2,lsr(%0,#%3))"
+  "%0=and(#%1,lsr(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
@@ -18877,7 +18877,7 @@
           (match_operand:SI 3 "immediate_operand" "Iu5")
         ] UNSPEC_QDSP6_Q6S4_ori_lsr_ri))]
   "TARGET_V4_FEATURES"
-  "%0=or(#%2,lsr(%0,#%3))"
+  "%0=or(#%1,lsr(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
@@ -18915,7 +18915,7 @@
           (match_operand:SI 3 "immediate_operand" "Iu5")
         ] UNSPEC_QDSP6_Q6S4_addi_lsr_ri))]
   "TARGET_V4_FEATURES"
-  "%0=add(#%2,lsr(%0,#%3))"
+  "%0=add(#%1,lsr(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
@@ -18953,7 +18953,7 @@
           (match_operand:SI 3 "immediate_operand" "Iu5")
         ] UNSPEC_QDSP6_Q6S4_subi_lsr_ri))]
   "TARGET_V4_FEATURES"
-  "%0=sub(#%2,lsr(%0,#%3))"
+  "%0=sub(#%1,lsr(%0,#%3))"
   [(set_attr "type" "X")]
 )
 
