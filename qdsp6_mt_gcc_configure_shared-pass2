@@ -35,6 +35,7 @@ TARGET_CFLAGS='-g -O0' \
 bash `dirname $0`/configure \
   --prefix=${PREFIX} \
   --target=qdsp6 \
+  --program-prefix=qdsp6- \
   --enable-languages=c \
   --without-fp \
   --disable-nls \
@@ -42,4 +43,4 @@ bash `dirname $0`/configure \
   --disable-bootstrap \
   --with-headers=${LPREFIX}/include \
   --with-libs=${LPREFIX}/lib \
-  --enable-shared
+  --enable-shared 

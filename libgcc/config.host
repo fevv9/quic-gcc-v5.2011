@@ -492,7 +492,7 @@ powerpcle-*-eabi*)
 qdsp6-*-elf*)
 	;;
 qdsp6-*-linux*)
-	extra_parts="crtbegin.o crtbeginT.o crtend.o"
+	extra_parts=
 	;;
 rs6000-ibm-aix4.[12]* | powerpc-ibm-aix4.[12]*)
 	;;

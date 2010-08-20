@@ -28,11 +28,13 @@ CXXFLAGS='-g -O0' \
 TARGET_CFLAGS='-g -O0' \
 bash `dirname $0`/configure \
   --prefix=${PREFIX} \
-  --target=qdsp6 \
+  --target=qdsp6-linux \
+  --program-prefix=qdsp6- \
   --enable-languages=c \
   --without-fp \
   --disable-nls \
   --disable-libssp \
+  --disable-threads \
   --with-newlib \
   --disable-bootstrap \
   --enable-shared
