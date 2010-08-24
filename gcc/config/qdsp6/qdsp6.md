@@ -4562,22 +4562,44 @@
     }
     else {
       if(which_alternative == 0){
-        return "%2 = %0\;"
-               "{\;"
-               "  lc0 = %2\;"
-               "  %2.h = #HI(%1)\;"
-               "}\;"
-               "%2.l = #LO(%1)\;"
-               "sa0 = %2";
+        if(flag_pic) {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "sa0 = %2";
+	}
+        else {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1)\;"
+                 "}\;"
+                 "%2.l = #LO(%1)\;"
+                 "sa0 = %2";
+        }
       }
       else {
-        return "%2 = #%0\;"
-               "{\;"
-               "  lc0 = %2\;"
-               "  %2.h = #HI(%1)\;"
-               "}\;"
-               "%2.l = #LO(%1)\;"
-               "sa0 = %2";
+        if(flag_pic) {
+          return "%2 = #%0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "sa0 = %2";
+        }
+	else {
+          return "%2 = #%0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1)\;"
+                 "}\;"
+                 "%2.l = #LO(%1)\;"
+                 "sa0 = %2";
+        }
       }
     }
   }
@@ -4604,7 +4626,7 @@
   [(set (reg:SI LC1_REGNUM) (match_operand:SI 0 "nonmemory_operand" "Rg,Iu10"))
    (set (reg:SI SA1_REGNUM) (label_ref (match_operand 1 "" "")))
    (clobber (match_scratch:SI 2 "=&Rg,&Rg"))]
-  ""
+  "!flag_pic"
   {
     if(get_attr_length(insn) == 4){
       if(which_alternative == 0){
@@ -4616,22 +4638,44 @@
     }
     else {
       if(which_alternative == 0){
-        return "%2 = %0\;"
-               "{\;"
-               "  lc1 = %2\;"
-               "  %2.h = #HI(%1)\;"
-               "}\;"
-               "%2.l = #LO(%1)\;"
-               "sa1 = %2";
+        if(flag_pic) {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "sa1 = %2";
+        }
+	else {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1)\;"
+                 "}\;"
+                 "%2.l = #LO(%1)\;"
+                 "sa1 = %2";
+        }
       }
       else {
-        return "%2 = #%0\;"
-               "{\;"
-               "  lc1 = %2\;"
-               "  %2.h = #HI(%1)\;"
-               "}\;"
-               "%2.l = #LO(%1)\;"
-               "sa1 = %2";
+        if(flag_pic) {
+          return "%2 = #%0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "sa1 = %2";
+        }
+	else {
+         return "%2 = #%0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1)\;"
+                 "}\;"
+                 "%2.l = #LO(%1)\;"
+                 "sa1 = %2";
+         }
       }
     }
   }
