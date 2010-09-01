@@ -146,3 +146,11 @@ Optimize memset routine in the backend
 menable-subreg1
 Common Target Var(flag_enable_subreg1) Optimization
 Enable subreg pass 1 (default)
+
+mduplex-scheduling
+Target Report Undocumented Mask(DUPLEX_SCHEDULING)
+Enable duplex scheduling
+
+mannotate_duplex
+Target Report Undocumented Mask(ANNOTATE_DUPLEX)
+Duplex debugging

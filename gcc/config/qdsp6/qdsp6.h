@@ -639,10 +639,13 @@ enum reg_class {
 
 /* See qdsp6_const_ok_for_constraint_p for meanings. */
 #define QDSP6_KOOKY_KONSTANT_LENS(STR) \
+  QDSP6_CONSTRAINT_LEN(STR, -1) \
+  QDSP6_CONSTRAINT_LEN(STR, 01) \
   QDSP6_CONSTRAINT_LEN(STR, 16) \
   QDSP6_CONSTRAINT_LEN(STR, 32) \
   QDSP6_CONSTRAINT_LEN(STR, u7p1) \
   QDSP6_CONSTRAINT_LEN(STR, s8p1) \
+  QDSP6_CONSTRAINT_LEN(STR, u5_3p8) \
   QDSP6_CONSTRAINT_LEN(STR, u9p1) \
   QDSP6_CONSTRAINT_LEN(STR, s10p1) \
   QDSP6_CONSTRAINT_LEN(STR, s8s8) \
@@ -661,7 +664,11 @@ enum reg_class {
   QDSP6_CONSTRAINT_LEN(STR, si) \
   QDSP6_CONSTRAINT_LEN(STR, csi) \
   QDSP6_CONSTRAINT_LEN(STR, memop) \
-  QDSP6_CONSTRAINT_LEN(STR, ememop)
+  QDSP6_CONSTRAINT_LEN(STR, ememop) \
+  QDSP6_CONSTRAINT_LEN(STR, dm3)    \
+  QDSP6_CONSTRAINT_LEN(STR, dm4)    \
+  QDSP6_CONSTRAINT_LEN(STR, dmsp5)  \
+  QDSP6_CONSTRAINT_LEN(STR, dmsp6)
 
 /* used by CONSTRAINT_LEN */
 #define CONSTRAINT_LEN_FOR_A(CHAR, STR) \
@@ -748,6 +755,10 @@ enum reg_class {
     : QDSP6_CONSTRAINT_P (STR, csi)    ? EXTRA_CONSTRAINT_FOR_A(VALUE, csi) \
     : QDSP6_CONSTRAINT_P (STR, memop)  ? EXTRA_CONSTRAINT_FOR_A(VALUE, memop) \
     : QDSP6_CONSTRAINT_P (STR, ememop) ? EXTRA_CONSTRAINT_FOR_A(VALUE, ememop) \
+    : QDSP6_CONSTRAINT_P (STR, dm3)     ? EXTRA_CONSTRAINT_FOR_A(VALUE, dm3) \
+    : QDSP6_CONSTRAINT_P (STR, dm4)     ? EXTRA_CONSTRAINT_FOR_A(VALUE, dm4) \
+    : QDSP6_CONSTRAINT_P (STR, dmsp5)     ? EXTRA_CONSTRAINT_FOR_A(VALUE, dmsp5) \
+    : QDSP6_CONSTRAINT_P (STR, dmsp6)     ? EXTRA_CONSTRAINT_FOR_A(VALUE, dmsp6) \
     : 0 \
   : 0)
 
@@ -759,7 +770,8 @@ enum reg_class {
        || QDSP6_CONSTRAINT_P (STR, si) \
        || QDSP6_CONSTRAINT_P (STR, csi) \
        || QDSP6_CONSTRAINT_P (STR, memop) \
-       || QDSP6_CONSTRAINT_P (STR, ememop)))
+       || QDSP6_CONSTRAINT_P (STR, ememop) \
+       || QDSP6_CONSTRAINT_P (STR, dm)))
 
 
 /*----------------
@@ -1251,6 +1263,9 @@ Miscellaneous Parameters
 /* ??? play with this? */
 /*#define MAX_CONDITIONAL_EXECUTE*/
 
+/* Allow querying the cpu units */
+#define CPU_UNITS_QUERY 1
+
 
 /*------------
 QDSP6 specific
@@ -1470,6 +1485,7 @@ struct qdsp6_final_info GTY(()) {
   rtx endloop_label;
   bool dot_new_predicate_p;
   bool dot_new_gpr_p;
+  bool duplex;
 };
 
 struct machine_function GTY(()) {
