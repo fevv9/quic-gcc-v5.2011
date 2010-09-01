@@ -921,7 +921,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_cmp_eq_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_R_cmp_eq_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_cmp_eq_RI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -951,7 +951,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_not_cmp_eq_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_R_not_cmp_eq_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_not_cmp_eq_RI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -1126,7 +1126,7 @@
         error("non-constant integer passed to argument 2 of Q6_p_cmp_eq_RI intrinsic");
       }
       if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is10")){
-        error("argument 2 of Q6_p_cmp_eq_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+        error("argument 2 of Q6_p_cmp_eq_RI intrinsic cannot be encoded as s10 immediate");
       }
     }
     else {
@@ -1134,7 +1134,7 @@
         error("non-constant integer passed to argument 2 of Q6_p_cmp_eq_RI intrinsic");
       }
       if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-        error("argument 2 of Q6_p_cmp_eq_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+        error("argument 2 of Q6_p_cmp_eq_RI intrinsic cannot be encoded as s8 immediate");
       }
     }
   }
@@ -1178,7 +1178,7 @@
         error("non-constant integer passed to argument 2 of Q6_p_cmp_gt_RI intrinsic");
       }
       if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is10")){
-        error("argument 2 of Q6_p_cmp_gt_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+        error("argument 2 of Q6_p_cmp_gt_RI intrinsic cannot be encoded as s10 immediate");
       }
     }
     else {
@@ -1186,7 +1186,7 @@
         error("non-constant integer passed to argument 2 of Q6_p_cmp_gt_RI intrinsic");
       }
       if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-        error("argument 2 of Q6_p_cmp_gt_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+        error("argument 2 of Q6_p_cmp_gt_RI intrinsic cannot be encoded as s8 immediate");
       }
     }
   }
@@ -1230,7 +1230,7 @@
         error("non-constant integer passed to argument 2 of Q6_p_cmp_gtu_RI intrinsic");
       }
       if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu9")){
-        error("argument 2 of Q6_p_cmp_gtu_RI intrinsic cannot be encoded as u9 immediate -- FIXME: can it be extended?");
+        error("argument 2 of Q6_p_cmp_gtu_RI intrinsic cannot be encoded as u9 immediate");
       }
     }
     else {
@@ -1238,7 +1238,7 @@
         error("non-constant integer passed to argument 2 of Q6_p_cmp_gtu_RI intrinsic");
       }
       if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu8")){
-        error("argument 2 of Q6_p_cmp_gtu_RI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+        error("argument 2 of Q6_p_cmp_gtu_RI intrinsic cannot be encoded as u8 immediate");
       }
     }
   }
@@ -1281,7 +1281,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_cmp_ge_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_cmp_ge_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_cmp_ge_RI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -1311,7 +1311,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_cmp_geu_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu8")){
-      error("argument 2 of Q6_p_cmp_geu_RI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_cmp_geu_RI intrinsic cannot be encoded as u8 immediate");
     }
   }
 )
@@ -1389,7 +1389,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_bitsclr_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu6")){
-      error("argument 2 of Q6_p_bitsclr_RI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_bitsclr_RI intrinsic cannot be encoded as u6 immediate");
     }
   }
 )
@@ -1419,7 +1419,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_not_bitsclr_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu6")){
-      error("argument 2 of Q6_p_not_bitsclr_RI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_bitsclr_RI intrinsic cannot be encoded as u6 immediate");
     }
   }
 )
@@ -1449,7 +1449,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_not_cmp_eq_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is10")){
-      error("argument 2 of Q6_p_not_cmp_eq_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_cmp_eq_RI intrinsic cannot be encoded as s10 immediate");
     }
   }
 )
@@ -1479,7 +1479,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_not_cmp_gt_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is10")){
-      error("argument 2 of Q6_p_not_cmp_gt_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_cmp_gt_RI intrinsic cannot be encoded as s10 immediate");
     }
   }
 )
@@ -1509,7 +1509,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_not_cmp_gtu_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu9")){
-      error("argument 2 of Q6_p_not_cmp_gtu_RI intrinsic cannot be encoded as u9 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_cmp_gtu_RI intrinsic cannot be encoded as u9 immediate");
     }
   }
 )
@@ -2159,13 +2159,13 @@
       error("non-constant integer passed to argument 2 of Q6_R_mux_pII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_R_mux_pII intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_mux_pII intrinsic cannot be encoded as s8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_mux_pII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Is8")){
-      error("argument 3 of Q6_R_mux_pII intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_mux_pII intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2197,7 +2197,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_mux_pRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Is8")){
-      error("argument 3 of Q6_R_mux_pRI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_mux_pRI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2229,7 +2229,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_mux_pIR intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_R_mux_pIR intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_mux_pIR intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2332,7 +2332,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmpb_eq_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu8")){
-      error("argument 2 of Q6_p_vcmpb_eq_PI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmpb_eq_PI intrinsic cannot be encoded as u8 immediate");
     }
   }
 )
@@ -2410,7 +2410,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmpb_gtu_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
-      error("argument 2 of Q6_p_vcmpb_gtu_PI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmpb_gtu_PI intrinsic cannot be encoded as u7 immediate");
     }
   }
 )
@@ -2464,7 +2464,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmpb_gt_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_vcmpb_gt_PI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmpb_gt_PI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2518,7 +2518,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_cmpb_eq_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu8")){
-      error("argument 2 of Q6_p_cmpb_eq_RI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_cmpb_eq_RI intrinsic cannot be encoded as u8 immediate");
     }
   }
 )
@@ -2572,7 +2572,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_cmpb_gtu_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
-      error("argument 2 of Q6_p_cmpb_gtu_RI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_cmpb_gtu_RI intrinsic cannot be encoded as u7 immediate");
     }
   }
 )
@@ -2626,7 +2626,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_cmpb_gt_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_cmpb_gt_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_cmpb_gt_RI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2728,7 +2728,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmph_eq_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_vcmph_eq_PI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmph_eq_PI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2758,7 +2758,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmph_gt_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_vcmph_gt_PI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmph_gt_PI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2788,7 +2788,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmph_gtu_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
-      error("argument 2 of Q6_p_vcmph_gtu_PI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmph_gtu_PI intrinsic cannot be encoded as u7 immediate");
     }
   }
 )
@@ -2890,7 +2890,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_cmph_eq_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_cmph_eq_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_cmph_eq_RI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2920,7 +2920,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_cmph_gt_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_cmph_gt_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_cmph_gt_RI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -2950,7 +2950,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_cmph_gtu_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
-      error("argument 2 of Q6_p_cmph_gtu_RI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_cmph_gtu_RI intrinsic cannot be encoded as u7 immediate");
     }
   }
 )
@@ -3052,7 +3052,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmpw_eq_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_vcmpw_eq_PI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmpw_eq_PI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -3082,7 +3082,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmpw_gt_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_p_vcmpw_gt_PI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmpw_gt_PI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -3112,7 +3112,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_vcmpw_gtu_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu7")){
-      error("argument 2 of Q6_p_vcmpw_gtu_PI intrinsic cannot be encoded as u7 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_vcmpw_gtu_PI intrinsic cannot be encoded as u7 immediate");
     }
   }
 )
@@ -7186,7 +7186,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_mpyi_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Im9")){
-      error("argument 2 of Q6_R_mpyi_RI intrinsic cannot be encoded as m9 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_mpyi_RI intrinsic cannot be encoded as m9 immediate");
     }
   }
 )
@@ -7217,7 +7217,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_mpyiacc_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu8")){
-      error("argument 3 of Q6_R_mpyiacc_RI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_mpyiacc_RI intrinsic cannot be encoded as u8 immediate");
     }
   }
 )
@@ -7249,7 +7249,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_mpyinac_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu8")){
-      error("argument 3 of Q6_R_mpyinac_RI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_mpyinac_RI intrinsic cannot be encoded as u8 immediate");
     }
   }
 )
@@ -7789,7 +7789,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_addacc_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Is8")){
-      error("argument 3 of Q6_R_addacc_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_addacc_RI intrinsic cannot be encoded as s8 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_addaccsi3(operands[0], operands[1], operands[2], operands[3]));
@@ -7855,7 +7855,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_addnac_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Is8")){
-      error("argument 3 of Q6_R_addnac_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_addnac_RI intrinsic cannot be encoded as s8 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_addnacc1si3(operands[0], operands[1], operands[2], operands[3]));
@@ -7947,7 +7947,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_add_mpyi_RIR intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'J', "Ju6_2")){
-      error("argument 2 of Q6_R_add_mpyi_RIR intrinsic cannot be encoded as u6_2 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_add_mpyi_RIR intrinsic cannot be encoded as u6_2 immediate");
     }
   }
 )
@@ -7979,7 +7979,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_add_mpyi_RRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_R_add_mpyi_RRI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_add_mpyi_RRI intrinsic cannot be encoded as u6 immediate");
     }
   }
 )
@@ -8011,13 +8011,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_add_mpyi_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu6")){
-      error("argument 1 of Q6_R_add_mpyi_IRI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_add_mpyi_IRI intrinsic cannot be encoded as u6 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_add_mpyi_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_R_add_mpyi_IRI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_add_mpyi_IRI intrinsic cannot be encoded as u6 immediate");
     }
   }
 )
@@ -8049,7 +8049,7 @@
       error("non-constant integer passed to argument 1 of Q6_R_add_mpyi_IRR intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu6")){
-      error("argument 1 of Q6_R_add_mpyi_IRR intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_add_mpyi_IRR intrinsic cannot be encoded as u6 immediate");
     }
   }
 )
@@ -10770,7 +10770,7 @@
       error("non-constant integer passed to argument 4 of Q6_P_vrcrotateacc_PRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[4]), 'I', "Iu2")){
-      error("argument 4 of Q6_P_vrcrotateacc_PRI intrinsic cannot be encoded as u2 immediate -- FIXME: can it be extended?");
+      error("argument 4 of Q6_P_vrcrotateacc_PRI intrinsic cannot be encoded as u2 immediate");
     }
   }
 )
@@ -10803,7 +10803,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_vrcrotate_PRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu2")){
-      error("argument 3 of Q6_P_vrcrotate_PRI intrinsic cannot be encoded as u2 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_vrcrotate_PRI intrinsic cannot be encoded as u2 immediate");
     }
   }
 )
@@ -11112,7 +11112,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_add_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is16")){
-      error("argument 2 of Q6_R_add_RI intrinsic cannot be encoded as s16 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_add_RI intrinsic cannot be encoded as s16 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_addsi3(operands[0], operands[1], operands[2]));
@@ -12331,7 +12331,7 @@
       error("non-constant integer passed to argument 1 of Q6_R_equals_I intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Is16")){
-      error("argument 1 of Q6_R_equals_I intrinsic cannot be encoded as s16 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_equals_I intrinsic cannot be encoded as s16 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_movsi(operands[0], operands[1]));
@@ -12400,7 +12400,7 @@
       error("non-constant integer passed to argument 1 of Q6_P_equals_I intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Is8")){
-      error("argument 1 of Q6_P_equals_I intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_P_equals_I intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -12569,7 +12569,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_combine_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_P_combine_RI intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_combine_RI intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -12599,7 +12599,7 @@
       error("non-constant integer passed to argument 1 of Q6_P_combine_IR intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Is8")){
-      error("argument 1 of Q6_P_combine_IR intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_P_combine_IR intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -12629,13 +12629,13 @@
       error("non-constant integer passed to argument 1 of Q6_P_combine_II intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Is8")){
-      error("argument 1 of Q6_P_combine_II intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_P_combine_II intrinsic cannot be encoded as s8 immediate");
     }
     if(GET_CODE (operands[2]) != CONST_INT){
       error("non-constant integer passed to argument 2 of Q6_P_combine_II intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is8")){
-      error("argument 2 of Q6_P_combine_II intrinsic cannot be encoded as s8 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_combine_II intrinsic cannot be encoded as s8 immediate");
     }
   }
 )
@@ -12761,7 +12761,7 @@
       error("non-constant integer passed to argument 2 of Q6_Rl_equals_I intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu16")){
-      error("argument 2 of Q6_Rl_equals_I intrinsic cannot be encoded as u16 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_Rl_equals_I intrinsic cannot be encoded as u16 immediate");
     }
   }
 )
@@ -12791,7 +12791,7 @@
       error("non-constant integer passed to argument 2 of Q6_Rh_equals_I intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu16")){
-      error("argument 2 of Q6_Rh_equals_I intrinsic cannot be encoded as u16 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_Rh_equals_I intrinsic cannot be encoded as u16 immediate");
     }
   }
 )
@@ -13127,7 +13127,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_add_add_RRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Is6")){
-      error("argument 3 of Q6_R_add_add_RRI intrinsic cannot be encoded as s6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_add_add_RRI intrinsic cannot be encoded as s6 immediate");
     }
   }
 )
@@ -13159,7 +13159,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_add_sub_RIR intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is6")){
-      error("argument 2 of Q6_R_add_sub_RIR intrinsic cannot be encoded as s6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_add_sub_RIR intrinsic cannot be encoded as s6 immediate");
     }
   }
 )
@@ -13399,7 +13399,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_or_and_RRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Is10")){
-      error("argument 3 of Q6_R_or_and_RRI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_or_and_RRI intrinsic cannot be encoded as s10 immediate");
     }
   }
 )
@@ -13431,7 +13431,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_andor_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Is10")){
-      error("argument 3 of Q6_R_andor_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_andor_RI intrinsic cannot be encoded as s10 immediate");
     }
   }
 )
@@ -13463,7 +13463,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_oror_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Is10")){
-      error("argument 3 of Q6_R_oror_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_oror_RI intrinsic cannot be encoded as s10 immediate");
     }
   }
 )
@@ -13572,7 +13572,7 @@
       error("non-constant integer passed to argument 1 of Q6_R_sub_IR intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Is10")){
-      error("argument 1 of Q6_R_sub_IR intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_sub_IR intrinsic cannot be encoded as s10 immediate");
     }
   }
 )
@@ -13602,7 +13602,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_and_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is10")){
-      error("argument 2 of Q6_R_and_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_and_RI intrinsic cannot be encoded as s10 immediate");
     }
   }
 )
@@ -13632,7 +13632,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_or_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is10")){
-      error("argument 2 of Q6_R_or_RI intrinsic cannot be encoded as s10 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_or_RI intrinsic cannot be encoded as s10 immediate");
     }
   }
 )
@@ -15440,7 +15440,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_round_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_round_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_round_RI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -15494,7 +15494,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_round_RI_sat intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_round_RI_sat intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_round_RI_sat intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -15548,7 +15548,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_cround_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_cround_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_cround_RI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -17298,7 +17298,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_asr_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_asr_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_asr_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrsi3(operands[0], operands[1], operands[2]));
@@ -17332,7 +17332,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_lsr_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_lsr_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_lsr_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrsi3(operands[0], operands[1], operands[2]));
@@ -17366,7 +17366,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_asl_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_asl_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_asl_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashlsi3(operands[0], operands[1], operands[2]));
@@ -17400,7 +17400,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_asr_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu6")){
-      error("argument 2 of Q6_P_asr_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_asr_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrdi3(operands[0], operands[1], operands[2]));
@@ -17434,7 +17434,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_lsr_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu6")){
-      error("argument 2 of Q6_P_lsr_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_lsr_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrdi3(operands[0], operands[1], operands[2]));
@@ -17468,7 +17468,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_asl_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu6")){
-      error("argument 2 of Q6_P_asl_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_asl_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashldi3(operands[0], operands[1], operands[2]));
@@ -17503,7 +17503,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_asracc_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_asracc_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_asracc_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrsi3_acc(operands[0], operands[2], operands[3], operands[1]));
@@ -17539,7 +17539,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_lsracc_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_lsracc_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_lsracc_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrsi3_acc(operands[0], operands[2], operands[3], operands[1]));
@@ -17575,7 +17575,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_aslacc_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_aslacc_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_aslacc_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashlsi3_acc(operands[0], operands[2], operands[3], operands[1]));
@@ -17611,7 +17611,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_asracc_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_asracc_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_asracc_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrdi3_acc(operands[0], operands[2], operands[3], operands[1]));
@@ -17647,7 +17647,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_lsracc_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_lsracc_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_lsracc_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrdi3_acc(operands[0], operands[2], operands[3], operands[1]));
@@ -17683,7 +17683,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_aslacc_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_aslacc_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_aslacc_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashldi3_acc(operands[0], operands[2], operands[3], operands[1]));
@@ -17719,7 +17719,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_asrnac_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_asrnac_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_asrnac_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrsi3_nacc(operands[0], operands[1], operands[2], operands[3]));
@@ -17755,7 +17755,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_lsrnac_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_lsrnac_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_lsrnac_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrsi3_nacc(operands[0], operands[1], operands[2], operands[3]));
@@ -17791,7 +17791,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_aslnac_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_aslnac_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_aslnac_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashlsi3_nacc(operands[0], operands[1], operands[2], operands[3]));
@@ -17827,7 +17827,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_asrnac_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_asrnac_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_asrnac_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrdi3_nacc(operands[0], operands[1], operands[2], operands[3]));
@@ -17863,7 +17863,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_lsrnac_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_lsrnac_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_lsrnac_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrdi3_nacc(operands[0], operands[1], operands[2], operands[3]));
@@ -17899,7 +17899,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_aslnac_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_aslnac_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_aslnac_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashldi3_nacc(operands[0], operands[1], operands[2], operands[3]));
@@ -17935,7 +17935,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_lsrxacc_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_lsrxacc_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_lsrxacc_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrsi3_xor(operands[0], operands[2], operands[3], operands[1]));
@@ -17971,7 +17971,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_aslxacc_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_aslxacc_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_aslxacc_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashlsi3_xor(operands[0], operands[2], operands[3], operands[1]));
@@ -18007,7 +18007,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_lsrxacc_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_lsrxacc_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_lsrxacc_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrdi3_xor(operands[0], operands[2], operands[3], operands[1]));
@@ -18043,7 +18043,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_aslxacc_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_aslxacc_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_aslxacc_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashldi3_xor(operands[0], operands[2], operands[3], operands[1]));
@@ -18079,7 +18079,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_asrand_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_asrand_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_asrand_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrsi3_and(operands[0], operands[2], operands[3], operands[1]));
@@ -18115,7 +18115,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_lsrand_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_lsrand_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_lsrand_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrsi3_and(operands[0], operands[2], operands[3], operands[1]));
@@ -18151,7 +18151,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_asland_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_asland_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_asland_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashlsi3_and(operands[0], operands[2], operands[3], operands[1]));
@@ -18187,7 +18187,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_asror_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_asror_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_asror_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrsi3_or(operands[0], operands[2], operands[3], operands[1]));
@@ -18223,7 +18223,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_lsror_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_lsror_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_lsror_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrsi3_or(operands[0], operands[2], operands[3], operands[1]));
@@ -18259,7 +18259,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_aslor_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_aslor_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_aslor_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashlsi3_or(operands[0], operands[2], operands[3], operands[1]));
@@ -18295,7 +18295,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_asrand_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_asrand_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_asrand_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrdi3_and(operands[0], operands[2], operands[3], operands[1]));
@@ -18331,7 +18331,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_lsrand_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_lsrand_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_lsrand_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrdi3_and(operands[0], operands[2], operands[3], operands[1]));
@@ -18367,7 +18367,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_asland_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_asland_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_asland_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashldi3_and(operands[0], operands[2], operands[3], operands[1]));
@@ -18403,7 +18403,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_asror_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_asror_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_asror_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashrdi3_or(operands[0], operands[2], operands[3], operands[1]));
@@ -18439,7 +18439,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_lsror_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_lsror_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_lsror_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_lshrdi3_or(operands[0], operands[2], operands[3], operands[1]));
@@ -18475,7 +18475,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_aslor_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_aslor_PI intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_aslor_PI intrinsic cannot be encoded as u6 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_ashldi3_or(operands[0], operands[2], operands[3], operands[1]));
@@ -18510,7 +18510,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_asl_RI_sat intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_asl_RI_sat intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_asl_RI_sat intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18540,7 +18540,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_asr_RI_rnd intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_asr_RI_rnd intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_asr_RI_rnd intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18570,7 +18570,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_asrrnd_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_asrrnd_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_asrrnd_RI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18600,7 +18600,7 @@
       error("non-constant integer passed to argument 1 of Q6_R_lsl_IR intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Is6")){
-      error("argument 1 of Q6_R_lsl_IR intrinsic cannot be encoded as s6 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_lsl_IR intrinsic cannot be encoded as s6 immediate");
     }
   }
 )
@@ -18631,7 +18631,7 @@
       error("non-constant integer passed to argument 3 of Q6_R_addasl_RRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu3")){
-      error("argument 3 of Q6_R_addasl_RRI intrinsic cannot be encoded as u3 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_addasl_RRI intrinsic cannot be encoded as u3 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_addaslsi4(operands[0], operands[2], operands[3], operands[1]));
@@ -18667,13 +18667,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_and_asl_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu8")){
-      error("argument 1 of Q6_R_and_asl_IRI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_and_asl_IRI intrinsic cannot be encoded as u8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_and_asl_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_and_asl_IRI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_and_asl_IRI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18705,13 +18705,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_or_asl_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu8")){
-      error("argument 1 of Q6_R_or_asl_IRI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_or_asl_IRI intrinsic cannot be encoded as u8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_or_asl_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_or_asl_IRI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_or_asl_IRI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18743,13 +18743,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_add_asl_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu8")){
-      error("argument 1 of Q6_R_add_asl_IRI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_add_asl_IRI intrinsic cannot be encoded as u8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_add_asl_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_add_asl_IRI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_add_asl_IRI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18781,13 +18781,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_sub_asl_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu8")){
-      error("argument 1 of Q6_R_sub_asl_IRI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_sub_asl_IRI intrinsic cannot be encoded as u8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_sub_asl_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_sub_asl_IRI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_sub_asl_IRI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18819,13 +18819,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_and_lsr_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu8")){
-      error("argument 1 of Q6_R_and_lsr_IRI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_and_lsr_IRI intrinsic cannot be encoded as u8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_and_lsr_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_and_lsr_IRI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_and_lsr_IRI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18857,13 +18857,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_or_lsr_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu8")){
-      error("argument 1 of Q6_R_or_lsr_IRI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_or_lsr_IRI intrinsic cannot be encoded as u8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_or_lsr_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_or_lsr_IRI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_or_lsr_IRI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18895,13 +18895,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_add_lsr_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu8")){
-      error("argument 1 of Q6_R_add_lsr_IRI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_add_lsr_IRI intrinsic cannot be encoded as u8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_add_lsr_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_add_lsr_IRI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_add_lsr_IRI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18933,13 +18933,13 @@
       error("non-constant integer passed to argument 1 of Q6_R_sub_lsr_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'I', "Iu8")){
-      error("argument 1 of Q6_R_sub_lsr_IRI intrinsic cannot be encoded as u8 immediate -- FIXME: can it be extended?");
+      error("argument 1 of Q6_R_sub_lsr_IRI intrinsic cannot be encoded as u8 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_sub_lsr_IRI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_sub_lsr_IRI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_sub_lsr_IRI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -18971,7 +18971,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_valignb_PPI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu3")){
-      error("argument 3 of Q6_P_valignb_PPI intrinsic cannot be encoded as u3 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_valignb_PPI intrinsic cannot be encoded as u3 immediate");
     }
   }
 )
@@ -19029,7 +19029,7 @@
       error("non-constant integer passed to argument 3 of Q6_P_vspliceb_PPI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu3")){
-      error("argument 3 of Q6_P_vspliceb_PPI intrinsic cannot be encoded as u3 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_vspliceb_PPI intrinsic cannot be encoded as u3 immediate");
     }
   }
 )
@@ -19132,13 +19132,13 @@
       error("non-constant integer passed to argument 3 of Q6_R_insert_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_insert_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_insert_RII intrinsic cannot be encoded as u5 immediate");
     }
     if(GET_CODE (operands[4]) != CONST_INT){
       error("non-constant integer passed to argument 4 of Q6_R_insert_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[4]), 'I', "Iu5")){
-      error("argument 4 of Q6_R_insert_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 4 of Q6_R_insert_RII intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_move_insn(operands[0], operands[1]);
@@ -19177,13 +19177,13 @@
       error("non-constant integer passed to argument 3 of Q6_R_tableidxb_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu4")){
-      error("argument 3 of Q6_R_tableidxb_RII intrinsic cannot be encoded as u4 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_tableidxb_RII intrinsic cannot be encoded as u4 immediate");
     }
     if(GET_CODE (operands[4]) != CONST_INT){
       error("non-constant integer passed to argument 4 of Q6_R_tableidxb_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[4]), 'I', "Iu5")){
-      error("argument 4 of Q6_R_tableidxb_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 4 of Q6_R_tableidxb_RII intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -19217,13 +19217,13 @@
       error("non-constant integer passed to argument 3 of Q6_R_tableidxh_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu4")){
-      error("argument 3 of Q6_R_tableidxh_RII intrinsic cannot be encoded as u4 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_tableidxh_RII intrinsic cannot be encoded as u4 immediate");
     }
     if(GET_CODE (operands[4]) != CONST_INT){
       error("non-constant integer passed to argument 4 of Q6_R_tableidxh_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[4]), 'I', "Iu5")){
-      error("argument 4 of Q6_R_tableidxh_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 4 of Q6_R_tableidxh_RII intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -19257,13 +19257,13 @@
       error("non-constant integer passed to argument 3 of Q6_R_tableidxw_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu4")){
-      error("argument 3 of Q6_R_tableidxw_RII intrinsic cannot be encoded as u4 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_tableidxw_RII intrinsic cannot be encoded as u4 immediate");
     }
     if(GET_CODE (operands[4]) != CONST_INT){
       error("non-constant integer passed to argument 4 of Q6_R_tableidxw_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[4]), 'I', "Iu5")){
-      error("argument 4 of Q6_R_tableidxw_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 4 of Q6_R_tableidxw_RII intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -19297,13 +19297,13 @@
       error("non-constant integer passed to argument 3 of Q6_R_tableidxd_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu4")){
-      error("argument 3 of Q6_R_tableidxd_RII intrinsic cannot be encoded as u4 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_tableidxd_RII intrinsic cannot be encoded as u4 immediate");
     }
     if(GET_CODE (operands[4]) != CONST_INT){
       error("non-constant integer passed to argument 4 of Q6_R_tableidxd_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[4]), 'I', "Iu5")){
-      error("argument 4 of Q6_R_tableidxd_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 4 of Q6_R_tableidxd_RII intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -19335,7 +19335,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_bitsplit_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_P_bitsplit_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_bitsplit_RI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -19390,13 +19390,13 @@
       error("non-constant integer passed to argument 2 of Q6_R_extract_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_extract_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_extract_RII intrinsic cannot be encoded as u5 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_extract_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_extract_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_extract_RII intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -19428,13 +19428,13 @@
       error("non-constant integer passed to argument 2 of Q6_R_extractu_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_extractu_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_extractu_RII intrinsic cannot be encoded as u5 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_R_extractu_RII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu5")){
-      error("argument 3 of Q6_R_extractu_RII intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_R_extractu_RII intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_extzv(operands[0], operands[1], operands[2], operands[3]));
@@ -19471,13 +19471,13 @@
       error("non-constant integer passed to argument 3 of Q6_P_insert_PII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_insert_PII intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_insert_PII intrinsic cannot be encoded as u6 immediate");
     }
     if(GET_CODE (operands[4]) != CONST_INT){
       error("non-constant integer passed to argument 4 of Q6_P_insert_PII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[4]), 'I', "Iu6")){
-      error("argument 4 of Q6_P_insert_PII intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 4 of Q6_P_insert_PII intrinsic cannot be encoded as u6 immediate");
     }
   }
 )
@@ -19510,13 +19510,13 @@
       error("non-constant integer passed to argument 2 of Q6_P_extract_PII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu6")){
-      error("argument 2 of Q6_P_extract_PII intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_extract_PII intrinsic cannot be encoded as u6 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_P_extract_PII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_extract_PII intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_extract_PII intrinsic cannot be encoded as u6 immediate");
     }
   }
 )
@@ -19548,13 +19548,13 @@
       error("non-constant integer passed to argument 2 of Q6_P_extractu_PII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu6")){
-      error("argument 2 of Q6_P_extractu_PII intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_extractu_PII intrinsic cannot be encoded as u6 immediate");
     }
     if(GET_CODE (operands[3]) != CONST_INT){
       error("non-constant integer passed to argument 3 of Q6_P_extractu_PII intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[3]), 'I', "Iu6")){
-      error("argument 3 of Q6_P_extractu_PII intrinsic cannot be encoded as u6 immediate -- FIXME: can it be extended?");
+      error("argument 3 of Q6_P_extractu_PII intrinsic cannot be encoded as u6 immediate");
     }
   }
 )
@@ -19733,7 +19733,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_tstbit_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_p_tstbit_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_tstbit_RI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -19763,7 +19763,7 @@
       error("non-constant integer passed to argument 2 of Q6_p_not_tstbit_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_p_not_tstbit_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_p_not_tstbit_RI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -19793,7 +19793,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_setbit_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_setbit_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_setbit_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_setbitsi(operands[0], operands[2], operands[1]));
@@ -19827,7 +19827,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_togglebit_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_togglebit_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_togglebit_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_togglebitsi(operands[0], operands[2], operands[1]));
@@ -19861,7 +19861,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_clrbit_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_clrbit_RI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_clrbit_RI intrinsic cannot be encoded as u5 immediate");
     }
     if(!TARGET_LITERAL_INTRINSICS){
       emit_insn(gen_clrbitsi(operands[0], operands[2], operands[1]));
@@ -20027,7 +20027,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_vasrh_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu4")){
-      error("argument 2 of Q6_P_vasrh_PI intrinsic cannot be encoded as u4 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_vasrh_PI intrinsic cannot be encoded as u4 immediate");
     }
   }
 )
@@ -20057,7 +20057,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_vlsrh_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu4")){
-      error("argument 2 of Q6_P_vlsrh_PI intrinsic cannot be encoded as u4 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_vlsrh_PI intrinsic cannot be encoded as u4 immediate");
     }
   }
 )
@@ -20087,7 +20087,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_vaslh_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu4")){
-      error("argument 2 of Q6_P_vaslh_PI intrinsic cannot be encoded as u4 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_vaslh_PI intrinsic cannot be encoded as u4 immediate");
     }
   }
 )
@@ -20213,7 +20213,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_vasrw_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_P_vasrw_PI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_vasrw_PI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -20243,7 +20243,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_vasrw_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_R_vasrw_PI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_vasrw_PI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -20297,7 +20297,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_vlsrw_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_P_vlsrw_PI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_vlsrw_PI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -20327,7 +20327,7 @@
       error("non-constant integer passed to argument 2 of Q6_P_vaslw_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Iu5")){
-      error("argument 2 of Q6_P_vaslw_PI intrinsic cannot be encoded as u5 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_P_vaslw_PI intrinsic cannot be encoded as u5 immediate");
     }
   }
 )
@@ -21145,7 +21145,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_add_clb_RI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is6")){
-      error("argument 2 of Q6_R_add_clb_RI intrinsic cannot be encoded as s6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_add_clb_RI intrinsic cannot be encoded as s6 immediate");
     }
   }
 )
@@ -21197,7 +21197,7 @@
       error("non-constant integer passed to argument 2 of Q6_R_add_clb_PI intrinsic");
     }
     if(!CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[2]), 'I', "Is6")){
-      error("argument 2 of Q6_R_add_clb_PI intrinsic cannot be encoded as s6 immediate -- FIXME: can it be extended?");
+      error("argument 2 of Q6_R_add_clb_PI intrinsic cannot be encoded as s6 immediate");
     }
   }
 )
