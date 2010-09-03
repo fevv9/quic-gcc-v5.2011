@@ -462,7 +462,9 @@ expandargv (int *argcp, char ***argvp)
 }
 
 #if _WIN32
-#define MAX_WIN_ARG_SIZE 32000 /* Windows cannot handle more than 32000 chars */
+#define MAX_WIN_ARG_SIZE 28000 /* Windows cannot handle more than 32000 chars 
+                                  (according to msdn doc), but the
+                                  actual value varies. We want to be safe*/
 
 /*
 CHECK_ARG_SIZE => Check the size of argv on windows.

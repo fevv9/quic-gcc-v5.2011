@@ -4372,6 +4372,11 @@ set_collect_gcc_options (void)
     {
       const char *const *args;
       const char *p, *q;
+
+      /* Ignore path options such as -I and -L. Bug# 4302 */
+      if (switches[i].part1[0] == 'I' || switches[i].part1[0] == 'L')
+          continue;
+
       if (!first_time)
 	obstack_grow (&collect_obstack, " ", 1);
 
@@ -4380,7 +4385,6 @@ set_collect_gcc_options (void)
       /* Ignore elided switches.  */
       if ((switches[i].live_cond & SWITCH_IGNORE) != 0)
 	continue;
-
       obstack_grow (&collect_obstack, "'-", 2);
       q = switches[i].part1;
       while ((p = strchr (q, '\'')))
