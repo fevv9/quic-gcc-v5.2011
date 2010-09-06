@@ -10022,6 +10022,7 @@ qdsp6_pack_insns(bool need_bb_info)
   struct qdsp6_packet_info *packet = NULL;
   struct qdsp6_insn_info *insn_info;
   rtx insn;
+  rtx prev_packetized_insn = NULL_RTX;
   rtx bb_head_insn = NULL_RTX;
   rtx bb_end_insn  = NULL_RTX;
   bool start_packet = true;
@@ -10055,6 +10056,19 @@ qdsp6_pack_insns(bool need_bb_info)
       continue;
     }
 
+    /* 
+       We must ensure that the previous instruction and this instruction
+       are in the same basic block.
+       If the basic block does not end with a control-flow instruction and the
+       next block does not start with a label, then we do not want to packetize
+       across basic blocks. See bug 4281
+    */
+    if (prev_packetized_insn && 
+        (BLOCK_FOR_INSN (prev_packetized_insn) != BLOCK_FOR_INSN (insn))){
+      start_packet = true;
+    }
+
+
     /* Ignore insns that don't do anything. */
     switch(GET_CODE (PATTERN (insn))){
       case USE:
@@ -10083,6 +10097,7 @@ qdsp6_pack_insns(bool need_bb_info)
     }
 
     qdsp6_add_insn_to_packet(packet, insn_info, false);
+    prev_packetized_insn = insn_info->insn;
 
     start_packet = false;
 
