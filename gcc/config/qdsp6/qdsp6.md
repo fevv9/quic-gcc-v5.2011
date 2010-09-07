@@ -413,23 +413,23 @@
 
 (define_insn_reservation "v4_loop"       1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "loop"))
-                         "Slot3  + PCadder")
+                         "Slot3  +  PCadder")
 
 (define_insn_reservation "v4_J"          1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "J"))
-                "(Slot2 | Slot3) + PCadder + control")
+                "(Slot2 | Slot3) + (PCadder | PCadder_dualjumps) + (control | control_dualjumps)")
 
 (define_insn_reservation "v4_JR"         1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "JR"))
-                 "Slot2                    + control")
+                 "Slot2                                          +  control + control_dualjumps")
 
 (define_insn_reservation "v4_endloop0"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "endloop0"))
-                                            "endloop0")
+                                  "endloop0 + endloop0_dualjumps")
 
 (define_insn_reservation "v4_endloop1"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "endloop1"))
-                                            "endloop1")
+                                  "endloop1 + endloop1_dualjumps")
 
 (define_insn_reservation "v4_EA"         1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EA"))
@@ -469,11 +469,11 @@
 
 (define_insn_reservation "v4_EJ"         1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EJ"))
-                  "(ESlot2 | ESlot3) + PCadder + control")
+                  "(ESlot2 | ESlot3) + (PCadder | PCadder_dualjumps) + (control | control_dualjumps)")
 
 (define_insn_reservation "v4_EJR"        1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EJR"))
-                   "ESlot2                     + control")
+                   "ESlot2                                           +  control + control_dualjumps")
 
 
 ;;-------;;

@@ -8176,8 +8176,11 @@ qdsp6_print_insn_info(FILE *file, struct qdsp6_insn_info *insn_info)
     if(QDSP6_INDIRECT_JUMP_P (insn_info)){
       fputs("indirect jump", file);
     }
-    if(QDSP6_CALL_P (insn_info)){
+    if(QDSP6_DIRECT_CALL_P (insn_info)){
       fputs("call", file);
+    }
+    if(QDSP6_INDIRECT_CALL_P (insn_info)){
+      fputs("indirect call", file);
     }
     if(QDSP6_ENDLOOP_P (insn_info)){
       fputs("endloop", file);
@@ -8438,7 +8441,17 @@ qdsp6_get_flags(rtx insn)
     }
   }
   else if(CALL_P (insn)){
-    flags |= QDSP6_CALL;
+    if(GET_CODE (pattern) == SET){
+      pattern = SET_SRC (pattern);
+    }
+
+    gcc_assert(GET_CODE (pattern) == CALL && MEM_P (XEXP (pattern, 0)));
+    if(REG_P (XEXP (XEXP (pattern, 0), 0))){
+      flags |= QDSP6_INDIRECT_CALL;
+    }
+    else {
+      flags |= QDSP6_DIRECT_CALL;
+    }
   }
   /* Ignore instructions that do nothing */
   else if ((GET_CODE (PATTERN (insn)) == CLOBBER) ||
@@ -8912,6 +8925,13 @@ qdsp6_start_new_packet(void)
 
 
 
+/* Add INSN_INFO to PACKET.  If ADD_TO_BEGINNING is true, the add INSN_INFO to
+   the beginning of PACKET.  If ADD_TO_BEGINNING is false and INSN_INFO is not a
+   control insn, then add INSN_INFO above any jump insns already in PACKET.  If
+   ADD_TO_BEGINNING is false and INSN_INFO is a control insn, then add INSN_INFO
+   above any unconditional jumps in PACKET, but below any conditional jumps in
+   PACKET. */
+
 static void
 qdsp6_add_insn_to_packet(
   struct qdsp6_packet_info *packet,
@@ -8927,29 +8947,16 @@ qdsp6_add_insn_to_packet(
     packet->location = insn_info->insn;
   }
 
-  if (add_to_beginning){
-    for(i = packet->num_insns;
-        i > 0;
-        i--){
-      packet->insns[i] = packet->insns[i - 1];
-    }
-    packet->insns[0] = insn_info;
-    packet->num_insns++;
-    return;
+  for(i = packet->num_insns;
+      i > 0
+      && ((QDSP6_JUMP_P (packet->insns[i - 1])
+           && (!QDSP6_CONDITIONAL_P (packet->insns[i - 1])
+               || !QDSP6_CONTROL_P (insn_info)))
+          || add_to_beginning);
+      i--){
+    packet->insns[i] = packet->insns[i - 1];
   }
-
-  if(QDSP6_JUMP_P (insn_info)){
-    packet->insns[packet->num_insns] = insn_info;
-  }
-  else {
-    for(i = packet->num_insns;
-        i > 0 && QDSP6_JUMP_P (packet->insns[i - 1]);
-        i--){
-      packet->insns[i] = packet->insns[i - 1];
-    }
-    packet->insns[i] = insn_info;
-  }
-
+  packet->insns[i] = insn_info;
   packet->num_insns++;
 }
 
@@ -9476,13 +9483,26 @@ qdsp6_control_dependencies(
   struct qdsp6_dependence *dependencies = NULL;
 
   if(QDSP6_CONTROL_P (first)){
-    if(!(TARGET_V3_FEATURES
-         && QDSP6_CONDITIONAL_P(first) && QDSP6_DIRECT_JUMP_P(first)
-         && QDSP6_CONDITIONAL_P(second) && QDSP6_DIRECT_JUMP_P(second)
-          /* not a dot-new jump */
-         && !QDSP6_NEW_PREDICATE_P (second) && !QDSP6_NEW_PREDICATE_P (first)
-          /* not a register-condition jump */
-         && !QDSP6_GPR_CONDITION_P (second) && !QDSP6_GPR_CONDITION_P (first))){
+    /* Allow dual jumps by not adding a control dependence between two jumps
+       that are allowed to be in the same packet. */
+    if(!((TARGET_V3_FEATURES
+          /* The first jump must be conditional. */
+          && QDSP6_CONDITIONAL_P (first)
+          /* Indirect jumps are not allowed to be dual jumps. */
+          && QDSP6_DIRECT_JUMP_P (first) && QDSP6_DIRECT_JUMP_P (second)
+          /* In V3, dot-new jumps are not allowed to be dual jumps. */
+          && !QDSP6_NEW_PREDICATE_P (second) && !QDSP6_NEW_PREDICATE_P (first)
+          /* Register-condition jumps are not allowed to be dual jumps. */
+          && !QDSP6_GPR_CONDITION_P (second) && !QDSP6_GPR_CONDITION_P (first))
+         || (TARGET_V4_FEATURES
+             /* The first jump must be conditional. */
+             && QDSP6_CONDITIONAL_P (first)
+             /* Indirect jumps are not allowed to be dual jumps. */
+             && (QDSP6_DIRECT_JUMP_P (first) || QDSP6_DIRECT_CALL_P (first))
+             && (QDSP6_DIRECT_JUMP_P (second) || QDSP6_DIRECT_CALL_P (second))
+             /* Register-condition jumps are not allowed to be dual jumps. */
+             && !QDSP6_GPR_CONDITION_P (first)
+             && !QDSP6_GPR_CONDITION_P (second)))){
       dependencies = qdsp6_add_dependence(dependencies,
                                           QDSP6_DEP_CONTROL,
                                           first->insn,
@@ -9654,8 +9674,7 @@ qdsp6_anti_dependencies(
   struct qdsp6_reg_access *write;
 
   /* Don't allow insns to move across control insns and vice versa. */
-  if(   QDSP6_CONTROL_P (earlier)
-     || QDSP6_CONTROL_P (later)){
+  if(QDSP6_CONTROL_P (earlier) ^ QDSP6_CONTROL_P (later)){
     dependencies = qdsp6_add_dependence(dependencies,
                                         QDSP6_DEP_CONTROL,
                                         earlier->insn,
