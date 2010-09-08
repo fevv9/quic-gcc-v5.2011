@@ -78,6 +78,7 @@ const char * qdsp6_oslib_string;
 int qdsp6_features;
 enum qdsp6_falign qdsp6_falign = QDSP6_FALIGN_UNSPECIFIED;
 bool qdsp6_dual_memory_accesses = true;
+bool qdsp6_packetize_volatiles = true;
 
 static GTY(()) struct qdsp6_packet_info *qdsp6_head_packet;
 static GTY(()) struct qdsp6_packet_info *qdsp6_tail_packet;
@@ -652,6 +653,9 @@ qdsp6_handle_option(size_t code, const char *arg, int value ATTRIBUTE_UNUSED)
       return true;
     case OPT_mfalign_all:
       qdsp6_falign = QDSP6_FALIGN_ALL;
+      return true;
+    case OPT_mno_packetize_volatiles:
+      qdsp6_packetize_volatiles = false;
       return true;
   }
   return true;
@@ -9664,14 +9668,16 @@ qdsp6_true_dependencies(
     return dependencies;
   }
 
-  /* If a memory access is volatile, then it should be the only memory access in
-     a packet.  (not really a dependency, but oh well) */
-  if((QDSP6_VOLATILE_P (writer) || QDSP6_VOLATILE_P (reader))
-     && (QDSP6_MEM_P (writer) && QDSP6_MEM_P (reader))){
-    dependencies = qdsp6_add_dependence(dependencies,
-                                        QDSP6_DEP_VOLATILE,
-                                        writer->insn,
-                                        reader->insn);
+  if (!TARGET_V4_FEATURES || !qdsp6_packetize_volatiles){
+    /* If a memory access is volatile, then it should be the only memory access in
+       a packet.  (not really a dependency, but oh well) */
+    if((QDSP6_VOLATILE_P (writer) || QDSP6_VOLATILE_P (reader))
+       && (QDSP6_MEM_P (writer) && QDSP6_MEM_P (reader))){
+      dependencies = qdsp6_add_dependence(dependencies,
+                                          QDSP6_DEP_VOLATILE,
+                                          writer->insn,
+                                          reader->insn);
+    }
   }
 
   /* Check for possible true memory dependencies. */

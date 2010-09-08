@@ -158,3 +158,8 @@ Enable duplex scheduling
 mannotate_duplex
 Target Report Undocumented Mask(ANNOTATE_DUPLEX)
 Duplex debugging
+
+mno-packetize-volatiles
+Target Report RejectNegative
+Do not packetize volatile stores with memory instructions
+
