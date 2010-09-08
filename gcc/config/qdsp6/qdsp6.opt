@@ -73,11 +73,15 @@ Do not use the falign directive (default with -O0 or -Os)
 
 mfalign-loops
 Target Report RejectNegative
-Use the falign directive before loops (default with -O and not -Os)
+Use the falign directive before loops (default with -O or -O2)
 
 mfalign-labels
 Target Report RejectNegative
-Use the falign directive before all labels (default with -O3 and not -Os)
+Use the falign directive before all labels
+
+mfalign-all
+Target Report RejectNegative
+Use the falign directive before all labels and after packets containing calls (default with -O3)
 
 mliteral-pool
 Target Report Mask(LITERAL_POOL)
@@ -91,9 +95,13 @@ mhardware-loops
 Target Report Mask(HARDWARE_LOOPS)
 Enable hardware loops (default)
 
-mdot-new
-Target Report Mask(DOT_NEW)
-Enable .new instructions (default)
+mnew-predicates
+Target Report Mask(NEW_PREDICATES)
+Enable .new-predicates (default)
+
+mnew-value-stores
+Target Report Mask(NEW_VALUE_STORES)
+Enable .new-value stores (default)
 
 mpackets
 Target Report Mask(PACKETS)
@@ -138,3 +146,15 @@ Optimize memset routine in the backend
 menable-subreg1
 Common Target Var(flag_enable_subreg1) Optimization
 Enable subreg pass 1 (default)
+
+maggregate-access
+Common Target Var(flag_aggregate_access) Optimization
+Optimize large struct member accesses
+
+mduplex-scheduling
+Target Report Undocumented Mask(DUPLEX_SCHEDULING)
+Enable duplex scheduling
+
+mannotate_duplex
+Target Report Undocumented Mask(ANNOTATE_DUPLEX)
+Duplex debugging

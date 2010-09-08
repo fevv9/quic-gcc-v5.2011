@@ -308,14 +308,15 @@ INSTALL_HEADERS_DIR = @build_install_headers_dir@
 
 # Header files that are made available under the same name
 # to programs compiled with GCC.
-USER_H = $(srcdir)/ginclude/float.h \
-	 $(srcdir)/ginclude/iso646.h \
-	 $(srcdir)/ginclude/stdarg.h \
-	 $(srcdir)/ginclude/stdbool.h \
-	 $(srcdir)/ginclude/stddef.h \
-	 $(srcdir)/ginclude/varargs.h \
-	 $(srcdir)/ginclude/stdfix.h \
-	 $(EXTRA_HEADERS)
+#USER_H = $(srcdir)/ginclude/float.h \
+#	 $(srcdir)/ginclude/iso646.h \
+#	 $(srcdir)/ginclude/stdarg.h \
+#	 $(srcdir)/ginclude/stdbool.h \
+#	 $(srcdir)/ginclude/stddef.h \
+#	 $(srcdir)/ginclude/varargs.h \
+#	 $(srcdir)/ginclude/stdfix.h \
+#	 $(EXTRA_HEADERS)
+USER_H = $(EXTRA_HEADERS)
 
 UNWIND_H = $(srcdir)/unwind-generic.h
 
@@ -1073,6 +1074,7 @@ OBJS-common = \
 	cfgloopmanip.o \
 	cfgrtl.o \
 	combine.o \
+	aggregate-access.o \
 	combine-stack-adj.o \
 	convert.o \
 	coverage.o \
@@ -2836,6 +2838,11 @@ dominance.o : dominance.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) \
 et-forest.o : et-forest.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) \
    et-forest.h alloc-pool.h $(BASIC_BLOCK_H)
 combine.o : combine.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) \
+   $(FLAGS_H) $(FUNCTION_H) insn-config.h $(INSN_ATTR_H) $(REGS_H) $(EXPR_H) \
+   rtlhooks-def.h $(BASIC_BLOCK_H) $(RECOG_H) $(REAL_H) hard-reg-set.h \
+   $(TOPLEV_H) $(TM_P_H) $(TREE_H) $(TARGET_H) output.h $(PARAMS_H) $(OPTABS_H) \
+   insn-codes.h $(TIMEVAR_H) tree-pass.h $(DF_H) vecprim.h $(CGRAPH_H)
+aggregate-access.o : aggregate-access.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) \
    $(FLAGS_H) $(FUNCTION_H) insn-config.h $(INSN_ATTR_H) $(REGS_H) $(EXPR_H) \
    rtlhooks-def.h $(BASIC_BLOCK_H) $(RECOG_H) $(REAL_H) hard-reg-set.h \
    $(TOPLEV_H) $(TM_P_H) $(TREE_H) $(TARGET_H) output.h $(PARAMS_H) $(OPTABS_H) \
