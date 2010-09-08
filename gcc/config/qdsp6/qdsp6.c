@@ -5351,8 +5351,18 @@ qdsp6_machine_dependent_reorg(void)
       qdsp6_builtin_mask_for_load = t; \
     } \
   } while (0);
+#define def_builtin_nonconst(NAME, TYPE, CODE) \
+  do { \
+    tree t; \
+    t = add_builtin_function(NAME, TYPE, END_BUILTINS + 1 + CODE, \
+                             BUILT_IN_MD, NULL, NULL_TREE);  \
+    if (CODE == QDSP6_BUILTIN_val_for_valignb) { \
+      qdsp6_builtin_mask_for_load = t; \
+    } \
+  } while (0);
 #endif /* !GCC_3_4_6 */
 
+#define PTR_type_node ptr_type_node
 #define BI_type_node boolean_type_node
 #define QI_type_node char_type_node
 #define HI_type_node short_integer_type_node
@@ -5416,6 +5426,20 @@ qdsp6_init_builtins(void)
   tree DI_ftype_QI       ATTRIBUTE_UNUSED;
   tree SI_ftype_QI       ATTRIBUTE_UNUSED;
   tree DI_ftype_DIDIQI   ATTRIBUTE_UNUSED;
+
+  tree PTR_ftype_PTRPTRSISI   ATTRIBUTE_UNUSED;
+
+  tree PTR_ftype_PTRDISISI   ATTRIBUTE_UNUSED;
+  tree PTR_ftype_PTRSISISI   ATTRIBUTE_UNUSED;
+  tree PTR_ftype_PTRHISISI   ATTRIBUTE_UNUSED;
+  tree PTR_ftype_PTRQISISI   ATTRIBUTE_UNUSED;
+
+  tree PTR_ftype_PTRPTRSI   ATTRIBUTE_UNUSED;
+
+  tree PTR_ftype_PTRDISI   ATTRIBUTE_UNUSED;
+  tree PTR_ftype_PTRSISI   ATTRIBUTE_UNUSED;
+  tree PTR_ftype_PTRHISI   ATTRIBUTE_UNUSED;
+  tree PTR_ftype_PTRQISI   ATTRIBUTE_UNUSED;
 
   endlink = void_list_node;
   QI_ftype_MEM =      build_function_type( QI_type_node,
@@ -5634,11 +5658,79 @@ qdsp6_init_builtins(void)
                         tree_cons(NULL_TREE, QI_type_node,
                         endlink))));
 
+  PTR_ftype_PTRPTRSISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink)))));
+
+  PTR_ftype_PTRDISISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink)))));
+
+  PTR_ftype_PTRSISISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink)))));
+
+  PTR_ftype_PTRHISISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, HI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink)))));
+
+  PTR_ftype_PTRQISISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, QI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink)))));
+
+  PTR_ftype_PTRPTRSI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink))));
+
+  PTR_ftype_PTRDISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, DI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink))));
+
+  PTR_ftype_PTRSISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink))));
+
+  PTR_ftype_PTRHISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, HI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink))));
+
+  PTR_ftype_PTRQISI =   build_function_type(   PTR_type_node,
+                        tree_cons(NULL_TREE, PTR_type_node,
+                        tree_cons(NULL_TREE, QI_type_node,
+                        tree_cons(NULL_TREE, SI_type_node,
+                        endlink))));
+
 #define BUILTIN_INFO(TAG, TYPE, NARGS) \
   def_builtin("__builtin_" #TAG, TYPE, QDSP6_BUILTIN_##TAG);
+#define BUILTIN_INFO_NONCONST(TAG, TYPE, NARGS) \
+  def_builtin_nonconst("__builtin_" #TAG, TYPE, QDSP6_BUILTIN_##TAG);
 #include "builtins.def"
 #include "manual_builtins.def"
 #undef BUILTIN_INFO
+#undef BUILTIN_INFO_NONCONST
 
 #if !GCC_3_4_6
   gcc_assert(qdsp6_builtin_mask_for_load);
@@ -5757,9 +5849,14 @@ qdsp6_expand_builtin(
     case QDSP6_BUILTIN_##TAG: \
       return expand_one_builtin(CODE_FOR_qdsp6_builtin_##TAG, \
                                 target, exp, NARGS);
+#define BUILTIN_INFO_NONCONST(TAG, TYPE, NARGS) \
+    case QDSP6_BUILTIN_##TAG: \
+      return expand_one_builtin(CODE_FOR_qdsp6_builtin_##TAG, \
+                                target, exp, NARGS);
 #include "builtins.def"
 #include "manual_builtins.def"
 #undef BUILTIN_INFO
+#undef BUILTIN_INFO_NONCONST
     default:
       abort();
       break;
@@ -7012,7 +7109,6 @@ s8_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
 {
   return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), -128, 127);
 }
-
 
 
 

@@ -170,6 +170,33 @@
        (match_test "IN_RANGE (INTVAL (op), -128, 127)"))
 )
 
+;; s7 constant
+(define_predicate "s7_const_int_operand"
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (INTVAL (op), -64, 63)"))
+)
+
+
+;; s6 constant
+(define_predicate "s6_const_int_operand"
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (INTVAL (op), -32, 31)"))
+)
+
+
+;; s5 constant
+(define_predicate "s5_const_int_operand"
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (INTVAL (op), -16, 15)"))
+)
+
+
+;; s4 constant
+(define_predicate "s4_const_int_operand"
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (INTVAL (op), -8, 7)"))
+)
+
 ;; u9 constant
 (define_predicate "u9_const_int_operand"
   (and (match_code "const_int")

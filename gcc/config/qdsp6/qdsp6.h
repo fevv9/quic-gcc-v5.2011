@@ -1212,6 +1212,10 @@ Miscellaneous Parameters
   {"s12_const_int_operand",       {CONST_INT}},                             \
   {"s10_const_int_operand",       {CONST_INT}},                             \
   {"s8_const_int_operand",        {CONST_INT}},                             \
+  {"s7_const_int_operand",        {CONST_INT}},                             \
+  {"s6_const_int_operand",        {CONST_INT}},                             \
+  {"s5_const_int_operand",        {CONST_INT}},                             \
+  {"s4_const_int_operand",        {CONST_INT}},                             \
   {"u9_const_int_operand",        {CONST_INT}},                             \
   {"u8_const_int_operand",        {CONST_INT}},                             \
   {"u7_const_int_operand",        {CONST_INT}},                             \
@@ -1408,9 +1412,11 @@ extern bool qdsp6_dual_memory_accesses;
 
 enum qdsp6_builtins {
 #define BUILTIN_INFO(TAG, TYPE, NARGS) QDSP6_BUILTIN_##TAG,
+#define BUILTIN_INFO_NONCONST(TAG, TYPE, NARGS) QDSP6_BUILTIN_##TAG,
 #include "builtins.def"
 #include "manual_builtins.def"
 #undef BUILTIN_INFO
+#undef BUILTIN_INFO_NONCONST
   QDSP6_BUILTIN_NONEXISTANT_THING_TO_SHUT_UP_GCC_WARNING
 };
 
