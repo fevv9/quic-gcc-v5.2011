@@ -61,6 +61,7 @@
    (UNSPEC_NOP             112)   ; nop for appeasing Combine
    (UNSPEC_SET_R_p         113)   ; general register = predicate register
    (UNSPEC_NEW_VALUE       114)   ; R.new
+   (UNSPEC_MOVSI_CONST32   115)   ; const32 a + b
    (UNSPEC_QDSP6_vcmpb_eq  150)
    (UNSPEC_QDSP6_vcmpb_gtu 151)
    (UNSPEC_QDSP6_any       152)
@@ -971,6 +972,15 @@
    memw(%0) = %1.new
    memw(%E0) = %1.new"
   [(set_attr "type" "NewValue,ENewValue")]
+)
+
+(define_insn "movsi_const32"
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
+        (unspec:SI [(match_operand:SI 1 "GP_or_reg_operand" "i")
+                    (match_operand:SI 2 "nonmemory_operand" "i")] UNSPEC_MOVSI_CONST32))]
+  "TARGET_V2_FEATURES"
+  "%0 = CONST32(%1 + %2)"
+  [(set_attr "type" "Load")]
 )
 
 (define_insn "movsi_real"

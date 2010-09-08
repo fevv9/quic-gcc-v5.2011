@@ -720,6 +720,9 @@ qdsp6_override_options(void)
   if(align_functions == 0){
     align_functions = 16;
   }
+
+  if(qdsp6_arch >= QDSP6_ARCH_V4)
+    flag_aggregate_access = 0;
 }
 
 
@@ -736,6 +739,7 @@ qdsp6_optimization_options(int level, int size)
     target_flags |= MASK_EXTENDED_CROSSJUMPING;
     target_flags |= MASK_LOCAL_COMBINE;
     target_flags |= MASK_DUPLEX_SCHEDULING;
+    flag_aggregate_access = 1;
   }
 
   if(level >= 1){
@@ -746,6 +750,7 @@ qdsp6_optimization_options(int level, int size)
     target_flags |= MASK_PACKETS;
     target_flags |= MASK_PULLUP;
     flag_optimize_memset = 1;
+    flag_aggregate_access = 1;
   }
 
   qdsp6_falign = QDSP6_NO_FALIGN;

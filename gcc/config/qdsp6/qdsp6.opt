@@ -147,6 +147,10 @@ menable-subreg1
 Common Target Var(flag_enable_subreg1) Optimization
 Enable subreg pass 1 (default)
 
+maggregate-access
+Common Target Var(flag_aggregate_access) Optimization
+Optimize large struct member accesses
+
 mduplex-scheduling
 Target Report Undocumented Mask(DUPLEX_SCHEDULING)
 Enable duplex scheduling
