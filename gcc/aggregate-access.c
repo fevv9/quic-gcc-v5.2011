@@ -291,6 +291,9 @@ rest_of_handle_aggregate_access (void)
                                 /* Gen up diff offset */
                                 rtx diff_offset = gen_int_mode (original_offset-aligned_offset, SImode);
 
+                                if (!CONST_OK_FOR_CONSTRAINT_P (INTVAL (diff_offset), 'I', "Is16"))
+                                  continue;
+
                                 /* Replace add_op0 with const32_insn */
                                 add_insn = replace_rtx (add_insn, add_op0, new_reg);
                                 /* Replace add_op1 with const32_insn */
