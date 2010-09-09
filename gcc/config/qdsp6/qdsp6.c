@@ -343,7 +343,7 @@ static void qdsp6_move_insn(
               struct qdsp6_packet_info *to_packet,
               bool move_to_beginning);
 static void qdsp6_sanity_check_cfg_packet_info(void);
-static void qdsp6_gen_nvj();  /* generate the new value jump for V4 architecture */
+static void qdsp6_gen_nvj(void);  /* generate the new value jump for V4 architecture */
 static void qdsp6_pull_up_insns(void);
 static void qdsp6_init_packing_info(bool need_bb_info);
 static void qdsp6_remove_new_values(void);
@@ -352,6 +352,7 @@ static void qdsp6_packet_optimizations(void);
 static void qdsp6_final_pack_insns(void);
 static void qdsp6_pack_duplex_insns(void);
 
+bool is_restrict_qualified (tree t);
 
 
 
@@ -589,6 +590,9 @@ Miscellaneous Parameters
 #undef TARGET_PRINT_RTL_PSEUDO_ASM
 #define TARGET_PRINT_RTL_PSEUDO_ASM qdsp6_print_rtl_pseudo_asm
 
+#undef TARGET_LOOP_INVALID_FOR_FORCED_UNROLL
+#define TARGET_LOOP_INVALID_FOR_FORCED_UNROLL   qdsp6_loop_invalid_for_forced_unroll
+
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -790,7 +794,7 @@ static struct machine_function *
 qdsp6_init_machine_status(void)
 {
   struct machine_function *mf;
-  mf = ggc_alloc_cleared(sizeof(struct machine_function));
+  mf = (struct machine_function *)ggc_alloc_cleared(sizeof(struct machine_function));
   return mf;
 }
 
@@ -804,7 +808,7 @@ Storage Layout
 /* Return the TYPE of the elements comprising
    the innermost dimension of ARRAY.  */
 
-tree
+static tree
 get_inner_array_type (const_tree array)
 {
   tree type = TREE_TYPE (array);
@@ -2505,7 +2509,7 @@ default_unique_section_2 (tree decl, int reloc)
   name = targetm.strip_name_encoding (name);
   nlen = strlen (name);
 
-  string = alloca (nlen + plen + 1);
+  string = (char *) alloca (nlen + plen + 1);
   memcpy (string, prefix, plen);
   memcpy (string + plen, name, nlen + 1);
 
@@ -2547,7 +2551,7 @@ sdata_symbolic_operand_smallest_accessable_size(rtx op)
         size = GET_MODE_SIZE (get_pool_mode(op));
       }
       else {
-        if(!SYMBOL_REF_SMALL_P (op))    size;
+        if(!SYMBOL_REF_SMALL_P (op))    return size;
         t = SYMBOL_REF_DECL (op);
 	/* if we want to take overall declaration size
 	   the following code will work just fine:
@@ -2738,7 +2742,7 @@ qdsp6_store_by_pieces_p(unsigned HOST_WIDE_INT size, unsigned int alignment)
 /* Helper function for qdsp6_rtx_costs */
 
 static bool
-qdsp6_free_immediate(rtx x, int outer_code, int value)
+qdsp6_free_immediate(rtx x ATTRIBUTE_UNUSED, int outer_code ATTRIBUTE_UNUSED, int value ATTRIBUTE_UNUSED)
 {
   return true;
 }
@@ -2749,7 +2753,7 @@ qdsp6_free_immediate(rtx x, int outer_code, int value)
 /* Implements hook TARGET_RTX_COSTS */
 
 static bool
-qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed)
+qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed ATTRIBUTE_UNUSED)
 {
   enum machine_mode mode = GET_MODE (x);
 
@@ -2967,7 +2971,7 @@ qdsp6_rtx_costs_debug(rtx x, int code, int outer_code, int *total, bool speed)
 /* Implements hook TARGET_ADDRESS_COST */
 
 static int
-qdsp6_address_cost(rtx address, bool speed)
+qdsp6_address_cost(rtx address, bool speed ATTRIBUTE_UNUSED)
 {
   enum rtx_code code = GET_CODE(address);
   rtx mod;
@@ -3779,22 +3783,22 @@ qdsp6_asm_select_rtx_section(
 {
   if(GET_MODE_SIZE (mode) > 0 && GET_MODE_SIZE (mode) <= g_switch_value){
       if(TARGET_SECTION_SORTING){ 
-	char *sname;
+          const char *sname;
 
-      	switch(GET_MODE_SIZE (mode))
-	{
-          case 1:  sname = ".sdata.1";	 break; 
-          case 2: sname = ".sdata.2";   break;
-          case 4: sname = ".sdata.4";   break;
-          case 8: sname = ".sdata.8";   break;	
-          default: sname = ".sdata";     break; 
-  	}
-	return get_named_section (NULL_TREE, sname, 0);
+          switch(GET_MODE_SIZE (mode))
+            {
+            case 1: sname = ".sdata.1";	  break; 
+            case 2: sname = ".sdata.2";   break;
+            case 4: sname = ".sdata.4";   break;
+            case 8: sname = ".sdata.8";   break;	
+            default: sname = ".sdata";    break; 
+            }
+          return get_named_section (NULL_TREE, sname, 0);
       } 
-    return sdata_section;
+      return sdata_section;
   }
   else {
-    return default_elf_select_rtx_section(mode, x, align);
+      return default_elf_select_rtx_section(mode, x, align);
   }
 }
 #endif /* !GCC_3_4_6 */
@@ -3843,7 +3847,7 @@ remember_this_tree(tree node){
 /* descent_smallest designed to identify the smallest addressable entity
    in a declaration. Used for sdata elements sorting */ 
 unsigned int 
-descent_smallest(const char *prefix, tree node, unsigned int smallest){
+descent_smallest(const char *prefix ATTRIBUTE_UNUSED, tree node, unsigned int smallest){
   unsigned int	new_smallest	= smallest; 
 
   if ((node == 0) || (smallest == 1))	return	new_smallest; 
@@ -5073,6 +5077,32 @@ qdsp6_fixup_cfg(void)
     }
   }
 }
+
+/* If this is HW loop, we should not allow 
+   to unroll it forcefullt */ 
+
+bool
+qdsp6_loop_invalid_for_forced_unroll(rtx tail){
+
+    int tail_code;
+
+    if(!tail)   return false;
+
+    if(!INSN_P (tail)){
+        tail = prev_real_insn(tail);
+    }
+
+    if(tail){ 
+        tail_code = recog_memoized(tail);
+
+        if(tail_code == CODE_FOR_endloop0
+           || tail_code == CODE_FOR_endloop1)
+          return true;
+    }
+
+    return false;
+}
+
 
 /* ggan:
  * Called in sms_schedule(), after loop_version.
@@ -6390,7 +6420,6 @@ static void
 qdsp6_print_rtx(FILE *stream, rtx x)
 {
   const char *op;
-  int size_in_bytes;
   int i;
 
   if(!x){
@@ -6528,7 +6557,7 @@ qdsp6_print_rtx(FILE *stream, rtx x)
           qdsp6_print_rtx(stream, XEXP (x, 0));
 /*
           fputc('.', stream);
-          size_in_bytes = 1;
+          int size_in_bytes = 1;
           switch(GET_MODE (x)){
             case DImode:
             case DFmode:
@@ -7379,7 +7408,7 @@ qdsp6_compute_dwarf_frame_information(void)
   struct qdsp6_frame_info *frame;
   HOST_WIDE_INT offset;
   char *label;
-  int i;
+  unsigned int i;
 
   if(!dwarf2out_do_frame()){
     return;
@@ -7650,7 +7679,7 @@ qdsp6_expand_compare(enum rtx_code code)
   rtx op0 = cfun->machine->compare_op0;
   rtx op1 = cfun->machine->compare_op1;
   enum rtx_code compare_code, jump_code;
-  rtx p_reg, const_reg;
+  rtx p_reg;
   int offset = 0;
 
   if(GET_MODE (op0) == BImode){
@@ -8593,7 +8622,7 @@ qdsp6_add_reg_access(struct qdsp6_reg_access *accesses, rtx reg, int flags)
   regno = REGNO (reg);
   next_hard_regno = regno + HARD_REGNO_NREGS (regno, GET_MODE (reg));
   for(; regno < next_hard_regno; regno++){
-    access = ggc_alloc_cleared(sizeof(struct qdsp6_reg_access));
+    access = (struct qdsp6_reg_access *)ggc_alloc_cleared(sizeof(struct qdsp6_reg_access));
     access->reg = reg;
     access->regno = regno;
     access->flags = flags;
@@ -8618,7 +8647,7 @@ qdsp6_add_mem_access(struct qdsp6_mem_access *accesses, rtx mem, int flags)
     }
   }
 
-  access = ggc_alloc_cleared(sizeof(struct qdsp6_mem_access));
+  access = (struct qdsp6_mem_access *)ggc_alloc_cleared(sizeof(struct qdsp6_mem_access));
   access->mem = mem;
   access->flags = flags;
   access->next = accesses;
@@ -8732,7 +8761,7 @@ qdsp6_get_insn_info(rtx insn)
 {
   struct qdsp6_insn_info *insn_info;
 
-  insn_info = ggc_alloc_cleared(sizeof(struct qdsp6_insn_info));
+  insn_info = (struct qdsp6_insn_info *)ggc_alloc_cleared(sizeof(struct qdsp6_insn_info));
 
   insn_info->insn = insn;
   insn_info->flags = qdsp6_get_flags(insn);
@@ -8918,7 +8947,7 @@ qdsp6_local_combine_pass(void)
 	      dest_pair_regno = get_pair_reg(dest_regno);
 	      if ((dest_pair_insn = VEC_index(rtx, transfer_source, dest_pair_regno)))
 		{
-		  enum machine_mode dummy_mode;
+		  enum machine_mode dummy_mode = VOIDmode;
 		  source_pair = SET_SRC (single_set (dest_pair_insn));
 
 		  /* Check if the sources for transfer instructions defining the pair are either:
@@ -9012,7 +9041,7 @@ qdsp6_start_new_packet(void)
 {
   struct qdsp6_packet_info *new_packet;
 
-  new_packet = ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
+  new_packet = (struct qdsp6_packet_info *)ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
 
   if(qdsp6_head_packet == NULL){
     qdsp6_head_packet = new_packet;
@@ -9463,7 +9492,7 @@ static struct qdsp6_insn_info *
 qdsp6_dot_newify_predicate(struct qdsp6_insn_info *insn_info)
 {
   struct qdsp6_insn_info *new_insn_info;
-  new_insn_info = ggc_alloc(sizeof(struct qdsp6_insn_info));
+  new_insn_info = (struct qdsp6_insn_info *)ggc_alloc(sizeof(struct qdsp6_insn_info));
   memcpy(new_insn_info, insn_info, sizeof(struct qdsp6_insn_info));
   new_insn_info->stack = insn_info;
   new_insn_info->flags |= QDSP6_NEW_PREDICATE;
@@ -9524,7 +9553,7 @@ qdsp6_add_dependence(
 )
 {
   struct qdsp6_dependence *new_dependence;
-  new_dependence = ggc_alloc(sizeof(struct qdsp6_dependence));
+  new_dependence = (struct qdsp6_dependence *)ggc_alloc(sizeof(struct qdsp6_dependence));
   new_dependence->type = type;
   new_dependence->set = set;
   new_dependence->use = use;
@@ -9938,7 +9967,6 @@ qdsp6_packet_insn_internal_dependence_p(
   struct qdsp6_dependence *anti_dependencies;
   struct qdsp6_dependence *true_dependencies, *control_dependencies;
   struct qdsp6_dependence *dependencies;
-  struct qdsp6_dependence *dep;
   int num_insns;
   int i;
 
@@ -10065,8 +10093,10 @@ qdsp6_create_bb_sentinel_packet(struct qdsp6_packet_info *packet)
   struct qdsp6_packet_info *sentinel_packet;
   struct qdsp6_insn_info *sentinel_insn;
 
-  sentinel_packet = ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
-  sentinel_insn = ggc_alloc_cleared(sizeof(struct qdsp6_insn_info));
+  sentinel_packet = (struct qdsp6_packet_info *)
+    ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
+  sentinel_insn = (struct qdsp6_insn_info *)
+    ggc_alloc_cleared(sizeof(struct qdsp6_insn_info));
 
   sentinel_insn->insn = PREV_INSN (packet->insns[0]->insn);
   sentinel_packet->insns[0] = sentinel_insn;
@@ -10791,11 +10821,13 @@ qdsp6_init_packing_info(bool need_bb_info)
     new_bb_aux = NULL;
     FOR_EACH_BB (bb){
       if(qdsp6_head_bb_aux == NULL){
-        qdsp6_head_bb_aux = ggc_alloc_cleared(sizeof(struct qdsp6_bb_aux_info));
+        qdsp6_head_bb_aux = (struct qdsp6_bb_aux_info *)
+            ggc_alloc_cleared(sizeof(struct qdsp6_bb_aux_info));
         new_bb_aux = qdsp6_head_bb_aux;
       }
       else {
-        new_bb_aux->next = ggc_alloc_cleared(sizeof(struct qdsp6_bb_aux_info));
+        new_bb_aux->next = (struct qdsp6_bb_aux_info *)
+            ggc_alloc_cleared(sizeof(struct qdsp6_bb_aux_info));
         new_bb_aux = new_bb_aux->next;
       }
       REG_SET_TO_HARD_REG_SET (new_bb_aux->live_out, df_get_live_out(bb));
@@ -11196,7 +11228,7 @@ qdsp6_pair_duplex_insn(struct qdsp6_packet_info* pred_packet,
                        struct qdsp6_packet_info* succ_packet,
                        enum duplex_move_direction dir)
 {
-  int i, j;
+  int i;
 
   if (dir == DOWN || dir == BOTH)
     {
@@ -11340,9 +11372,7 @@ slot0or1_occupied_p(struct qdsp6_packet_info *packet, bool count_duplexes)
 */
 static void qdsp6_pack_duplex_insns(void)
 {
-  basic_block bb;
   struct qdsp6_packet_info *packet;
-  struct qdsp6_insn_info *insn;
   int i;
 
   packet = qdsp6_head_packet; 
@@ -11385,7 +11415,7 @@ static void qdsp6_pack_duplex_insns(void)
               /* Create a new packet and choose instructions to move to that
                  packet */
               struct qdsp6_packet_info *new_packet = 
-                ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
+                (struct qdsp6_packet_info *)ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
               struct qdsp6_packet_info **movable_insns[2];
               int num_movable_insns = 0;
 
@@ -11449,7 +11479,7 @@ static void qdsp6_pack_duplex_insns(void)
                      If there are extra duplexes in one packet, try to move 
                      from that packet to the other 
                   */
-                  enum duplex_move_direction dir;
+                  enum duplex_move_direction dir = UP;
                   bool can_move = false;
                   if ((duplex_this_packet == 1) && (duplex_next_packet == 1))
                     {
@@ -11499,7 +11529,7 @@ static void qdsp6_pack_duplex_insns(void)
           
           if(!packet->next)
             {
-              gcc_assert(packet == BB_END_PACKET (bb));
+              gcc_assert(packet == BB_END_PACKET (this_bb));
             }
           packet = packet->next;
         }

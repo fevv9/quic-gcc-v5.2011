@@ -807,6 +807,10 @@ struct gcc_target
      otherwise it returns an error message.  */
   const char * (*invalid_within_doloop) (const_rtx);
 
+  /* Returns true if this loop
+     should not be forced to unroll */ 
+  bool (*loop_invalid_for_forced_unroll) (rtx); 
+
   /* DECL is a variable or function with __attribute__((dllimport))
      specified.  Use this hook if the target needs to add extra validation
      checks to  handle_dll_attribute ().  */

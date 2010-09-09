@@ -63,6 +63,7 @@ extern enum reg_class qdsp6_secondary_reload_class(rtx, enum reg_class);
 #endif /* GCC_3_4_6 */
 extern rtx  qdsp6_return_addr_rtx(int, rtx);
 extern bool qdsp6_legitimate_address_p(enum machine_mode, rtx, bool, const char *);
+extern bool qdsp6_loop_invalid_for_forced_unroll(rtx loop_header);
 #if GCC_3_4_6
 extern bool qdsp6_reg_ok_for_base_p(rtx, bool);
 #endif /* GCC_3_4_6 */
