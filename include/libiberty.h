@@ -90,6 +90,10 @@ extern void expandargv PARAMS ((int *, char ***));
 
 extern int writeargv PARAMS ((char **, FILE *));
 
+#if _WIN32
+extern char** check_arg_size(char **, char**);
+#endif
+
 /* Return the last component of a path name.  Note that we can't use a
    prototype here because the parameter is declared inconsistently
    across different systems, sometimes as "char *" and sometimes as
