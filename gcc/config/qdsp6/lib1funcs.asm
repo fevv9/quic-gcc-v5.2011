@@ -641,9 +641,9 @@ FUNC_START deallocframe
 FUNC_END deallocframe
 #endif /* L_common_prologue_epilogue */
 
-#ifdef L__qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+#ifdef L_qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 #if __QDSP6_ARCH__ >= 4
-FUNC_START __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+FUNC_START qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 	{
 		p0 = bitsclr(r1,#7)
 		p0 = bitsclr(r0,#7)
@@ -663,7 +663,7 @@ FUNC_START __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 		loop0(1f,r3)
 	}
 	.falign
-1:
+xo1:
 	{
 		memd(r0++#8) = r5:4
 		r5:4 = memd(r1++#8)
@@ -673,9 +673,9 @@ FUNC_START __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 		r0 -= add(r2,#-8)
 		jumpr r31
 	}
-FUNC_END __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+FUNC_END qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 #else
-FUNC_START __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+FUNC_START qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 	{
 		p0 = bitsclr(r1,#7)
 		p1 = bitsclr(r0,#7)
@@ -712,6 +712,6 @@ FUNC_START __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 		r0 -= add(r2,#-8)
 		jumpr r31
 	}
-FUNC_END __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+FUNC_END qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 #endif /* __QDSP6_ARCH__ >= 4 */
-#endif /* L__qdsp_memcpy_likely_aligned_min32bytes_mult8bytes */
+#endif /* L_qdsp_memcpy_likely_aligned_min32bytes_mult8bytes */
