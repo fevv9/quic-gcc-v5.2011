@@ -163,3 +163,10 @@ mno-packetize-volatiles
 Target Report RejectNegative
 Do not packetize volatile stores with memory instructions
 
+mnew-value-jump
+Target Var(new_value_jump) Init(1)
+Enable new value jump (default)
+
+mdebug_nvj=
+Target Joined Var(debug_nvj)
+NVJ debugging

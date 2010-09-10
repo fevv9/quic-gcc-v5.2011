@@ -343,16 +343,82 @@ static void qdsp6_move_insn(
               struct qdsp6_packet_info *to_packet,
               bool move_to_beginning);
 static void qdsp6_sanity_check_cfg_packet_info(void);
-static void qdsp6_gen_nvj(void);  /* generate the new value jump for V4 architecture */
 static void qdsp6_pull_up_insns(void);
 static void qdsp6_init_packing_info(bool need_bb_info);
 static void qdsp6_remove_new_values(void);
 static void qdsp6_free_packing_info(bool free_bb_info);
 static void qdsp6_packet_optimizations(void);
+static bool qdsp6_move_insn_down_p(struct qdsp6_insn_info* insn, 
+             struct qdsp6_packet_info* pred_packet, 
+             struct qdsp6_packet_info* succ_packet);
+
 static void qdsp6_final_pack_insns(void);
 static void qdsp6_pack_duplex_insns(void);
 
 bool is_restrict_qualified (tree t);
+/*generate a new value nump for V4 */
+static void qdsp6_new_value_jump(void ); 
+static bool qdsp6_query_nvj_candidate(
+              struct qdsp6_packet_info *packet, 
+              bool *dot_new_predicate,
+              basic_block bb,
+              struct qdsp6_insn_info **nvj_candidate);
+static bool qdsp6_used_predicate (
+              struct qdsp6_packet_info *packet,
+              struct qdsp6_insn_info **nvj_candidate);
+static bool qdsp6_used_operands( 
+              struct qdsp6_packet_info *packet, 
+              struct qdsp6_insn_info **nvj_insns);
+static bool qdsp6_register_defined(struct qdsp6_insn_info *insn, int reg_no );
+static bool qdsp6_register_used(struct qdsp6_insn_info *insn, int reg_no  );
+static struct qdsp6_reg_access * qdsp6_get_compare_feeder(struct qdsp6_insn_info *pred_insn);
+static struct qdsp6_packet_info * qdsp6_get_source_packet(
+              struct qdsp6_packet_info *packet, 
+              rtx feeder_reg, 
+              struct qdsp6_insn_info *d_insn,
+              struct qdsp6_insn_info **s_insn);
+static bool qdsp6_move_insn_across_packet_down( 
+              struct qdsp6_packet_info *from_packet, 
+              struct qdsp6_packet_info *to_packet, 
+              struct qdsp6_insn_info *insn);
+static bool 
+qdsp6_nvj_move_possible(
+              struct qdsp6_packet_info *candidate_packet,
+              struct qdsp6_packet_info *prev_packet,
+              struct qdsp6_insn_info **nvj_candidate, 
+              rtx *operator, 
+              rtx *pred,
+              rtx *op1, 
+              rtx *op2,
+              rtx *b_label,
+              struct qdsp6_packet_info **src_packet,
+              struct qdsp6_insn_info **src_insn,
+              int reads_cnt);
+
+static bool qdsp6_compare_p(rtx insn);
+static int qdsp6_get_reads_count(struct qdsp6_insn_info *insn_info);
+
+static bool
+qdsp6_scan_dot_new_gpr(
+              struct qdsp6_insn_info *consumer,
+              struct qdsp6_dependence *dependence);
+static bool qdsp6_nvj_check_resources ( 
+              struct qdsp6_insn_info *q_insn, 
+              struct qdsp6_packet_info *nvj_packet,
+              struct qdsp6_insn_info *comp_insn, 
+              struct qdsp6_insn_info *jump_insn, 
+              rtx nvj_insn_rtx );
+static void
+qdsp6_remove_empty_packets( 
+              basic_block bb,
+              struct qdsp6_packet_info *packet);
+static bool
+qdsp6_packet_in_bb(
+              basic_block bb, 
+              struct qdsp6_packet_info *packet); 
+
+static bool
+qdsp6_predicate_use_DImode( struct qdsp6_insn_info *insn_info);
 
 
 
@@ -8563,7 +8629,14 @@ qdsp6_print_bb_packets(FILE *file, basic_block bb)
 }
 
 
+void qdsp6_debug_all_bb_packets() 
+{
+  basic_block bb;
 
+  FOR_EACH_BB (bb){
+   qdsp6_debug_bb_packets(bb);
+  }
+}
 
 void
 qdsp6_debug_bb_packets(basic_block bb)
@@ -8617,7 +8690,12 @@ qdsp6_get_flags(rtx insn)
     flags |= QDSP6_UNCONDITIONAL;
   }
 
-  if(JUMP_P (insn) && !(flags & QDSP6_ENDLOOP)){
+  if ( INSN_CODE (insn) == CODE_FOR_old_new_value_jump )
+  {
+    flags |= QDSP6_NEW_PREDICATE;
+  }
+
+  if(JUMP_P (insn) && !(flags & QDSP6_ENDLOOP) ){
     if(GET_CODE (pattern) == RETURN){
       flags |= QDSP6_INDIRECT_JUMP;
     }
@@ -8635,6 +8713,10 @@ qdsp6_get_flags(rtx insn)
         flags |= QDSP6_INDIRECT_JUMP;
       }
     }
+  }
+  else if( get_attr_type == TYPE_NEWVALUEJUMP )
+  {
+    gcc_unreachable();
   }
   else if(CALL_P (insn)){
     if(GET_CODE (pattern) == SET){
@@ -9334,7 +9416,7 @@ qdsp6_gpr_dot_newable_p(
   rtx pattern;
   rtx set;
 
-  if(!TARGET_NEW_VALUE_STORES){
+  if(!TARGET_NEW_VALUE_STORES && !new_value_jump){
     return false;
   }
 
@@ -9342,6 +9424,12 @@ qdsp6_gpr_dot_newable_p(
   if(!TARGET_V4_FEATURES){
     return false;
   }
+
+ if (new_value_jump && 
+    QDSP6_DIRECT_JUMP_P(consumer) &&
+    qdsp6_scan_dot_new_gpr(consumer, dependence)){
+  return true;
+ }
 
   /* If the producer is conditional, then consumer must have the same
      condition. */
@@ -9412,8 +9500,7 @@ qdsp6_dot_newify_gpr(
 )
 {
   struct qdsp6_insn_info *new_insn_info;
-  rtx insn;
-  rtx pattern;
+  rtx insn, pattern;
 
   pattern = copy_rtx(PATTERN (insn_info->insn));
   pattern = replace_rtx(pattern,
@@ -9438,6 +9525,14 @@ qdsp6_dot_newify_gpr(
   new_insn_info = qdsp6_get_insn_info(insn);
   new_insn_info->stack = insn_info;
   new_insn_info->flags |= QDSP6_NEW_GPR;
+
+
+  if (new_value_jump && 
+      (INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump ||
+       INSN_CODE(insn_info->insn) == CODE_FOR_old_new_value_jump )) 
+  {
+    JUMP_LABEL(insn) = JUMP_LABEL(insn_info->insn);
+  }
 
   if(QDSP6_NEW_PREDICATE_P (insn_info)){
     new_insn_info->flags |= QDSP6_NEW_PREDICATE;
@@ -9474,12 +9569,29 @@ qdsp6_dot_oldify_gpr(struct qdsp6_insn_info *insn_info)
   rtx pattern;
   rtx new_value;
 
-  pattern = copy_rtx(PATTERN (insn_info->insn));
-  for_each_rtx(&pattern, qdsp6_find_new_value, &new_value);
-  pattern = replace_rtx(pattern, new_value, XVECEXP (new_value, 0, 0));
+  if (new_value_jump && INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump) {
+    pattern = copy_rtx(PATTERN(insn_info->insn));
+
+    for_each_rtx(&XVECEXP(pattern,0,0), qdsp6_find_new_value, &new_value);
+    XVECEXP(pattern,0,0) = replace_rtx(XVECEXP(pattern,0,0), new_value, XVECEXP (new_value, 0, 0));
+
+    for_each_rtx(&XVECEXP(pattern,0,1), qdsp6_find_new_value, &new_value);
+    XVECEXP(pattern,0,1) = replace_rtx(XVECEXP(pattern,0,1), new_value, XVECEXP (new_value, 0, 0));
+
+  } else 
+  {
+    pattern = copy_rtx(PATTERN (insn_info->insn));
+    for_each_rtx(&pattern, qdsp6_find_new_value, &new_value);
+    pattern = replace_rtx(pattern, new_value, XVECEXP (new_value, 0, 0));
+  }
+
 
   if(JUMP_P (insn_info->insn)){
     insn = emit_jump_insn_after(pattern, insn_info->insn);
+    if (INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump)
+    {
+      JUMP_LABEL(insn) = JUMP_LABEL(insn_info->insn);
+    }
   }
   else if(CALL_P (insn_info->insn)){
     insn = emit_call_insn_after(pattern, insn_info->insn);
@@ -10942,26 +11054,728 @@ qdsp6_free_packing_info(bool free_bb_info)
 }
 
 
-/* Generate compound new value jump, from two instructions compare and jump
-*  into the single instruction of compound compare/jump of new value
-*  The following three instructions in a packet  
-*  r2 = #10
-*  p0 = cmp.eq(r2.new,0)
-*  if p0 jump:t foo
-*
-*  will be converted into 
-*  r2 = #10 
-*  if (cmp.eq(r2.new,0)) jump:t foo
-*
-*/ 
+/****************************************/
+/*** Functions for New Value Jump *******/
+/****************************************/
 
-static void 
-qdsp6_gen_nvj(void)
+
+static bool
+qdsp6_scan_dot_new_gpr(
+  struct qdsp6_insn_info *consumer,
+  struct qdsp6_dependence *dependence
+)
 {
+  rtx pattern, comp, cop, op1, op2;
+  pattern = PATTERN(consumer->insn);
+  //op = XEXP(SET_SRC(PATTERN(consumer->insn)),0);
+  comp = XVECEXP(pattern, 0, 0);
+
+  cop = XVECEXP(comp, 1, 0);
+
+  op1 = XEXP(cop,0);
+  op2 = XEXP(cop,1);
+
+
+  if ( GET_CODE(op1) == UNSPEC &&  
+      XINT(op1,1) == UNSPEC_NEW_VALUE && 
+      XVECEXP(op1,0,0) == dependence->use ) 
+  {
+    return true;
+  }
+
+  if ( GET_CODE(op2) == UNSPEC &&  
+       XINT(op2,1) == UNSPEC_NEW_VALUE && 
+       XVECEXP(op2,0,0) == dependence->use ) 
+  {
+    return true;
+  }
+  return false;
 }
 
 
 
+
+/*Given: an instruction, 
+ *       any two packets (from and two in downward flow)
+ *Returns true if insn can be moved from from_packet to the to_packet
+ */      
+static bool
+qdsp6_move_insn_across_packet_down(
+  struct qdsp6_packet_info *from,
+  struct qdsp6_packet_info *to, 
+  struct qdsp6_insn_info  *insn) 
+{
+  while( from != to)
+  {
+    if (!qdsp6_move_insn_down_p(insn, from, from->next)) 
+      return (false); 
+    from = from->next;
+  }
+  return (true);
+}
+
+static bool 
+qdsp6_nvj_move_possible(
+  struct qdsp6_packet_info *candidate_packet,
+  struct qdsp6_packet_info *prev_packet,
+  struct qdsp6_insn_info **nvj_candidate, 
+  rtx *oper, 
+  rtx *pred,
+  rtx *op1, 
+  rtx *op2,
+  rtx *b_lab,
+  struct qdsp6_packet_info **src_packet,
+  struct qdsp6_insn_info **src_insn,
+  int reads_cnt
+)
+{
+  rtx feeder_reg, nvj_insn_rtx;
+  int i;
+  enum rtx_code compare_code, jump_code;
+  //enum rtx_code code; 
+  bool resource_avail = false;
+  bool move_possible = false;
+  *src_insn = NULL;
+  *src_packet = NULL;
+
+
+  
+  for (i=0; i< reads_cnt; i++) 
+  {
+    feeder_reg = XEXP(XEXP(PATTERN(nvj_candidate[1]->insn),1),i);
+    *src_packet = qdsp6_get_source_packet(prev_packet, feeder_reg, nvj_candidate[1], src_insn);
+    if (!*src_packet || GET_MODE(XEXP(PATTERN((*src_insn)->insn),i))!=SImode) 
+      /*reject everything that not SI - pattern won't support it
+      However, at some point - add multiple patterns for supporting all types*/
+    {
+      /*src packet is not in the same bb*/
+         /* or */
+      /*source is from a combine */
+      return false;
+    }
+
+
+    compare_code = GET_CODE(SET_SRC(PATTERN(nvj_candidate[1]->insn)));
+    jump_code    = GET_CODE(XEXP(SET_SRC(PATTERN(nvj_candidate[0]->insn)),0));
+
+    /* swap the compare code depeding on the condition of jump and compare*/
+    if (jump_code ==  EQ)
+    {
+      switch(compare_code) 
+      {
+        case EQ:  compare_code = NE; break;
+        case GT:  compare_code = LE; break;
+        case GTU: compare_code = LEU; break;
+        default: break;
+          //gcc_unreachable();
+      }
+    }
+
+    *oper  = gen_rtx_fmt_ee(compare_code, SImode, NULL_RTX, NULL_RTX);
+    *pred  = SET_DEST(PATTERN(nvj_candidate[1]->insn));
+    *op1   = XEXP(SET_SRC(PATTERN(nvj_candidate[1]->insn)),0);
+    *op2   = XEXP(SET_SRC(PATTERN(nvj_candidate[1]->insn)),1);
+    *b_lab = XEXP(SET_SRC(PATTERN(nvj_candidate[0]->insn)),1);
+
+
+
+
+    /* Make sure compare uses either two registers or
+       one register and an CONST_INT 
+    */
+    if ((GET_CODE(*op1) == REG) && (!(GET_CODE(*op2) == CONST_INT || GET_CODE(*op2) == REG))) 
+    {
+      return (false);
+    }
+    if ((GET_CODE(*op2) == REG) && (!(GET_CODE(*op1) == CONST_INT || GET_CODE(*op1) == REG))) 
+    {
+      return (false);
+    }
+
+    /* reject if cmp.XX(r1,r1) case:peren_c++/Sec23/2_1/P23784.C*/
+    if ((GET_CODE(*op1) == REG) && (GET_CODE(*op2) == REG) && ( REGNO(*op1) == REGNO(*op2) ))
+    {
+      return (false);
+    }
+
+
+
+
+    /* if one of operands of the compare is immediate, 
+     * only allowed values are -1 to U5 ie 32*/
+    if (reads_cnt < 2  && 
+        (GET_CODE(*op2) == CONST_INT ||
+         GET_CODE(*op1) == CONST_INT) ) 
+    {
+      switch(compare_code) {
+        case EQ:  
+        case NE:
+        case LE:
+        case GT:
+          if (INTVAL(*op2) < -1 || INTVAL(*op2) > 31)
+            return false;
+          break;
+        case GTU:
+        case LEU:
+          if ((INTVAL(*op2) < 0)  || (INTVAL(*op2) > 31))
+            return false;
+          break;
+        default:
+          break;
+      }
+    }
+
+    start_sequence();
+    nvj_insn_rtx = emit_jump_insn ( gen_new_value_jump( *oper, *op1, *op2, *b_lab, *pred )); 
+    resource_avail =  qdsp6_nvj_check_resources ( *src_insn, candidate_packet, nvj_candidate[1], nvj_candidate[0], nvj_insn_rtx);
+    end_sequence();
+
+    if (resource_avail) 
+    {
+      qdsp6_remove_insn_from_packet(candidate_packet, nvj_candidate[1]);
+      move_possible = qdsp6_move_insn_across_packet_down(*src_packet, candidate_packet, *src_insn);
+      qdsp6_add_insn_to_packet(candidate_packet, nvj_candidate[1], false);
+      if (move_possible) 
+      {
+        return true;
+      }
+    }
+
+  }
+
+  return false;
+}
+
+static int 
+qdsp6_get_writes_count(struct qdsp6_insn_info *insn_info) 
+{
+  int cnt=0;
+  struct qdsp6_reg_access *write;
+  for (write=insn_info->reg_writes; write; write = write->next) cnt++;
+  return (cnt);
+}
+
+static int 
+qdsp6_get_reads_count(struct qdsp6_insn_info *insn_info) 
+{
+  int cnt=0;
+  struct qdsp6_reg_access *read;
+  for (read=insn_info->reg_reads; read; read = read->next) cnt++;
+  return (cnt);
+}
+
+
+static struct qdsp6_reg_access * 
+qdsp6_get_compare_feeder(struct qdsp6_insn_info *pred_insn)
+{
+  struct qdsp6_reg_access *read;
+ 
+  for (read=pred_insn->reg_reads; read; read = read->next)
+  {
+    if ( (read->regno >= 0 && read->regno <= 7 ) || 
+        (read->regno >= 16 && read->regno <= 23 ))
+    {
+      return (read);
+    }
+ }
+ return (NULL);
+}
+
+/* Now that we have identified the feeder register, 
+*  iterate over the prev packets, and find it's defination
+*  (src_insn) and return the packet which contains the def.
+*/ 
+static struct qdsp6_packet_info * 
+qdsp6_get_source_packet( 
+              struct qdsp6_packet_info *prev_packet,
+              rtx feeder_reg, 
+              struct qdsp6_insn_info *d_insn, 
+              struct qdsp6_insn_info **s_insn) 
+{
+ int i;
+ basic_block bb = BLOCK_FOR_INSN(d_insn->insn);
+ *s_insn = NULL;
+ 
+ while( prev_packet && 
+     prev_packet->num_insns &&
+     BLOCK_FOR_INSN(prev_packet->insns[0]->insn) == bb )
+ {
+  for( i = 0; i < prev_packet->num_insns; i++ ) 
+  {
+   if ( GET_CODE (prev_packet->insns[i]->insn) != NOTE && 
+				    XEXP(PATTERN(prev_packet->insns[i]->insn),0) == feeder_reg) {
+    *s_insn = prev_packet->insns[i];
+    return prev_packet;
+   }
+  }
+  prev_packet=prev_packet->prev;
+ }
+ return (NULL);
+}
+
+
+  /* Now that we have found the definition, see if we can have 
+   * to the end of the basic block or to the packet, where we have jump
+  */
+
+
+static bool
+qdsp6_compare_p(rtx insn) 
+{ 
+  enum rtx_code code = GET_CODE(XEXP(PATTERN(insn),1));
+  enum machine_mode mode = GET_MODE(XEXP(PATTERN(insn),1));
+
+  /*for now allow only EQ, GT and GTU - this is only a test*/
+  return (mode == BImode && 
+       (code == EQ  || 
+        code == GT  || 
+        code == GTU));
+  /*
+  return (mode == BImode && 
+       (code == NE  || code == EQ  || 
+        code == LE  || code == GT  || 
+        code == LEU || code == GTU));
+  */
+}
+
+/* 
+* Validate that predicate is used only for jump and nothing else
+*/
+static bool  
+qdsp6_used_predicate( struct qdsp6_packet_info *packet, struct qdsp6_insn_info **nvj_candidate )
+{
+  int i, pred_no = nvj_candidate[0]->reg_reads->regno;
+  for( i = 0; i < packet->num_insns; i++ ) 
+  {
+    struct qdsp6_insn_info *pred_insn = packet->insns[i];
+    /*while we are at it, get the compare instruction*/
+
+    /*this avoids cases like { r3 = r2; r2 = r1 } generated by combinesi_v4*/
+    /*assumption: there will NOT be parallel RTX's one of which will be use of a predicate*/
+    if (GET_CODE(PATTERN(pred_insn->insn)) == PARALLEL)
+      continue;
+
+    if (qdsp6_compare_p(pred_insn->insn) &&
+        qdsp6_register_defined(pred_insn, pred_no))
+    {
+      nvj_candidate[1] = pred_insn;
+    }
+
+    if ( QDSP6_NEW_PREDICATE_P(pred_insn) && 
+        !QDSP6_DIRECT_JUMP_P (pred_insn)  && 
+         ( qdsp6_predicate_use_DImode(pred_insn) || /*predicate is generated with DI mode regs */
+           qdsp6_register_defined(pred_insn, pred_no) ||
+           qdsp6_register_used(pred_insn, pred_no) )) 
+       /*there is another use/def of the predicate in this packet */
+      return (true);
+  }
+
+  /* handle cases like p0 = r0 - where nvj_candidate is not populated*/
+  if (!nvj_candidate[1]) 
+  {
+    return (true);
+  }
+
+  return (false);
+}
+
+/*
+* Determine if the new value jump can be created (along with other instructions)
+* in the packet. 
+*/
+static bool
+qdsp6_nvj_check_resources ( 
+     struct qdsp6_insn_info *q_insn, 
+     struct qdsp6_packet_info *nvj_packet, 
+     struct qdsp6_insn_info *comp_insn,
+     struct qdsp6_insn_info *jump_insn, 
+     rtx nvj_insn_rtx )
+      
+
+{
+  struct qdsp6_packet_info *d_packet;
+  struct qdsp6_insn_info *src_insn;
+  int i=0;
+
+  d_packet = (struct qdsp6_packet_info *) ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
+
+  /*first copy all the non-jump/non-compare instructions*/
+  for (i=0; i < nvj_packet->num_insns; i++ )
+  {
+    if ( (nvj_packet->insns[i] != comp_insn) &&
+         (nvj_packet->insns[i] != jump_insn))
+    {
+      qdsp6_add_insn_to_packet(d_packet, nvj_packet->insns[i], false); 
+    }
+  }
+
+  /* see if nvj can be put in the packet */
+  src_insn = qdsp6_get_insn_info(nvj_insn_rtx);
+  if (!qdsp6_insn_fits_in_packet_p(src_insn, d_packet)) 
+  {
+    return false;
+  }
+
+  /*if nvj can be put, check to see if its source (.new) 
+    can be put in the same packet, 
+    and at the start of the packet - */
+  qdsp6_add_insn_to_packet(d_packet, src_insn, false); 
+  return (qdsp6_insn_fits_in_packet_p(q_insn, d_packet)); 
+}
+
+
+/* Given an instruction, return
+*    true if compare uses combine registers
+*/
+static bool
+qdsp6_predicate_use_DImode( struct qdsp6_insn_info *insn_info)
+{
+  rtx pattern = PATTERN(insn_info->insn);
+  rtx uses = XEXP(pattern,1);
+  if ((GET_CODE (XEXP(uses,1)) == REG && 
+       GET_MODE (XEXP(uses,1)) == DImode) ||
+      (GET_CODE (XEXP(uses,0)) == REG && 
+       GET_MODE (XEXP(uses,0)) == DImode)
+     )
+  {
+    return (true);
+  }
+  return (false);
+}
+
+/* reject if the operands of the compare instruction is def' in the packet */
+static bool
+qdsp6_used_operands( struct qdsp6_packet_info *packet, 
+                     struct qdsp6_insn_info **nvj_insns)
+{
+  int i, j, reads_cnt = qdsp6_get_reads_count(nvj_insns[1]);
+  for( i = 0; i < packet->num_insns; i++ ) 
+  {
+    if ( packet->insns[i] != nvj_insns[0] /*jump insn*/ &&
+         packet->insns[i] != nvj_insns[1] /*comp insn*/ )
+    {
+      for (j=0; j<qdsp6_get_writes_count(packet->insns[i]); j++)
+      {
+        int reg_no = nvj_insns[1]->reg_reads->regno;
+        if (qdsp6_register_defined(packet->insns[i], reg_no))
+        {
+          return (true);
+        }
+
+        if (reads_cnt > 1)
+        {
+          reg_no = nvj_insns[1]->reg_reads->next->regno;
+          if (qdsp6_register_defined(packet->insns[i], reg_no))
+          {
+            return (true);
+          }
+        } 
+      }
+    }
+  }
+  return (false);
+}
+
+/*
+* Given an instruction insn_info, return true
+*    if it defines/loads the register reg_no  
+*/
+static bool
+qdsp6_register_defined(struct qdsp6_insn_info *insn_info, int reg_no) 
+{
+  struct qdsp6_reg_access *write = insn_info->reg_writes;
+  while(write) 
+  {
+    if (write->regno == reg_no) 
+    {
+      return (true);
+    }
+    write = write->next;
+  }
+  return (false);
+}
+
+/*
+* Given an instruction insn_info, return true
+*     if it uses the register reg_no
+*/
+static bool
+qdsp6_register_used(struct qdsp6_insn_info *insn_info, int reg_no) 
+{
+  struct qdsp6_reg_access *read = insn_info->reg_reads;
+  while(read) 
+  {
+    if (read->regno == reg_no) 
+    {
+      return (true);
+    }
+    read = read->next;
+  }
+  return (false);
+}
+
+
+static bool
+qdsp6_in_bb_live_out( basic_block bb, struct qdsp6_insn_info *q_insn)
+{
+  struct qdsp6_reg_access *write;
+
+  for(write = q_insn->reg_reads; write; write = write->next)
+  {
+    if(TEST_HARD_REG_BIT (BB_LIVE_OUT (bb), write->regno))
+    {
+      return (true);
+    }
+  }
+  return (false);
+}
+
+/* Given a packet and array of two rtx
+ * returns 
+ *    false if 
+ *       a. there are no jumps in the packet 
+ *     b. two dumps (dual jumps not allowed)
+ *    true  if there is a single jump in the packet
+ *    does not modify the array of rtx if there are(is) no jump
+ *    modifies the first  element of rtx with the jmp if it's a jump (single jump packet)
+ *    modifies the second element of rtx with the jmp if it's the second jump and can be
+            converted into the compound new value jump (dual jump & copacket)
+ */
+static bool 
+qdsp6_query_nvj_candidate ( 
+  struct qdsp6_packet_info *packet, 
+  bool   *dot_new_predicate,
+  basic_block bb, 
+  struct qdsp6_insn_info    **nvj_candidate ) 
+
+{
+  int i, nvj_count = 0;
+  for( i = 0; i < packet->num_insns; i++ ) 
+  {
+    struct qdsp6_insn_info *pred_insn = packet->insns[i];
+    //if ( (QDSP6_DIRECT_JUMP_P(pred_insn) && QDSP6_PREDICATE(pred_insn)) ) {
+    if ( QDSP6_DIRECT_JUMP_P(pred_insn) && 
+         QDSP6_CONDITIONAL_P(pred_insn) && 
+         !qdsp6_in_bb_live_out(bb, pred_insn)
+       ) 
+    {
+    
+    nvj_count++;
+    nvj_candidate[0]=pred_insn;
+
+    /*if dot new predicate*/
+    if (QDSP6_NEW_PREDICATE_P(pred_insn))
+      *dot_new_predicate = true;
+    else 
+      *dot_new_predicate = false; /*this is just for the breakpoint - don't need it */
+    }
+  }
+
+
+  if (nvj_count == 1 ) return (true);
+
+  /*just making sure, in case of dual jumps - it might have been set to true */
+  *dot_new_predicate = false;
+  return (false) ;
+}
+ 
+
+
+
+static bool
+qdsp6_packet_in_bb(basic_block bb, struct qdsp6_packet_info *packet) 
+{
+  if(packet->num_insns && 
+     BLOCK_FOR_INSN(packet->insns[0]->insn) == bb)
+  {
+     return true;
+  }
+  return false;
+}
+
+static void 
+qdsp6_new_value_jump(void)
+{
+ /* 
+ * 1. Scan the packets from the bottom of the basic looking for predicated 
+ *     (p[01] or p[01].new) jump - .new or otherwise.
+ *
+ * 2. a. If p[01].new is found, (the predicate of the compare is generated 
+ *       in the same packet), make sure that the registers used in compare 
+ *       instructions are r0-r7 and r16-r23. If not, exit.
+  *   a. i. scan the predecessor of this packet,
+ *       ii. if the predecessor has the producer that feeds the compare, you've 
+ *           found the guy, collapse compare and jump instructions into one
+ *      compound new value jump and move (rematerialize) the producer 
+ *      instruction instruction in the same packet.
+ *       iii. if the predecessor does not have the producer that feeds the 
+ *            compare, repeat 2.a.ii until top of the basic block is reached.
+ *
+ * 2. b. If p[01] is found - this is a little bit more complicated as it we have to 
+ *    consider three packets -
+  *   a. i. scan the predecessor and the precedessor of the predessor of this packet, 
+ *       ii. if the predecessor has compare I that feeds the jump AND the registers 
+ *           used in the compare are r0-r7 or r16-r23, move the compare down -
+ *      rematerialize
+ *     iii. if the pred of the pred has the producer for that feeds the compare
+ *       in the pred, move the move the producer to the current packet 
+ *       and collapse compare and jump instructions into one compound 
+ *       new value jump. This will have rematerialized instruction that 
+ *       fed the compare. 
+ *
+ * 3. Run the linear dead code elimination, to remove (if possible) the 
+ *   original producer instruction in case of two packets and the 
+ *    original producer and compare in case of three packets analysis.
+ */
+
+  basic_block bb;
+
+  FOR_EACH_BB(bb)
+  {
+    struct qdsp6_packet_info  *packet, *nvj_packet;
+    struct qdsp6_insn_info    *nvj_candidate[2]= {NULL, NULL};
+    bool                      dot_new_predicate = false;
+    rtx                       nvj_insn;
+
+    packet = BB_END_PACKET(bb);
+
+    while (packet && packet->prev && 
+           packet->prev->num_insns &&
+           BLOCK_FOR_INSN(packet->prev->insns[0]->insn) == bb ) 
+    {
+      if ( !qdsp6_query_nvj_candidate(packet, &dot_new_predicate, bb, nvj_candidate)) 
+        break;
+
+      else /* single jumps */
+      {
+        struct qdsp6_insn_info *src_insn;
+        struct qdsp6_packet_info *src_packet;
+        /*
+        enum rtx_code comp_code;
+        bool resource_avail = false; 
+        rtx rtx_insn, comp_operator, operand1, operand2, branch_label, note, p_reg;
+        */
+        rtx comp_operator, p_reg, operand1, operand2, branch_label; 
+        int reads_cnt = 0;
+        struct qdsp6_insn_info *new_insn; 
+
+        nvj_packet = packet;
+        if (dot_new_predicate)  /* predicate is generated in the same packet, two packets */
+        {
+          if (qdsp6_used_predicate(nvj_packet, nvj_candidate) )  
+          {
+          /*predicate is used, other than for jump insn*/
+             break;
+          }
+
+          if (qdsp6_used_operands(nvj_packet, nvj_candidate) )
+          {
+            /*one of operands of the compare is defined in the same packet*/
+            break;
+          }
+
+
+          /* get the feeder to the compare and search in the prev packets 
+           * of the bb 
+           */
+          reads_cnt = qdsp6_get_reads_count(nvj_candidate[1]);
+          if (!qdsp6_nvj_move_possible(nvj_packet, packet->prev, nvj_candidate, 
+                                       &comp_operator, &p_reg, &operand1, &operand2, 
+                                       &branch_label, &src_packet, &src_insn,  reads_cnt)) 
+          {
+            break;
+          }
+
+          qdsp6_move_insn(src_insn, src_packet, src_insn, nvj_packet, true);
+
+          /*now call the qdsp6 genroutine to get the actual instruction */
+          nvj_insn = emit_jump_insn_after( 
+                               gen_new_value_jump(comp_operator, operand1, operand2, branch_label, p_reg), 
+                               nvj_candidate[0]->insn);
+
+          /*add a note for the hint on the jump*/
+          /*
+          note = find_reg_note(nvj_candidate[0]->insn, REG_BR_PROB, 0);
+          add_reg_note(nvj_insn, REG_BR_PROB, note);
+          */
+
+          /*add a jump label*/
+           JUMP_LABEL(nvj_insn) = XEXP(branch_label,0);
+           /*
+           c_label = XEXP(branch_label, 0);
+           JUMP_LABEL(nvj_insn) = c_label;
+           JUMP_LABEL(nvj_insn) = XEXP(XVECEXP(PATTERN(nvj_candidate[0]->insn),1,1),0);
+           barrier = emit_barrier_after(nvj_insn);
+           emit_label_after(branch_label, barrier);
+           */
+           //XEXP(XVECEXP(PATTERN(nvj_insn),1,1),0) = XEXP(XVECEXP(PATTERN(nvj_candidate[0]->insn),1,1),0);
+
+           /*ensuring that code label can be accessed through label ref */
+           XEXP(XEXP(XVECEXP(PATTERN(nvj_insn),0,0),1),1) = XVECEXP(PATTERN(nvj_candidate[0]->insn),1,1);
+          /*not 100% sure if the kind of the label should be REG_LABEL_TARGET or REG_LABEL_OPERAND */
+          if (!(find_reg_note(nvj_insn, REG_LABEL_OPERAND, branch_label)))
+          {
+            add_reg_note(nvj_insn, REG_LABEL_OPERAND, branch_label);
+          }
+
+          /* assign the block number for the instruction*/
+          set_block_for_insn(nvj_insn, BLOCK_FOR_INSN(nvj_candidate[0]->insn));
+
+          delete_insn(nvj_candidate[0]->insn);
+          qdsp6_remove_insn_from_packet(nvj_packet, nvj_candidate[0]);
+
+          delete_insn(nvj_candidate[1]->insn);
+          qdsp6_remove_insn_from_packet(nvj_packet, nvj_candidate[1]);
+
+          new_insn = qdsp6_get_insn_info(nvj_insn);
+          new_insn->flags |= QDSP6_NEW_GPR;
+          qdsp6_add_insn_to_packet(nvj_packet, new_insn, false);
+
+          if (src_packet->num_insns == 0 ) 
+          {
+            /* remove empty packets */
+            qdsp6_remove_empty_packets(bb, src_packet);
+          }
+          break;
+        } 
+        else  /* three packets */
+        {
+          //printf("three packets case \n");
+        }
+      } /*end of single jumps*/
+      packet = packet->prev;
+    } /* iterate over all the packets in the basic block*/
+  } /* iterated over all the basic blocks in proc*/
+
+} /* end of qdsp6_new_value_jump */
+
+
+static void
+qdsp6_remove_empty_packets( 
+              basic_block bb,
+              struct qdsp6_packet_info *packet)
+{
+  if (BB_HEAD_PACKET(bb) == packet) {
+    BB_HEAD_PACKET(bb) = packet->next;
+  }
+  if (packet->prev != NULL) 
+  {
+    packet->prev->next = packet->next;
+  }
+  packet->next->prev = packet->prev;
+}
+
+static void 
+qdsp6_print_all_packets(void)
+{
+  basic_block bb;
+  FOR_EACH_BB(bb)
+  {
+    struct qdsp6_packet_info *packet;
+    packet = BB_HEAD_PACKET(bb);
+    qdsp6_print_packets(stdout, packet);
+  }
+}
 
 static void
 qdsp6_packet_optimizations(void)
@@ -10974,8 +11788,9 @@ qdsp6_packet_optimizations(void)
 
   qdsp6_init_packing_info(true);
   qdsp6_pack_insns(true);
-  if(TARGET_V4_FEATURES){
-    qdsp6_gen_nvj();
+  if(TARGET_V4_FEATURES && new_value_jump)
+  {
+    qdsp6_new_value_jump();
   }
   qdsp6_pull_up_insns();
   qdsp6_free_packing_info(true);
