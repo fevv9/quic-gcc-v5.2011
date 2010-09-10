@@ -79,6 +79,8 @@ extern int  qdsp6_nonimmediate_operand_with_GP_c(rtx, enum machine_mode);
 extern int  qdsp6_instructions_dependent(rtx, rtx);
 #endif /* RTX_CODE */
 
+extern void qdsp6_fast_math_libfunc(rtx);
+
 #if defined(TREE_CODE) && defined(RTX_CODE)
 extern rtx  qdsp6_function_arg(CUMULATIVE_ARGS, enum machine_mode, tree, int);
 #if GCC_3_4_6

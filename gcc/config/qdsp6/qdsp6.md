@@ -4080,6 +4080,9 @@
               (clobber (reg:SI LINK_REGNUM))])]
   ""
   {
+    if (flag_unsafe_math_optimizations){
+       qdsp6_fast_math_libfunc (operands[1]);
+    }
     if(TARGET_LONG_CALLS && !REG_P (XEXP (operands[1], 0))){
       XEXP (operands[1], 0) = force_reg(Pmode, XEXP (operands[1], 0));
     }
@@ -4114,7 +4117,11 @@
                          (match_operand 2 "" "")))
               (return)])]
   "!TARGET_LONG_CALLS"
-  ""
+  {
+    if (flag_unsafe_math_optimizations){
+       qdsp6_fast_math_libfunc (operands[1]);
+    }
+  }        
 )
 
 (define_insn "sibcall_value_real"
