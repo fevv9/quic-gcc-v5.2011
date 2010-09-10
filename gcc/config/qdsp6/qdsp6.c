@@ -795,7 +795,7 @@ qdsp6_override_options(void)
     align_functions = 16;
   }
 
-  if(qdsp6_arch >= QDSP6_ARCH_V4)
+  if(!TARGET_CONST32 || !TARGET_LITERAL_POOL_ADDRESSES || qdsp6_arch >= QDSP6_ARCH_V4)
     flag_aggregate_access = 0;
 }
 
