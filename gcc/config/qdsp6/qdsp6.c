@@ -78,7 +78,7 @@ const char * qdsp6_oslib_string;
 int qdsp6_features;
 enum qdsp6_falign qdsp6_falign = QDSP6_FALIGN_UNSPECIFIED;
 bool qdsp6_dual_memory_accesses = true;
-bool qdsp6_packetize_volatiles = true;
+bool qdsp6_packetize_volatiles = false;
 
 static GTY(()) struct qdsp6_packet_info *qdsp6_head_packet;
 static GTY(()) struct qdsp6_packet_info *qdsp6_tail_packet;
