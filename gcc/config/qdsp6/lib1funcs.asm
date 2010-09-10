@@ -640,3 +640,78 @@ FUNC_START deallocframe
 		jumpr lr
 FUNC_END deallocframe
 #endif /* L_common_prologue_epilogue */
+
+#ifdef L__qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+#if __QDSP6_ARCH__ >= 4
+FUNC_START __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+	{
+		p0 = bitsclr(r1,#7)
+		p0 = bitsclr(r0,#7)
+		if (p0.new) r5:4 = memd(r1)
+		r3 = #-3
+	}
+	{
+		if (!p0) jump memcpy
+		if (p0) memd(r0++#8) = r5:4
+		if (p0) r5:4 = memd(r1+#8)
+		r3 += lsr(r2,#3)
+	}
+	{
+		memd(r0++#8) = r5:4
+		r5:4 = memd(r1+#16)
+		r1 = add(r1,#24)
+		loop0(1f,r3)
+	}
+	.falign
+1:
+	{
+		memd(r0++#8) = r5:4
+		r5:4 = memd(r1++#8)
+	}:endloop0
+	{
+		memd(r0) = r5:4
+		r0 -= add(r2,#-8)
+		jumpr r31
+	}
+FUNC_END __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+#else
+FUNC_START __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+	{
+		p0 = bitsclr(r1,#7)
+		p1 = bitsclr(r0,#7)
+		if (p0.new) r5:4 = memd(r1)
+		r3 = #-4
+	}
+	{
+		if (p1) memd(r0) = r5:4
+		if (p0) r5:4 = memd(r1+#8)
+		p0 = and(p0,p1)
+		r3 += lsr(r2,#3)
+	}
+	{
+		if (!p0) jump memcpy
+		if (p0) memd(r0+#8) = r5:4
+		if (p0) r5:4 = memd(r1+#16)
+		if (p0) r0 = add(r0,#16)
+	}
+	{
+		memd(r0++#8) = r5:4
+		r5:4 = memd(r1+#24)
+		loop0(1f,r3)
+		p0 = cmp.eq(r2,#32)
+	}
+	.falign
+1:
+	{
+		memd(r0++#8) = r5:4
+		if (!p0) r5:4 = memd(r1+#32)
+		r1 = add(r1,#8)
+	}:endloop0
+	{
+		if (!p0) memd(r0) = r5:4
+		r0 -= add(r2,#-8)
+		jumpr r31
+	}
+FUNC_END __qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
+#endif /* __QDSP6_ARCH__ >= 4 */
+#endif /* L__qdsp_memcpy_likely_aligned_min32bytes_mult8bytes */
