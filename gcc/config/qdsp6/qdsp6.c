@@ -11070,7 +11070,7 @@ qdsp6_scan_dot_new_gpr(
   //op = XEXP(SET_SRC(PATTERN(consumer->insn)),0);
   comp = XVECEXP(pattern, 0, 0);
 
-  cop = XVECEXP(comp, 1, 0);
+  cop = XEXP(XEXP(comp, 1),0);
 
   op1 = XEXP(cop,0);
   op2 = XEXP(cop,1);
@@ -11711,7 +11711,7 @@ qdsp6_new_value_jump(void)
            //XEXP(XVECEXP(PATTERN(nvj_insn),1,1),0) = XEXP(XVECEXP(PATTERN(nvj_candidate[0]->insn),1,1),0);
 
            /*ensuring that code label can be accessed through label ref */
-           XEXP(XEXP(XVECEXP(PATTERN(nvj_insn),0,0),1),1) = XVECEXP(PATTERN(nvj_candidate[0]->insn),1,1);
+           XEXP(XEXP(XVECEXP(PATTERN(nvj_insn),0,0),1),1) = branch_label;
           /*not 100% sure if the kind of the label should be REG_LABEL_TARGET or REG_LABEL_OPERAND */
           if (!(find_reg_note(nvj_insn, REG_LABEL_OPERAND, branch_label)))
           {
