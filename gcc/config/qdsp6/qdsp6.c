@@ -1768,7 +1768,7 @@ qdsp6_initial_elimination_offset(int from_reg, int to_reg)
   }
   else if( from_reg == FRAME_POINTER_REGNUM
           && to_reg == STACK_POINTER_REGNUM){
-    return frame->args_size;
+    return frame->args_size + frame->var_size;
   }
   else if( from_reg == HARD_FRAME_POINTER_REGNUM
           && to_reg == STACK_POINTER_REGNUM){
@@ -1780,7 +1780,7 @@ qdsp6_initial_elimination_offset(int from_reg, int to_reg)
   }
   else if( from_reg == FRAME_POINTER_REGNUM
           && to_reg == HARD_FRAME_POINTER_REGNUM){
-    return -(frame->reg_size + frame->var_size);
+    return -(frame->reg_size);
   }
 
   return 0;
