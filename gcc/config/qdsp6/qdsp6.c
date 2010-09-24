@@ -8290,6 +8290,13 @@ qdsp6_record_reads(rtx *y, void *info)
       for_each_rtx(&COND_EXEC_CODE (x), qdsp6_record_reads, insn_info);
       return -1;
     case SET:
+      /* V2/V3/V4 insert instruction is unusual in the way that it reads and
+         writes its destination, so we need to record reads here
+         as a special case.
+         (set (zero_extract (...) (...) (...)) (...)) */
+      if(XEXP (x, 0) && GET_CODE (XEXP (x, 0)) == ZERO_EXTRACT){
+          for_each_rtx(&XEXP (x, 0), qdsp6_record_reads, insn_info);
+      }
       if(GET_CODE (SET_SRC (x)) != CALL){
         for_each_rtx(&SET_DEST (x), qdsp6_record_writes, insn_info);
       }
