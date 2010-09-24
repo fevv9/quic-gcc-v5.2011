@@ -3590,10 +3590,10 @@ init_varasm_status (void)
    include the same symbol.  */
 
 rtx
-simplify_subtraction (rtx x)
+simplify_subtraction (const_rtx x)
 {
   rtx r = simplify_rtx (x);
-  return r ? r : x;
+  return r ? r : CONST_CAST_RTX (x);
 }
 
 /* Given a constant rtx X, make (or find) a memory constant for its value

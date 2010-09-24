@@ -2132,9 +2132,9 @@ hard_reg_set_here_p (unsigned int beg_regno, unsigned int end_regno, rtx x)
    hard reg.  */
 
 int
-strict_memory_address_p (enum machine_mode mode ATTRIBUTE_UNUSED, rtx addr)
+strict_memory_address_p (enum machine_mode mode ATTRIBUTE_UNUSED, const_rtx addr)
 {
-  GO_IF_LEGITIMATE_ADDRESS (mode, addr, win);
+  GO_IF_LEGITIMATE_ADDRESS (mode, CONST_CAST_RTX (addr), win);
   return 0;
 
  win:
