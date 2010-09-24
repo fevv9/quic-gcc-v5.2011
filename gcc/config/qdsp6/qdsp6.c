@@ -38,9 +38,7 @@
 #include "flags.h"
 #include "recog.h"
 #include "tree.h"
-#if !GCC_3_4_6
 #include "tree-pass.h"
-#endif /* !GCC_3_4_6 */
 #include "output.h"
 #include "expr.h"
 #include "obstack.h"
@@ -67,14 +65,7 @@
 
 
 enum qdsp6_architecture qdsp6_arch = QDSP6_ARCH_UNSPECIFIED;
-#if GCC_3_4_6
-const char * qdsp6_arch_string = QDSP6_ARCH_DEFAULT_STRING;
-#endif /* GCC_3_4_6 */
 enum qdsp6_abi qdsp6_abi = QDSP6_ABI_UNSPECIFIED;
-#if GCC_3_4_6
-const char * qdsp6_abi_string = NULL;
-const char * qdsp6_oslib_string;
-#endif /* GCC_3_4_6 */
 int qdsp6_features;
 enum qdsp6_falign qdsp6_falign = QDSP6_FALIGN_UNSPECIFIED;
 bool qdsp6_dual_memory_accesses = true;
@@ -87,52 +78,37 @@ static struct qdsp6_bb_aux_info *qdsp6_head_bb_aux;
 
 
 
-#if !GCC_3_4_6
 static bool qdsp6_handle_option(size_t code, const char *arg, int value);
-#endif /* !GCC_3_4_6 */
 
 static struct machine_function *qdsp6_init_machine_status(void);
 
 static int qdsp6_array_alignment(tree type, int align);
 static bool qdsp6_align_anon_bitfield(void);
 
-#if !GCC_3_4_6
 static bool qdsp6_default_short_enums(void);
-#endif /* !GCC_3_4_6 */
 
-#if !GCC_3_4_6
 static enum reg_class qdsp6_secondary_reload(
                         bool in_p,
                         rtx x,
                         enum reg_class reload_class,
                         enum machine_mode reload_mode,
                         secondary_reload_info *sri);
-#endif /* !GCC_3_4_6 */
 
 static bool qdsp6_save_register_p(unsigned int regno);
 static void qdsp6_make_prologue_epilogue_decisions(
               struct qdsp6_frame_info *info);
 static struct qdsp6_frame_info *qdsp6_frame_info(void);
 
-#if !GCC_3_4_6
 static bool qdsp6_must_pass_in_stack(enum machine_mode mode, const_tree type);
-#endif /* !GCC_3_4_6 */
 
-#if !GCC_3_4_6
 static bool qdsp6_vector_mode_supported_p(enum machine_mode mode);
-#endif /* !GCC_3_4_6 */
 
-#if !GCC_3_4_6
 static rtx qdsp6_function_value(
              const_tree ret_type,
              const_tree fn_decl_or_type,
              bool outgoing);
-#endif /* !GCC_3_4_6 */
 
 static bool qdsp6_return_in_memory(const_tree type, const_tree fntype);
-#if GCC_3_4_6
-static rtx qdsp6_struct_value_rtx(tree fndecl, int incoming);
-#endif /* GCC_3_4_6 */
 
 static void qdsp6_asm_function_prologue(FILE *file, HOST_WIDE_INT size);
 
@@ -146,13 +122,9 @@ static bool qdsp6_legit_addr_const_p(
               HOST_WIDE_INT value,
               enum machine_mode mode,
               int num_bits);
-#if !GCC_3_4_6
 static bool qdsp6_reg_ok_for_base_p(rtx x, bool reg_ok_strict_p);
-#endif /* !GCC_3_4_6 */
 static bool qdsp6_reg_ok_for_index_p(rtx x, bool reg_ok_strict_p);
-#if !GCC_3_4_6
 static tree qdsp6_vectorize_builtin_mask_for_load(void);
-#endif /* !GCC_3_4_6 */
 
 static bool qdsp6_free_immediate(rtx x, int outer_code, int value);
 static bool qdsp6_rtx_costs(
@@ -161,33 +133,23 @@ static bool qdsp6_rtx_costs(
               int outer_code,
               int *total,
               bool speed);
-static bool qdsp6_rtx_costs_debug(
-              rtx x,
-              int code,
-              int outer_code,
-              int *total,
-              bool speed);
+bool qdsp6_rtx_costs_debug(
+       rtx x,
+       int code,
+       int outer_code,
+       int *total,
+       bool speed);
 static int qdsp6_address_cost(rtx address, bool speed);
-static int qdsp6_address_cost_debug(rtx address, bool speed);
+int qdsp6_address_cost_debug(rtx address, bool speed);
 
 static int qdsp6_sched_issue_rate(void);
 static void qdsp6_sched_dependencies_eval (rtx, rtx);
-#if GCC_3_4_6
-static int qdsp6_sched_use_dfa_pipeline_interface(void);
-#endif /* GCC_3_4_6 */
 static int qdsp6_sched_first_cycle_multipass_dfa_lookahead(void);
 
-#if GCC_3_4_6
-static void qdsp6_asm_select_rtx_section(
-              enum machine_mode mode,
-              rtx x,
-              unsigned HOST_WIDE_INT align);
-#else /* !GCC_3_4_6 */
 static section *qdsp6_asm_select_rtx_section(
                   enum machine_mode mode,
                   rtx x,
                   unsigned HOST_WIDE_INT align);
-#endif /* !GCC_3_4_6 */
 static section * qdsp6_select_section (tree decl, int reloc, unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED); 
 static bool qdsp6_in_small_data_p(const_tree exp);
 static void qdsp6_unique_section (tree decl, int reloc); 
@@ -213,18 +175,18 @@ static rtx qdsp6_expand_builtin(
              enum machine_mode mode,
              int ignore);
 static const char *qdsp6_invalid_within_doloop(const_rtx insn);
-static void qdsp6_print_jump(FILE *file, rtx x);
-static void qdsp6_print_transfer(FILE *file, rtx x);
-static void qdsp6_print_condition(FILE *file, rtx x, bool non_inverted);
-static void qdsp6_print_address(FILE *file, rtx x);
-static void qdsp6_print_unary_op(FILE *file, const char *op, rtx x);
-static void qdsp6_print_binary_op(FILE *file, const char *op, rtx x);
-static void qdsp6_print_swapped_binary_op(FILE *file, const char *op, rtx x);
-static void qdsp6_print_binary_op_with_option(FILE *file, const char *op, const char *option, rtx x);
-static void qdsp6_print_trinary_op(FILE *file, const char *op, rtx x);
-static void qdsp6_print_vecexp(FILE *file, const char *open, const char *separator, const char *close, rtx x);
-static void qdsp6_print_rtx(FILE *file, rtx x);
-static void qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x);
+static void qdsp6_print_jump(FILE *file, const_rtx x);
+static void qdsp6_print_transfer(FILE *file, const_rtx x);
+static void qdsp6_print_condition(FILE *file, const_rtx x, bool non_inverted);
+static void qdsp6_print_address(FILE *file, const_rtx x);
+static void qdsp6_print_unary_op(FILE *file, const char *op, const_rtx x);
+static void qdsp6_print_binary_op(FILE *file, const char *op, const_rtx x);
+static void qdsp6_print_swapped_binary_op(FILE *file, const char *op, const_rtx x);
+static void qdsp6_print_binary_op_with_option(FILE *file, const char *op, const char *option, const_rtx x);
+static void qdsp6_print_trinary_op(FILE *file, const char *op, const_rtx x);
+static void qdsp6_print_vecexp(FILE *file, const char *open, const char *separator, const char *close, const_rtx x);
+static void qdsp6_print_rtx(FILE *file, const_rtx x);
+static void qdsp6_print_rtl_pseudo_asm(FILE *stream, const_rtx x);
 
 static void qdsp6_compute_dwarf_frame_information(void);
 static void qdsp6_allocate_stack(
@@ -241,15 +203,15 @@ static void qdsp6_emit_special_case_memcpy_fn(
               bool tailcall);
 static void qdsp6_expand_movmem_inline(rtx operands[], bool volatile_p);
 
-static unsigned HOST_WIDE_INT sdata_symbolic_operand_smallest_accessable_size(rtx);
-
 void qdsp6_print_insn_info(FILE *file, struct qdsp6_insn_info *insn_info);
 void qdsp6_debug_insn_info(struct qdsp6_insn_info *insn_info);
 void qdsp6_print_packet(FILE *file, struct qdsp6_packet_info *packet);
 void qdsp6_print_packets(FILE *file, struct qdsp6_packet_info *packet);
+void qdsp6_print_all_packets(void);
 void qdsp6_debug_packet(struct qdsp6_packet_info *packet);
 void qdsp6_print_bb_packets(FILE *file, basic_block bb);
 void qdsp6_debug_bb_packets(basic_block bb);
+void qdsp6_debug_all_bb_packets(void);
 
 static int  qdsp6_get_flags(rtx insn);
 static struct qdsp6_reg_access *qdsp6_add_reg_access(
@@ -428,18 +390,14 @@ qdsp6_predicate_use_DImode( struct qdsp6_insn_info *insn_info);
 Run-time Target Specification
 ---------------------------*/
 
-#if !GCC_3_4_6
 #undef TARGET_DEFAULT_TARGET_FLAGS
 #define TARGET_DEFAULT_TARGET_FLAGS \
   (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
    | MASK_NEW_PREDICATES | MASK_NEW_VALUE_STORES | MASK_BASE_PLUS_INDEX \
    | MASK_MEMOPS | MASK_SECTION_SORTING | MASK_SECTION_SORTING_CODE_SUPPORT)
-#endif /* !GCC_3_4_6 */
 
-#if !GCC_3_4_6
 #undef TARGET_HANDLE_OPTION
 #define TARGET_HANDLE_OPTION qdsp6_handle_option
-#endif /* !GCC_3_4_6 */
 
 
 /*------------
@@ -466,45 +424,35 @@ Storage Layout
 Layout of Source Language Data Types
 ----------------------------------*/
 
-#if !GCC_3_4_6
 #undef TARGET_DEFAULT_SHORT_ENUMS
 #define TARGET_DEFAULT_SHORT_ENUMS qdsp6_default_short_enums
-#endif /* !GCC_3_4_6 */
 
 
 /*--------------
 Register Classes
 --------------*/
 
-#if !GCC_3_4_6
 #undef TARGET_SECONDARY_RELOAD
 #define TARGET_SECONDARY_RELOAD qdsp6_secondary_reload
-#endif /* !GCC_3_4_6 */
 
 
 /*----------------------------
 Passing Arguments in Registers
 ----------------------------*/
 
-#if !GCC_3_4_6
 #undef TARGET_MUST_PASS_IN_STACK
 #define TARGET_MUST_PASS_IN_STACK qdsp6_must_pass_in_stack
-#endif /* !GCC_3_4_6 */
 
-#if !GCC_3_4_6
 #undef TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P qdsp6_vector_mode_supported_p
-#endif /* !GCC_3_4_6 */
 
 
 /*-------------------------------------
 How Scalar Function Values Are Returned
 -------------------------------------*/
 
-#if !GCC_3_4_6
 #undef TARGET_FUNCTION_VALUE
 #define TARGET_FUNCTION_VALUE qdsp6_function_value
-#endif /* !GCC_3_4_6 */
 
 
 /*---------------------------
@@ -513,11 +461,6 @@ How Large Values Are Returned
 
 #undef TARGET_RETURN_IN_MEMORY
 #define TARGET_RETURN_IN_MEMORY qdsp6_return_in_memory
-
-#if GCC_3_4_6
-#undef TARGET_STRUCT_VALUE_RTX
-#define TARGET_STRUCT_VALUE_RTX qdsp6_struct_value_rtx
-#endif /* GCC_3_4_6 */
 
 
 /*---------------------
@@ -558,11 +501,9 @@ Implicit Calls to Library Routines
 Addressing Modes
 --------------*/
 
-#if !GCC_3_4_6
 #undef TARGET_VECTORIZE_BUILTIN_MASK_FOR_LOAD
 #define TARGET_VECTORIZE_BUILTIN_MASK_FOR_LOAD \
   qdsp6_vectorize_builtin_mask_for_load
-#endif /* !GCC_3_4_6 */
 
 
 /*-------------------------------------
@@ -582,12 +523,6 @@ Adjusting the Instruction Scheduler
 
 #undef TARGET_SCHED_ISSUE_RATE
 #define TARGET_SCHED_ISSUE_RATE qdsp6_sched_issue_rate
-
-#if GCC_3_4_6
-#undef TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE
-#define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE \
-  qdsp6_sched_use_dfa_pipeline_interface
-#endif /* GCC_3_4_6 */
 
 #undef TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD
 #define TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD \
@@ -680,7 +615,6 @@ static const struct qdsp6_arch_table_entry qdsp6_arch_table[NUM_QDSP6_ARCH] =
 static const struct qdsp6_abi_table_entry qdsp6_abi_table[NUM_QDSP6_ABI] =
   QDSP6_ABI_TABLE_INITIALIZER;
 
-#if !GCC_3_4_6
 /* Implements hook TARGET_HANDLE_OPTION
 
    Process command-line options such as -march. */
@@ -730,7 +664,6 @@ qdsp6_handle_option(size_t code, const char *arg, int value ATTRIBUTE_UNUSED)
   }
   return true;
 }
-#endif /* !GCC_3_4_6 */
 
 
 
@@ -786,7 +719,7 @@ qdsp6_override_options(void)
   }
 
   if(!g_switch_set){
-    g_switch_value = 2 * UNITS_PER_WORD;
+    g_switch_value = 8;
   }
 
   /* Align functions to 16-byte boundaries to prevent
@@ -955,7 +888,7 @@ qdsp6_constant_alignment(tree constant, int align)
    Doubleword align arrays whose element size <= 4 bytes to facilitate
    vectorization. */
 
-int
+unsigned int
 qdsp6_local_alignment(tree type, int align)
 {
   if(TREE_CODE (type) == ARRAY_TYPE){
@@ -986,7 +919,6 @@ qdsp6_align_anon_bitfield(void)
 Layout of Source Language Data Types
 ----------------------------------*/
 
-#if !GCC_3_4_6
 /* Implements hook TARGET_DEFAULT_SHORT_ENUMS
 
    The default ABI specifies that enumerated types behave like the smallest
@@ -998,7 +930,6 @@ qdsp6_default_short_enums(void)
 {
   return qdsp6_abi != QDSP6_ABI_LINUX;
 }
-#endif /* !GCC_3_4_6 */
 
 
 
@@ -1205,13 +1136,6 @@ qdsp6_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
    Predicate registers can not be directly loaded from or stored to memory.
    The value must first be moved to a general purpose register. */
 
-#if GCC_3_4_6
-enum reg_class
-qdsp6_secondary_reload_class(
-  rtx x,
-  enum reg_class reload_class
-)
-#else /* !GCC_3_4_6 */
 static enum reg_class
 qdsp6_secondary_reload(
   bool in_p ATTRIBUTE_UNUSED,
@@ -1220,7 +1144,6 @@ qdsp6_secondary_reload(
   enum machine_mode reload_mode ATTRIBUTE_UNUSED,
   secondary_reload_info *sri ATTRIBUTE_UNUSED
 )
-#endif /* !GCC_3_4_6 */
 {
   switch(reload_class){
     case PREDICATE_REGS:
@@ -1851,11 +1774,7 @@ qdsp6_function_arg(
      the stack)
    - if the type is > 8 bytes. */
 
-#if GCC_3_4_6
-bool
-#else /* !GCC_3_4_6 */
 static bool
-#endif /* !GCC_3_4_6 */
 qdsp6_must_pass_in_stack(enum machine_mode mode ATTRIBUTE_UNUSED, const_tree type)
 {
   return type && TYPE_SIZE (type)
@@ -1910,7 +1829,6 @@ qdsp6_function_arg_advance(
 
 
 
-#if !GCC_3_4_6
 /* Implements hook TARGET_VECTOR_MODE_SUPPORTED_P */
 
 static bool
@@ -1922,7 +1840,6 @@ qdsp6_vector_mode_supported_p(enum machine_mode mode)
          || mode == V2HImode
          || mode == V4QImode;
 }
-#endif /* !GCC_3_4_6 */
 
 
 
@@ -1933,11 +1850,7 @@ How Scalar Function Values Are Returned
 
 /* Implements hook TARGET_FUNCTION_VALUE */
 
-#if GCC_3_4_6
-rtx
-#else /* !GCC_3_4_6 */
 static rtx
-#endif /* !GCC_3_4_6 */
 qdsp6_function_value(
   const_tree ret_type,
   const_tree fn_decl_or_type ATTRIBUTE_UNUSED,
@@ -1976,28 +1889,8 @@ qdsp6_return_in_memory(const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
     byte_size = int_size_in_bytes(type);
   }
 
-  return !IN_RANGE (byte_size, 0, 2 * UNITS_PER_WORD);
+  return !IN_RANGE (byte_size, 0, 8);
 }
-
-
-
-
-#if GCC_3_4_6
-/* Implements hook TARGET_STRUCT_VALUE_RTX
-
-   If a function returns a struct that does not fit in a register, then the
-   address where the struct should be stored should be passed to the function
-   as if it were the first argument. */
-
-static rtx
-qdsp6_struct_value_rtx(
-  tree fndecl ATTRIBUTE_UNUSED,
-  int incoming ATTRIBUTE_UNUSED
-)
-{
-  return NULL_RTX;
-}
-#endif /* GCC_3_4_6 */
 
 
 
@@ -2205,14 +2098,11 @@ qdsp6_init_libfuncs(void)
       set_optab_libfunc(sqrt_optab, DFmode, "__qdsp_fast_sqrt_df");
     }
 
-
-#if !GCC_3_4_6
   set_conv_libfunc(ufloat_optab, SFmode, SImode, "__qdsp_floatunsisf");
   set_conv_libfunc(ufloat_optab, SFmode, DImode, "__qdsp_floatundisf");
 
   set_conv_libfunc(ufloat_optab, DFmode, SImode, "__qdsp_floatunsidf");
   set_conv_libfunc(ufloat_optab, DFmode, DImode, "__qdsp_floatundidf");
-#endif /* !GCC_3_4_6 */
 }
 #endif /* QDSP6_DINKUMWARE */
 
@@ -2258,15 +2148,9 @@ qdsp6_legit_addr_const_p(
 
 
 
-#if GCC_3_4_6
-/* Implements macro REG_OK_FOR_BASE_P */
-
-bool
-#else /* !GCC_3_4_6 */
 /* Helper function for qdsp6_legitimate_address_p */
 
 static bool
-#endif /* !GCC_3_4_6 */
 qdsp6_reg_ok_for_base_p(rtx x, bool reg_ok_strict_p)
 {
   if(reg_ok_strict_p){
@@ -2658,7 +2542,7 @@ qdsp6_unique_section (tree decl, int reloc)
 
 /* _LSY_ Loks for smallest addressable entity in
    a declaration, not overall declaration size. */  
-static unsigned HOST_WIDE_INT 
+unsigned HOST_WIDE_INT 
 sdata_symbolic_operand_smallest_accessable_size(rtx op)
 {
   unsigned HOST_WIDE_INT size = 16;
@@ -2701,130 +2585,8 @@ sdata_symbolic_operand_smallest_accessable_size(rtx op)
 
 
 
-/* copy of general_operand() rtl predicate plus memory sorting */  
-int
-qdsp6_GP_or_reg_operand_c (rtx op, enum machine_mode mode)
-{
-  enum rtx_code code = GET_CODE (op);
-  
-  if (mode == VOIDmode)	mode = GET_MODE (op);  
-
-  /* Don't accept CONST_INT or anything similar
-     if the caller wants something floating.  */
-  if (GET_MODE (op) == VOIDmode && mode != VOIDmode
-      && GET_MODE_CLASS (mode) != MODE_INT
-      && GET_MODE_CLASS (mode) != MODE_PARTIAL_INT)
-    return 0;
-
-  if (GET_CODE (op) == CONST_INT
-      && mode != VOIDmode
-      && trunc_int_for_mode (INTVAL (op), mode) != INTVAL (op))
-    return 0;
-
-  if (CONSTANT_P (op)){
-    return ((GET_MODE (op) == VOIDmode || GET_MODE (op) == mode
-             || mode == VOIDmode)
-            && (! flag_pic || LEGITIMATE_PIC_OPERAND_P (op))
-            && LEGITIMATE_CONSTANT_P (op));
-   }
-
-  /* Except for certain constants with VOIDmode, already checked for,
-     OP's mode must match MODE if MODE specifies a mode.  */
-  if (GET_MODE (op) != mode)	return 0; 
-
-  if (code == SUBREG){ 
-      rtx sub = SUBREG_REG (op);
-
-#ifdef INSN_SCHEDULING
-      /* On machines that have insn scheduling, we want all memory
-	 reference to be explicit, so outlaw paradoxical SUBREGs.
-	 However, we must allow them after reload so that they can
-	 get cleaned up by cleanup_subreg_operands.  */
-      if (!reload_completed && MEM_P (sub)
-	  && GET_MODE_SIZE (mode) > GET_MODE_SIZE (GET_MODE (sub)))
-	return 0;
-#endif
-      /* Avoid memories with nonzero SUBREG_BYTE, as offsetting the memory
-         may result in incorrect reference.  We should simplify all valid
-         subregs of MEM anyway.  But allow this after reload because we
-         might be called from cleanup_subreg_operands.
-         ??? This is a kludge.  */
-      if (!reload_completed && SUBREG_BYTE (op) != 0 && MEM_P (sub))	
-        return 0;
-
-      /* FLOAT_MODE subregs can't be paradoxical.  Combine will occasionally
-         create such rtl, and we must reject it.  */
-      if (SCALAR_FLOAT_MODE_P (GET_MODE (op))
-	  && GET_MODE_SIZE (GET_MODE (op)) > GET_MODE_SIZE (GET_MODE (sub)))
-	return 0;
-
-      op = sub;
-      code = GET_CODE (op);
-    }
-  if (code == REG) 
-    /* A register whose class is NO_REGS is not a general operand.  */
-    return (REGNO (op) >= FIRST_PSEUDO_REGISTER
-            || REGNO_REG_CLASS (REGNO (op)) != NO_REGS);
-
-  if (code == MEM){ 
-      rtx y = XEXP (op, 0);
-
-      if (! volatile_ok && MEM_VOLATILE_P (op))	return 0; 
-      /* _LSY_ if (GET_CODE (y) == ADDRESSOF)		return 1; */  
-
-      /* Use the mem's mode, since it will be reloaded thus.  */
-      mode = GET_MODE (op);
-
-      /* Catch GP relative MEM accesses */  
-      if(sdata_symbolic_operand(y, Pmode)){
-    	/* Will be GP relative */
-	unsigned HOST_WIDE_INT mem_size = 0; 
-
-	if((GET_CODE (op) == MEM) && MEM_SIZE (op))	
-		mem_size = INTVAL (MEM_SIZE (op)); 
-	/* Dev warning. if(GET_MODE_SIZE(mode) != mem_size)	
-           fprintf(stderr,"Warning. GET_MODE_SIZE(%d) != mem_size(%d)\n",
-	   GET_MODE_SIZE(mode),mem_size); 
-        */
-
-	/* This makes this predicate to reject GP relative 
-	   addressing if access unit is smaller than declaration unit*/ 
-	if(TARGET_SECTION_SORTING_CODE_SUPPORT 
-	&& TARGET_SECTION_SORTING 
-	/* There is a difference in approach possible here: In case of a struct
-           we can consider overal struct size as grounds for rejection, on the other
-           hand we can see what is the smallest accessable member of the struct is, and 
-           use that instead. Currently it makes no significant difference in performance
-           or size, but we can easily think of a theoretical example where it might.
-           Alternative code:
-           mem_size < sdata_symbolic_operand_size(y)
-        */
-	&& (mem_size < sdata_symbolic_operand_smallest_accessable_size(y))){ 
-	   if(reload_completed)	; /* Dev warning. fprintf(stderr,
-                                     "Warning. Skip late section sorting match\n"); */ 
-	   else	return 0;
-	}
-      }
-      if (memory_address_p (mode, y))	return 1;
-   }
-  return 0;
-}
-
-
-
-
-int
-qdsp6_nonimmediate_operand_with_GP_c (rtx op, enum machine_mode mode)
-{
-  return (! CONSTANT_P (op) && GP_or_reg_operand (op, mode));
-}
-
-
-
-
 static GTY(()) tree qdsp6_builtin_mask_for_load;
 
-#if !GCC_3_4_6
 /* Implements hook TARGET_VECTORIZE_BUILTIN_MASK_FOR_LOAD */
 
 static tree
@@ -2832,7 +2594,6 @@ qdsp6_vectorize_builtin_mask_for_load(void)
 {
   return qdsp6_builtin_mask_for_load;
 }
-#endif /* !GCC_3_4_6 */
 
 
 
@@ -2914,8 +2675,7 @@ qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed ATTRIBUT
       if(mode == DFmode || mode == SFmode){
         *total = COSTS_N_INSNS (50);
       }
-      else if(TARGET_V2_FEATURES
-              && (outer_code == PLUS || outer_code == MINUS)){
+      else if(outer_code == PLUS || outer_code == MINUS){
         /* Add/Sub and Accumulate */
         /* OK, we'd like to tell GCC something here, but
          * It's a little bit tricky, because otherwise
@@ -2954,11 +2714,8 @@ qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed ATTRIBUT
       return false;
 
     case CLZ:
-      *total = COSTS_N_INSNS(1);
-      return false;
-
     case FFS:
-      *total = TARGET_V2_FEATURES ? COSTS_N_INSNS (1) : COSTS_N_INSNS (10);
+      *total = COSTS_N_INSNS(1);
       return false;
 
     case NOT:
@@ -3081,7 +2838,7 @@ qdsp6_rtx_costs(rtx x, int code, int outer_code, int *total, bool speed ATTRIBUT
 
 
 
-static bool
+bool
 qdsp6_rtx_costs_debug(rtx x, int code, int outer_code, int *total, bool speed)
 {
   bool retval;
@@ -3186,7 +2943,7 @@ qdsp6_address_cost(rtx address, bool speed ATTRIBUTE_UNUSED)
 
 
 
-static int
+int
 qdsp6_address_cost_debug(rtx address, bool speed)
 {
   int retval;
@@ -3853,22 +3610,6 @@ qdsp6_sched_dependencies_eval (rtx head, rtx tail)
 
 
 
-#if GCC_3_4_6
-/* Implements hook TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE
-
-   Yes, please actually use the automaton description
-   in the machine description for scheduling.  Thank you. */
-
-static int
-qdsp6_sched_use_dfa_pipeline_interface(void)
-{
-  return 1;
-}
-#endif /* GCC_3_4_6 */
-
-
-
-
 /* Implements hook TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD */
 
 static int
@@ -3886,22 +3627,6 @@ Dividing the Output into Sections (Texts, Data, ...)
 
 /* Implements hook TARGET_ASM_SELECT_RTX_SECTION */
 
-#if GCC_3_4_6
-static void
-qdsp6_asm_select_rtx_section(
-  enum machine_mode mode,
-  rtx x,
-  unsigned HOST_WIDE_INT align
-)
-{
-  if(GET_MODE_SIZE (mode) > 0 && GET_MODE_SIZE (mode) <= g_switch_value){
-    named_section(NULL_TREE, ".sdata", 0);
-  }
-  else {
-    default_elf_select_rtx_section(mode, x, align);
-  }
-}
-#else /* !GCC_3_4_6 */
 static section *
 qdsp6_asm_select_rtx_section(
   enum machine_mode mode,
@@ -3929,7 +3654,6 @@ qdsp6_asm_select_rtx_section(
       return default_elf_select_rtx_section(mode, x, align);
   }
 }
-#endif /* !GCC_3_4_6 */
 
 
 
@@ -4375,11 +4099,6 @@ qdsp6_elf_asm_named_section (const char *name, unsigned int flags,
 static bool
 qdsp6_in_small_data_p(const_tree exp)
 {
-  /* GP relative addressing is a V2 feature. */
-  if(!TARGET_V2_FEATURES){
-    return false;
-  }
-
   /* We want to merge strings, so we never consider them small data. */
   if(TREE_CODE (exp) == STRING_CST){
     return false;
@@ -4842,7 +4561,7 @@ static enum machine_mode qdsp6_address_mode;
 /* Implements macro PRINT_OPERAND */
 
 void
-qdsp6_print_operand(FILE *stream, rtx x, int code)
+qdsp6_print_operand(FILE *stream, const_rtx x, int code)
 {
   qdsp6_extended_constant = false;
 
@@ -5026,7 +4745,7 @@ qdsp6_print_operand(FILE *stream, rtx x, int code)
    Print a memory address as an operand to reference that memory location. */
 
 void
-qdsp6_print_operand_address(FILE *stream, rtx x)
+qdsp6_print_operand_address(FILE *stream, const_rtx x)
 {
   switch(GET_CODE (x)){
     case REG:
@@ -5167,10 +4886,6 @@ qdsp6_print_operand_address(FILE *stream, rtx x)
 /*----------------------
 Miscellaneous Parameters
 ----------------------*/
-
-#if GCC_3_4_6
-#define dump_file rtl_dump_file
-#endif /* GCC_3_4_6 */
 
 static void
 qdsp6_fixup_cfg(void)
@@ -5502,11 +5217,6 @@ qdsp6_machine_dependent_reorg(void)
 
 
 
-#if GCC_3_4_6
-#define def_builtin(NAME, TYPE, CODE) \
-  builtin_function(NAME, TYPE, END_BUILTINS + 1 + CODE, BUILT_IN_MD, NULL, \
-                   NULL_TREE)
-#else /* !GCC_3_4_6 */
 #define def_builtin(NAME, TYPE, CODE) \
   do { \
     tree t; \
@@ -5527,7 +5237,6 @@ qdsp6_machine_dependent_reorg(void)
       qdsp6_builtin_mask_for_load = t; \
     } \
   } while (0);
-#endif /* !GCC_3_4_6 */
 
 #define PTR_type_node ptr_type_node
 #define BI_type_node boolean_type_node
@@ -5899,9 +5608,7 @@ qdsp6_init_builtins(void)
 #undef BUILTIN_INFO
 #undef BUILTIN_INFO_NONCONST
 
-#if !GCC_3_4_6
   gcc_assert(qdsp6_builtin_mask_for_load);
-#endif /* !GCC_3_4_6 */
 }
 
 
@@ -6126,7 +5833,7 @@ qdsp6_invalid_within_doloop(const_rtx insn)
    (set (pc) (...)) */
 
 static void
-qdsp6_print_jump(FILE *stream, rtx x)
+qdsp6_print_jump(FILE *stream, const_rtx x)
 {
   /* (set (pc) (if_then_else (...) (...) (...))) */
   if(x && GET_CODE (x) == SET
@@ -6180,7 +5887,7 @@ qdsp6_print_jump(FILE *stream, rtx x)
    (set (...) (...)) */
 
 static void
-qdsp6_print_transfer(FILE *stream, rtx x)
+qdsp6_print_transfer(FILE *stream, const_rtx x)
 {
   if(!x){
     qdsp6_print_rtx(stream, x);
@@ -6301,7 +6008,7 @@ qdsp6_print_transfer(FILE *stream, rtx x)
 /* Helper function for qdsp6_print_rtl_pseudo_asm */
 
 static void
-qdsp6_print_condition(FILE *stream, rtx x, bool non_inverted)
+qdsp6_print_condition(FILE *stream, const_rtx x, bool non_inverted)
 {
   fputs("if (", stream);
   if(!x){
@@ -6403,7 +6110,7 @@ qdsp6_print_condition(FILE *stream, rtx x, bool non_inverted)
 /* Helper function for qdsp6_print_rtl_pseudo_asm */
 
 static void
-qdsp6_print_address(FILE *stream, rtx x)
+qdsp6_print_address(FILE *stream, const_rtx x)
 {
   /* (plus (...) (...)) */
   if(x && GET_CODE (x) == PLUS){
@@ -6424,7 +6131,7 @@ qdsp6_print_address(FILE *stream, rtx x)
    (op (...)) */
 
 static void
-qdsp6_print_unary_op(FILE *stream, const char *op, rtx x)
+qdsp6_print_unary_op(FILE *stream, const char *op, const_rtx x)
 {
   fputs(op, stream);
   fputc('(', stream);
@@ -6440,7 +6147,7 @@ qdsp6_print_unary_op(FILE *stream, const char *op, rtx x)
    (op (...) (...)) */
 
 static void
-qdsp6_print_binary_op(FILE *stream, const char *op, rtx x)
+qdsp6_print_binary_op(FILE *stream, const char *op, const_rtx x)
 {
   fputs(op, stream);
   fputc('(', stream);
@@ -6458,7 +6165,7 @@ qdsp6_print_binary_op(FILE *stream, const char *op, rtx x)
    (op (...) (...)) */
 
 static void
-qdsp6_print_swapped_binary_op(FILE *stream, const char *op, rtx x)
+qdsp6_print_swapped_binary_op(FILE *stream, const char *op, const_rtx x)
 {
   fputs(op, stream);
   fputc('(', stream);
@@ -6480,7 +6187,7 @@ qdsp6_print_binary_op_with_option(
   FILE *stream,
   const char *op,
   const char *option,
-  rtx x
+  const_rtx x
 )
 {
   fputs(op, stream);
@@ -6500,7 +6207,7 @@ qdsp6_print_binary_op_with_option(
    (op (...) (...) (...)) */
 
 static void
-qdsp6_print_trinary_op(FILE *stream, const char *op, rtx x)
+qdsp6_print_trinary_op(FILE *stream, const char *op, const_rtx x)
 {
   fputs(op, stream);
   fputc('(', stream);
@@ -6525,7 +6232,7 @@ qdsp6_print_vecexp(
   const char *open,
   const char *separator,
   const char *close,
-  rtx x
+  const_rtx x
 )
 {
   int i;
@@ -6545,7 +6252,7 @@ qdsp6_print_vecexp(
 /* Helper function for qdsp6_print_rtl_pseudo_asm */
 
 static void
-qdsp6_print_rtx(FILE *stream, rtx x)
+qdsp6_print_rtx(FILE *stream, const_rtx x)
 {
   const char *op;
   int i;
@@ -6587,12 +6294,12 @@ qdsp6_print_rtx(FILE *stream, rtx x)
         fputs(".new", stream);
       }
       else {
-        fprintf(stream, "unspec" HOST_WIDE_INT_PRINT_DEC, XINT (x, 1));
+        fprintf(stream, "unspec%d", XINT (x, 1));
         qdsp6_print_vecexp(stream, "(", ",", ")", x);
       }
       break;
     case UNSPEC_VOLATILE:
-      fprintf(stream, "unspec_volatile" HOST_WIDE_INT_PRINT_DEC, XINT (x, 1));
+      fprintf(stream, "unspec_volatile%d", XINT (x, 1));
       qdsp6_print_vecexp(stream, "(", ",", ")", x);
       break;
     case PREFETCH:
@@ -7039,7 +6746,7 @@ qdsp6_print_rtx(FILE *stream, rtx x)
 /* Implements hook TARGET_PRINT_RTL_PSEUDO_ASM */
 
 void
-qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x)
+qdsp6_print_rtl_pseudo_asm(FILE *stream, const_rtx x)
 {
   if(x && INSN_P (x)){
     qdsp6_print_rtx(stream, PATTERN (x));
@@ -7048,477 +6755,6 @@ qdsp6_print_rtl_pseudo_asm(FILE *stream, rtx x)
     qdsp6_print_rtx(stream, x);
   }
 }
-
-
-
-
-/*----------------------------
-Machine Description Predicates
-----------------------------*/
-
-#if GCC_3_4_6
-/*-------
-Registers
--------*/
-
-/* general purpose register */
-
-int
-gr_register_operand(rtx op, enum machine_mode mode)
-{
-  unsigned int regno;
-  if(!register_operand(op, mode)){
-    return false;
-  }
-  if(GET_CODE (op) == SUBREG){
-    op = SUBREG_REG (op);
-    /* Paradoxical SUBREGs where the smaller mode is BI are causing problems.
-       Try disallowing them here. */
-    if(GET_MODE (op) == BImode){
-      return false;
-    }
-  }
-  /* ??? Allow (subreg (mem))? */
-  if(!REG_P (op)){
-    return false;
-  }
-  regno = REGNO (op);
-  return G_REGNO_P (regno)
-         || regno == FRAME_POINTER_REGNUM
-         || regno == ARG_POINTER_REGNUM
-         || regno >= FIRST_PSEUDO_REGISTER;
-}
-
-
-
-
-/* predicate register */
-
-int
-pr_register_operand(rtx op, enum machine_mode mode)
-{
-  unsigned int regno;
-  if(!register_operand(op, mode)){
-    return false;
-  }
-  if(GET_CODE (op) == SUBREG){
-    op = SUBREG_REG (op);
-  }
-  /* ??? Allow (subreg (mem))? */
-  if(!REG_P (op)){
-    return false;
-  }
-  regno = REGNO (op);
-  return P_REGNO_P (regno) || regno >= FIRST_PSEUDO_REGISTER;
-}
-
-
-
-
-/* non-general purpose register */
-
-int
-nongr_register_operand(rtx op, enum machine_mode mode)
-{
-  if(!register_operand(op, mode)){
-    return false;
-  }
-  if(GET_CODE (op) == SUBREG){
-    op = SUBREG_REG (op);
-  }
-  /* ??? Allow (subreg (mem))? */
-  return REG_P (op) && !G_REG_P (op);
-}
-
-
-
-
-/* vector suitable for splatting */
-
-int
-splattable_vector(rtx op, enum machine_mode mode)
-{
-  int i;
-  if(!gr_register_operand(op, mode)){
-    return false;
-  }
-  for(i = 1; i < GET_MODE_NUNITS (mode); i++){
-    if(!rtx_equal_p(XVECEXP (op, 0, i), XVECEXP (op, 0, 0))){
-      return false;
-    }
-  }
-  return true;
-}
-
-
-
-
-/*---------------
-Memory/References
----------------*/
-
-/* memory with address in register */
-
-int
-indirect_memory_operand(rtx op, enum machine_mode mode)
-{
-  return memory_operand(op, mode) && REG_P (XEXP (op, 0));
-}
-
-
-
-
-/* call target */
-
-int
-call_target_operand(rtx op, enum machine_mode mode)
-{
-  return GET_CODE (op) == SYMBOL_REF || register_operand(op, mode);
-}
-
-
-
-
-/* small data reference */
-
-int
-sdata_symbolic_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  HOST_WIDE_INT offset = 0, size = 0;
-  tree t;
-  switch(GET_CODE (op)){
-    case CONST:
-      op = XEXP (op, 0);
-      if(!(GET_CODE (op) == PLUS
-           && GET_CODE (XEXP (op, 0)) == SYMBOL_REF
-           && GET_CODE (XEXP (op, 1)) == CONST_INT)){
-        return false;
-      }
-      offset = INTVAL (XEXP (op, 1));
-      op = XEXP (op, 0);
-      /* FALL THROUGH */
-    case SYMBOL_REF:
-      if(CONSTANT_POOL_ADDRESS_P (op)){
-        size = GET_MODE_SIZE (get_pool_mode(op));
-        if((unsigned HOST_WIDE_INT) size > g_switch_value){
-          return false;
-        }
-      }
-      else {
-        if(!SYMBOL_REF_SMALL_P (op)){
-          return false;
-        }
-        t = SYMBOL_REF_DECL (op);
-        if(DECL_P (t)){
-          t = DECL_SIZE_UNIT (t);
-        }
-        else {
-          t = TYPE_SIZE_UNIT (TREE_TYPE (t));
-        }
-        if(t && host_integerp(t, 0)){
-          size = tree_low_cst(t, 0);
-          if(size < 0){
-            size = 0;
-          }
-        }
-      }
-      return offset >= 0 && offset <= size;
-    default:
-      return false;
-  }
-}
-
-
-
-
-/*-------
-Constants
--------*/
-
-/* s16 constant */
-
-int
-s16_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), -32768, 32767);
-}
-
-
-
-
-/* s12 constant */
-
-int
-s12_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), -2048, 2047);
-}
-
-
-
-
-/* s10 constant */
-
-int
-s10_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), -512, 511);
-}
-
-
-
-
-/* s8 constant */
-
-int
-s8_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), -128, 127);
-}
-
-
-
-/* u9 constant */
-
-int
-u9_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), 0, 511);
-}
-
-
-
-
-/* u8 constant */
-
-int
-u8_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), 0, 255);
-}
-
-
-
-
-/* u7 constant */
-
-int
-u7_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), 0, 127);
-}
-
-
-
-
-/* u6 constant */
-
-int
-u6_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), 0, 63);
-}
-
-
-
-
-/* u5 constant */
-
-int
-u5_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), 0, 31);
-}
-
-
-
-
-/* u3 constant */
-
-int
-u3_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), 0, 7);
-}
-
-
-
-
-/* u2 constant */
-
-int
-u2_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), 0, 3);
-}
-
-
-
-
-/* u1 constant */
-
-int
-u1_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), 0, 1);
-}
-
-
-
-
-/* u0 constant */
-
-int
-zero_constant(rtx op, enum machine_mode mode)
-{
-  return op == CONST0_RTX (mode);
-}
-
-
-
-
-/* m9 signed magnitude constant */
-
-int
-m9_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && IN_RANGE (INTVAL (op), -255, 255);
-}
-
-
-
-
-/* constant == 2^N where N is an integer */
-
-int
-power_of_two_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && exact_log2(INTVAL (op)) != -1;
-}
-
-
-
-
-/* constant == 2^N where N is an element of {0, 1, 2, 3, 4, 5, 6, 7} */
-
-int
-addasl_const_int_operand(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == CONST_INT && (   INTVAL (op) == (1 << 0)
-                                        || INTVAL (op) == (1 << 1)
-                                        || INTVAL (op) == (1 << 2)
-                                        || INTVAL (op) == (1 << 3)
-                                        || INTVAL (op) == (1 << 4)
-                                        || INTVAL (op) == (1 << 5)
-                                        || INTVAL (op) == (1 << 6)
-                                        || INTVAL (op) == (1 << 7));
-}
-
-
-
-
-/* constant that might not fit in s16 */
-
-int
-immediate_not_s16_operand(rtx op, enum machine_mode mode)
-{
-  switch(GET_CODE (op)){
-    case CONST_INT:
-    case CONST_DOUBLE:
-    case CONST_VECTOR:
-    case CONST:
-    case LABEL_REF:
-    case SYMBOL_REF:
-      return immediate_operand(op, mode) && !s16_const_int_operand(op, mode);
-    default:
-      return false;
-  }
-}
-
-
-
-
-/*-----------------
-Memory or Registers
------------------*/
-
-/* non-general purpose register or memory */
-
-int
-nongr_reg_or_memory_operand(rtx op, enum machine_mode mode)
-{
-  return nongr_register_operand(op, mode) || memory_operand(op, mode);
-}
-
-
-
-
-/* conditional move destination */
-
-int
-conditional_dest_operand(rtx op, enum machine_mode mode)
-{
-  return !reload_completed ? nonimmediate_operand(op, mode)
-                           : (memory_operand(op, mode)
-                              && qdsp6_legitimate_address_p(GET_MODE (op),
-                                                            XEXP (op, 0),
-                                                            true, "cond"))
-                             || gr_register_operand(op, mode);
-}
-
-
-
-
-/*--------------------
-Registers or Constants
---------------------*/
-
-/* conditional add operand */
-
-int
-conditional_add_operand(rtx op, enum machine_mode mode)
-{
-  return !reload_completed ? nonmemory_operand(op, mode)
-                           : gr_register_operand(op, mode)
-                             || s8_const_int_operand(op, mode);
-}
-
-
-
-
-/*-----
-General
------*/
-
-/* conditional move source */
-
-int
-conditional_src_operand(rtx op, enum machine_mode mode)
-{
-  return !reload_completed ? general_operand(op, mode)
-                           : (memory_operand(op, mode)
-                              && qdsp6_legitimate_address_p(GET_MODE (op),
-                                                            XEXP (op, 0),
-                                                            true, "cond"))
-                             || gr_register_operand(op, mode)
-                             || s12_const_int_operand(op, mode);
-}
-
-
-
-
-/*-------
-Operators
--------*/
-
-/* operator used for predication */
-
-int
-predicate_operator(rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return GET_CODE (op) == NE || GET_CODE (op) == EQ;
-}
-#endif /* GCC_3_4_6 */
 
 
 
@@ -8598,6 +7834,21 @@ qdsp6_print_packets(FILE *file, struct qdsp6_packet_info *packet)
 
 
 
+void 
+qdsp6_print_all_packets(void)
+{
+  basic_block bb;
+  FOR_EACH_BB(bb)
+  {
+    struct qdsp6_packet_info *packet;
+    packet = BB_HEAD_PACKET(bb);
+    qdsp6_print_packets(stdout, packet);
+  }
+}
+
+
+
+
 void
 qdsp6_debug_packet(struct qdsp6_packet_info *packet)
 {
@@ -8629,19 +7880,25 @@ qdsp6_print_bb_packets(FILE *file, basic_block bb)
 }
 
 
-void qdsp6_debug_all_bb_packets() 
+
+
+void
+qdsp6_debug_bb_packets(basic_block bb)
+{
+  qdsp6_print_bb_packets(stderr, bb);
+}
+
+
+
+
+void
+qdsp6_debug_all_bb_packets(void)
 {
   basic_block bb;
 
   FOR_EACH_BB (bb){
    qdsp6_debug_bb_packets(bb);
   }
-}
-
-void
-qdsp6_debug_bb_packets(basic_block bb)
-{
-  qdsp6_print_bb_packets(stderr, bb);
 }
 
 
@@ -11765,17 +11022,8 @@ qdsp6_remove_empty_packets(
   packet->next->prev = packet->prev;
 }
 
-static void 
-qdsp6_print_all_packets(void)
-{
-  basic_block bb;
-  FOR_EACH_BB(bb)
-  {
-    struct qdsp6_packet_info *packet;
-    packet = BB_HEAD_PACKET(bb);
-    qdsp6_print_packets(stdout, packet);
-  }
-}
+
+
 
 static void
 qdsp6_packet_optimizations(void)

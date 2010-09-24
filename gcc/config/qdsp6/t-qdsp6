@@ -27,5 +27,3 @@ MULTILIB_DIRNAMES   = v3 v4 G0
 MULTILIB_MATCHES    =
 MULTILIB_EXCEPTIONS =
 MULTILIB_EXTRA_OPTS = mbuilding-multilib
-
-gt-qdsp6.h: s-gtype ; @true
