@@ -1639,7 +1639,7 @@ follow_ssa_edge (struct loop *loop, gimple def, gimple halting_phi,
 	 the halting_phi to itself in the loop.  */
       if (def == halting_phi)
 	return t_true;
-	else if(!TARGET_DISABLE_DEEP_PHI_MATCH &&
+	else if(TARGET_DEEP_PHI_MATCH &&
             analyze_possible_phi_aliasing(loop, def, 
 	         halting_phi, evolution_of_loop, limit))	
 		return t_true; 

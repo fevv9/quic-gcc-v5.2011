@@ -59,7 +59,6 @@
    (UNSPEC_MULDI_1         110)   ; First part of a muldi
    (UNSPEC_MULDI_2         111)   ; second part of a muldi
    (UNSPEC_NOP             112)   ; nop for appeasing Combine
-   (UNSPEC_SET_R_p         113)   ; general register = predicate register
    (UNSPEC_NEW_VALUE       114)   ; R.new
    (UNSPEC_MOVSI_CONST32   115)   ; const32 a + b
    (UNSPEC_QDSP6_vcmpb_eq  150)
@@ -547,51 +546,29 @@
 )
 
 (define_insn "movbi_real"
-  [(set (match_operand:BI 0 "nonimmediate_operand" "=Rp,  Rp,Rp,?*Rg,?Rp,*Rg, ?*Rg,?*Rg,?*Rg,?*Anoext,?*m,?*Rg")
+  [(set (match_operand:BI 0 "nonimmediate_operand" "=Rp,  Rp,Rp,?*Rg,?Rp,*Rg, ?*Rg,   ?*Rg,?*Rg,?*Anoext,?*m,?*Rg")
         (match_operand:BI 1 "general_operand"      "Iu0,Iu01,Rp,  Rp,*Rg,*Rg,*Adm3,*Anoext,  *m,     *Rg,*Rg,Iu01"))]
   "!(memory_operand(operands[0], BImode)
      && immediate_operand(operands[1], BImode))"
-  {
-    switch(which_alternative){
-      case 0:
-        return "%0 = cmp.gt(r0,r0)";
-      case 1:
-        return "%0 = cmp.eq(r0,r0)";
-      case 2:
-        return "%0 = or(%1,%1) //pred=pred(BI)";
-      case 3:
-        if(TARGET_V2_FEATURES){
-          return "%0 = mux(%1,#1,#0) //reg=pred(BI)";
-        }
-        else {
-          return "#";
-        }
-      case 4:
-        return "%0 = tstbit(%1,#0) //pred=reg(BI)";
-      case 5:
-        return "%0 = %1 //reg=reg(BI)";
-      case 6:
-        return "%0 = memub(%1) //load(BI)";
-      case 7:
-        return "%0 = memub(%1) //load(BI)";
-      case 8:
-        return "%0 = memub(%E1) //load(BI)";
-      case 9:
-        return "memb(%0) = %1 //store(BI)";
-      case 10:
-        return "memb(%E0) = %1 //store(BI)";
-      case 11:
-        return "%0 = #%1";
-      default:
-        gcc_unreachable();
-    }
-  }
+  "@
+   %0 = cmp.gt(r0,r0)
+   %0 = cmp.eq(r0,r0)
+   %0 = or(%1,%1) //pred=pred(BI)
+   %0 = mux(%1,#1,#0) //reg=pred(BI)
+   %0 = tstbit(%1,#0) //pred=reg(BI)
+   %0 = %1 //reg=reg(BI)
+   %0 = memub(%1) //load(BI)
+   %0 = memub(%1) //load(BI)
+   %0 = memub(%E1) //load(BI)
+   memb(%0) = %1 //store(BI)
+   memb(%E0) = %1 //store(BI)
+   %0 = #%1"
   [(set_attr "type" "A,A,S,A,S,A,Load,Load,ELoad,Store,EStore,A")
    (set_attr "duplex" "no,no,no,no,no,no,yes,no,no,no,no,no")]
 )
 
 (define_insn "movbi_new_value"
-  [(set (match_operand:BI 0 "memory_operand"             "=Anoext,m")
+  [(set (match_operand:BI 0 "memory_operand"             "=Anoext, m")
         (unspec:BI [(match_operand:BI 1 "gr_register_operand" "Rg,Rg")]
                    UNSPEC_NEW_VALUE))]
   "TARGET_V4_FEATURES"
@@ -599,27 +576,6 @@
    memb(%0) = %1.new //store(BI)
    memb(%E0) = %1.new //store(BI)"
   [(set_attr "type" "NewValue,ENewValue")]
-)
-
-(define_split
-  [(set (match_operand:BI 0 "gr_register_operand" "")
-        (match_operand:BI 1 "pr_register_operand" ""))]
-  "!TARGET_V2_FEATURES && reload_completed"
-  [(set (match_dup 0) (unspec:BI [(match_dup 1)] UNSPEC_SET_R_p))
-   (set (match_dup 2) (ashift:SI (match_dup 2) (const_int 31)))
-   (set (match_dup 2) (lshiftrt:SI (match_dup 2) (const_int 31)))]
-  {
-    operands[2] = gen_rtx_REG (SImode, REGNO (operands[0]));
-  }
-)
-
-(define_insn "movbi_unspec_set_r_p"
-  [(set (match_operand:BI 0 "gr_register_operand"            "=Rg")
-        (unspec:BI [(match_operand:BI 1 "pr_register_operand" "Rp")]
-                   UNSPEC_SET_R_p))]
-  "!TARGET_V2_FEATURES"
-  "%0 = %1 //reg=pred(BI)"
-  [(set_attr "type" "S")]
 )
 
 ;;-------;;
@@ -659,8 +615,8 @@
 )
 
 (define_insn "movqi_real_v4"
-  [(set (match_operand:QI 0 "nonimmediate_operand_with_GP" "=Rg,  Rg,     Rg,Rg,Adm4,Asi,Asi,Adm4,Anoext, m, Rg,  Rg,?Rg,?*Rp")
-        (match_operand:QI 1 "GP_or_reg_operand"             "Rg,Adm3, Anoext, m, Iu1,Is8,  i,  Rg,    Rg,Rg,Iu6,Is16,*Rp,  Rg"))]
+  [(set (match_operand:QI 0 "nonimmediate_operand_with_GP" "=Rg,  Rg,    Rg,Rg,Adm4,Asi,Asi,Adm4,Anoext, m, Rg,  Rg,?Rg,?*Rp")
+        (match_operand:QI 1 "GP_or_reg_operand"             "Rg,Adm3,Anoext, m, Iu1,Is8,  i,  Rg,    Rg,Rg,Iu6,Is16,*Rp,  Rg"))]
   "TARGET_V4_FEATURES
    && (!memory_operand(operands[0], QImode)
        || gr_register_operand(operands[1], QImode)
@@ -988,10 +944,10 @@
 )
 
 (define_insn "movsi_const32"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"         "=Rg")
         (unspec:SI [(match_operand:SI 1 "GP_or_reg_operand" "i")
                     (match_operand:SI 2 "nonmemory_operand" "i")] UNSPEC_MOVSI_CONST32))]
-  "TARGET_V2_FEATURES"
+  ""
   "%0 = CONST32(%1 + %2)"
   [(set_attr "type" "Load")]
 )
@@ -1049,10 +1005,10 @@
 (define_insn "cond_movsi"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"         "Rp,   Rp,    Rp,  Rp,  Rp,   Rp,    Rp,  Rp,Rp, Rp")
+       [(match_operand:BI 3 "pr_register_operand"         "Rp,   Rp,    Rp,  Rp,  Rp,   Rp,    Rp,  Rp,  Rp,Rp")
         (const_int 0)])
-     (set (match_operand:SI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg, Acsi, Acsi,Acond,Aecond,  Rg,   Rg,   Rg")
-          (match_operand:SI 1 "conditional_src_operand"   "Rg,Acond,Aecond,  Is6,    i,   Rg,    Rg,  Iu00, Is12,    i")))]
+     (set (match_operand:SI 0 "conditional_dest_operand" "=Rg,   Rg,    Rg,Acsi,Acsi,Acond,Aecond,  Rg,  Rg,Rg")
+          (match_operand:SI 1 "conditional_src_operand"   "Rg,Acond,Aecond, Is6,   i,   Rg,    Rg,Iu00,Is12, i")))]
   "!memory_operand(operands[0], SImode)
    || gr_register_operand(operands[1], SImode)
    || (TARGET_V4_FEATURES
@@ -1159,10 +1115,9 @@
 (define_split
   [(set (match_operand:DI 0 "gr_register_operand" "")
         (match_operand:DI 1 "immediate_operand" ""))]
-  "!(((TARGET_V2_FEATURES && GET_CODE (operands[1]) == CONST_INT
-       && CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'K', \"Ks8s8\"))
-      || TARGET_CONST64)
-     || operands[1] == const0_rtx)
+  "!((GET_CODE (operands[1]) == CONST_INT
+      && CONST_OK_FOR_CONSTRAINT_P (INTVAL (operands[1]), 'K', \"Ks8s8\"))
+     || TARGET_CONST64)
    && reload_completed"
   [(set (match_dup 2) (match_dup 4))
    (set (match_dup 3) (match_dup 5))]
@@ -1785,7 +1740,7 @@
   [(set (match_operand:DI 0 "gr_register_operand"        "=&Rg")
         (mult:DI (match_operand:DI 1 "gr_register_operand" "Rg")
                  (match_operand:DI 2 "gr_register_operand" "Rg")))]
-  "TARGET_V2_FEATURES"
+  ""
   "#"
   "reload_completed"
   [
@@ -1799,7 +1754,7 @@
   [(set (match_operand:DI 0 "gr_register_operand"            "=Rg")
         (unspec:DI [(match_operand:DI 1 "gr_register_operand" "Rg")
                     (match_operand:DI 2 "gr_register_operand" "Rg")] UNSPEC_MULDI_1))]
-  "TARGET_V2_FEATURES"
+  ""
   "%P0 = mpyu(%L1,%L2)"
   [(set_attr "type" "M")]
 )
@@ -1809,7 +1764,7 @@
         (unspec:DI [(match_operand:DI 1 "gr_register_operand" "Rg")
                     (match_operand:DI 2 "gr_register_operand" "Rg")
                     (match_operand:DI 3 "gr_register_operand"  "0")] UNSPEC_MULDI_2))]
-  "TARGET_V2_FEATURES"
+  ""
   "%H0 += mpyi(%L1,%H2)"
   [(set_attr "type" "M")]
 )
@@ -2120,7 +2075,7 @@
      (set (match_operand:SI 0 "gr_register_operand"        "=Rg")
           (xor:SI (match_operand:SI 1 "gr_register_operand" "Rg")
                   (match_operand:SI 2 "gr_register_operand" "Rg"))))]
-  "TARGET_V2_FEATURES"
+  ""
   "if (%C3) %0 = xor(%1,%2)"
   [(set_attr "type" "A")]
 )
@@ -2638,7 +2593,7 @@
 (define_insn "ctzsi2"
   [(set (match_operand:SI 0 "gr_register_operand"        "=Rg")
         (ctz:SI (match_operand:SI 1 "gr_register_operand" "Rg")))]
-  "TARGET_V2_FEATURES"
+  ""
   "%0 = ct0(%1)"
   [(set_attr "type" "S")]
 )
@@ -3332,7 +3287,7 @@
 )
 ;; short -> int
 (define_insn "zero_extendhisi2"
-  [(set (match_operand:SI 0 "gr_register_operand"                         "=Rg,  Rg,     Rg,Rg")
+  [(set (match_operand:SI 0 "gr_register_operand"                         "=Rg,  Rg,    Rg,Rg")
         (zero_extend:SI (match_operand:HI 1 "nonimmediate_operand_with_GP" "Rg,Adm3,Anoext, m")))]
   ""
   "@
@@ -3424,16 +3379,7 @@
                          (match_operand:SI 3 "nonmemory_operand" "")))]
   ""
   {
-    rtx reg;
     operands[1] = qdsp6_expand_compare(GET_CODE (operands[1]));
-    if(!TARGET_V2_FEATURES && !reload_completed){
-      reg = gen_reg_rtx(SImode);
-      emit_move_insn(reg, operands[2]);
-      operands[2] = reg;
-      reg = gen_reg_rtx(SImode);
-      emit_move_insn(reg, operands[3]);
-      operands[3] = reg;
-    }
   }
 )
 
@@ -3830,7 +3776,6 @@
                       (pc)))]
   ""
   {
-    rtx prediction;
     if(get_attr_length(insn) == 4){
       operands[3] = qdsp6_branch_hint(insn);
       return "if (%C0) jump%h3 %l2";
@@ -3952,148 +3897,6 @@
 ;;----------------;;
 ;; cbranch{mode}4 ;;
 ;;----------------;;
-
-(define_insn "cbranchsi4"
-  [(set (pc)
-        (if_then_else (match_operator:SI 0 "comparison_operator"
-                        [(match_operand:SI 1 "nonmemory_operand" "Rg,Rg")
-                         (match_operand:SI 2 "nonmemory_operand"  "i,Rg")])
-                      (label_ref (match_operand 3 "" ""))
-                      (pc)))
-   (clobber (match_scratch:BI 4 "=Rp,Rp"))]
-  "TARGET_COMPRESSED"
-  {
-    rtx op0 = operands[1];
-    rtx op1 = operands[2];
-    enum rtx_code code = GET_CODE (operands[0]), compare_code, jump_code;
-    int offset = 0;
-    bool swap = false;
-
-    if(REG_P (op1) || GET_CODE (op1) == SUBREG){
-      switch(code){
-        case EQ:
-          compare_code = EQ; jump_code = NE; break;
-        case NE:
-          compare_code = EQ; jump_code = EQ; break;
-
-        /* Signed compares */
-        case LT:
-          compare_code = GT; jump_code = NE; swap = true; break;
-        case LE:
-          compare_code = GT; jump_code = EQ; break;
-        case GT:
-          compare_code = GT; jump_code = NE; break;
-        case GE:
-          compare_code = GT; jump_code = EQ; swap = true; break;
-
-        /* Unsigned compares */
-        case LTU:
-          compare_code = GTU; jump_code = NE; swap = true; break;
-        case LEU:
-          compare_code = GTU; jump_code = EQ; break;
-        case GTU:
-          compare_code = GTU; jump_code = NE; break;
-        case GEU:
-          compare_code = GTU; jump_code = EQ; swap = true; break;
-
-        default:
-          gcc_unreachable();
-      }
-
-      if(swap){
-        op0 = operands[2];
-        op1 = operands[1];
-      }
-    }
-    else {
-      switch(code){
-        case EQ:
-          compare_code = EQ; jump_code = NE; break;
-        case NE:
-          compare_code = EQ; jump_code = EQ; break;
-
-        /* Signed compares */
-        case LT:
-          compare_code = GT; jump_code = EQ; offset = -1; break;
-        case LE:
-          compare_code = GT; jump_code = EQ; break;
-        case GT:
-          compare_code = GT; jump_code = NE; break;
-        case GE:
-          compare_code = GT; jump_code = NE; offset = -1; break;
-
-        /* Unsigned compares */
-        case LTU:
-          compare_code = GTU; jump_code = EQ; offset = -1; break;
-        case LEU:
-          compare_code = GTU; jump_code = EQ; break;
-        case GTU:
-          compare_code = GTU; jump_code = NE; break;
-        case GEU:
-          compare_code = GTU; jump_code = NE; offset = -1; break;
-
-        default:
-          gcc_unreachable();
-      }
-
-      if(offset != 0){
-        op1 = plus_constant(op1, offset);
-      }
-    }
-
-    operands[1] = op0;
-    operands[2] = op1;
-
-    if(GET_CODE (op1) == CONST_INT
-       && INTVAL (op1) >= (compare_code == GTU ? 0 : -512)
-       && INTVAL (op1) <= 511){
-      switch(compare_code){
-        case EQ:
-          return jump_code == NE ? "{ %4 = cmp.eq(%1,#%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.eq(%1,#%2); if (!%4.new) jump:nt %l3 }";
-        case GT:
-          return jump_code == NE ? "{ %4 = cmp.gt(%1,#%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.gt(%1,#%2); if (!%4.new) jump:nt %l3 }";
-        case GTU:
-          return jump_code == NE ? "{ %4 = cmp.gtu(%1,#%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.gtu(%1,#%2); if (!%4.new) jump:nt %l3 }";
-        default:
-          gcc_unreachable();
-      }
-    }
-    else if(CONSTANT_P (op1)){
-      switch(compare_code){
-        case EQ:
-          return jump_code == NE ? "{ %4 = cmp.eq(%1,##%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.eq(%1,##%2); if (!%4.new) jump:nt %l3 }";
-        case GT:
-          return jump_code == NE ? "{ %4 = cmp.gt(%1,##%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.gt(%1,##%2); if (!%4.new) jump:nt %l3 }";
-        case GTU:
-          return jump_code == NE ? "{ %4 = cmp.gtu(%1,##%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.gtu(%1,##%2); if (!%4.new) jump:nt %l3 }";
-        default:
-          gcc_unreachable();
-      }
-    }
-    else {
-      switch(compare_code){
-        case EQ:
-          return jump_code == NE ? "{ %4 = cmp.eq(%1,%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.eq(%1,%2); if (!%4.new) jump:nt %l3 }";
-        case GT:
-          return jump_code == NE ? "{ %4 = cmp.gt(%1,%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.gt(%1,%2); if (!%4.new) jump:nt %l3 }";
-        case GTU:
-          return jump_code == NE ? "{ %4 = cmp.gtu(%1,%2); if (%4.new) jump:nt %l3 }"
-                                 : "{ %4 = cmp.gtu(%1,%2); if (!%4.new) jump:nt %l3 }";
-        default:
-          gcc_unreachable();
-      }
-    }
-  }
-  [(set_attr "type" "multiple")]
-)
 
 
 ;;------;;
@@ -4217,7 +4020,7 @@
     if (flag_unsafe_math_optimizations){
        qdsp6_fast_math_libfunc (operands[1]);
     }
-  }        
+  }
 )
 
 (define_insn "sibcall_value_real"
@@ -4323,41 +4126,6 @@
   }
   [(set_attr "type" "NewValue")
    (set_attr "duplex" "yes")]
-)
-
-(define_insn "cond_dealloc_inverse"
-  [(set (pc)
-        (if_then_else (match_operator:BI 0 "predicate_operator"
-                        [(match_operand:BI 1 "pr_register_operand" "Rp,Rnp")
-                         (const_int 0)])
-                      (pc)
-                      (return)))
-   (cond_exec
-     (match_dup 0)
-     (parallel
-       [(set (reg:SI SP_REGNUM)
-             (plus:SI (reg:SI FP_REGNUM) (const_int 8)))
-        (set (reg:SI LINK_REGNUM)
-             (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
-        (set (reg:SI FP_REGNUM)
-             (mem:SI (reg:SI FP_REGNUM)))]))]
-  "qdsp6_direct_return()"
-  {
-    rtx prediction;
-    if(which_alternative == 0){
-      return "if (%I0) dealloc_return";
-    }
-    else {
-      prediction = find_reg_note (insn, REG_BR_PROB, 0);
-      if(prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2){
-        return "if (%I0) dealloc_return:t";
-      }
-      else {
-        return "if (%I0) dealloc_return:nt";
-      }
-    }
-  }
-  [(set_attr "type" "NewValue")]
 )
 
 
@@ -5066,40 +4834,19 @@
    (set (match_dup 0) (unspec:SI [(match_dup 0)] UNSPEC_NOP))]
 )
 
-(define_insn_and_split "andttbisi3_v2"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (if_then_else:SI
-          (and:BI (match_operand:BI 1 "pr_register_operand" "Rp")
-                  (match_operand:BI 2 "pr_register_operand" "Rp"))
-          (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))]
-  "TARGET_V2_FEATURES"
-  "#"
-  "reload_completed"
-  [(set (match_dup 3) (and:BI (match_dup 1) (match_dup 2)))
-   (set (match_dup 0) (if_then_else:SI (ne:BI (match_dup 3) (const_int 0))
-                                       (const_int 1) (const_int 0)))]
-  ""
-  [(set_attr "type" "multiple")]
-)
-
 (define_insn_and_split "andttbisi3"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
         (if_then_else:SI
           (and:BI (match_operand:BI 1 "pr_register_operand" "Rp")
                   (match_operand:BI 2 "pr_register_operand" "Rp"))
           (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))
-   (clobber (match_scratch:SI 4 "=Rg"))
-   (clobber (match_scratch:SI 5 "=Rg"))]
+   (clobber (match_scratch:BI 3 "=Rp"))]
   ""
   "#"
   "reload_completed"
-  [(set (match_dup 4) (const_int 1))
-   (set (match_dup 5) (const_int 0))
-   (set (match_dup 3) (and:BI (match_dup 1) (match_dup 2)))
+  [(set (match_dup 3) (and:BI (match_dup 1) (match_dup 2)))
    (set (match_dup 0) (if_then_else:SI (ne:BI (match_dup 3) (const_int 0))
-                                       (match_dup 4) (match_dup 5)))]
+                                       (const_int 1) (const_int 0)))]
   ""
   [(set_attr "type" "multiple")]
 )
@@ -5165,40 +4912,19 @@
    (set (match_dup 0) (unspec:SI [(match_dup 0)] UNSPEC_NOP))]
 )
 
-(define_insn_and_split "andtfbisi3_v2"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (if_then_else:SI
-          (and:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
-                  (match_operand:BI 2 "pr_register_operand" "Rp"))
-          (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))]
-  "TARGET_V2_FEATURES"
-  "#"
-  "reload_completed"
-  [(set (match_dup 3) (and:BI (not:BI (match_dup 1)) (match_dup 2)))
-   (set (match_dup 0) (if_then_else:SI (ne:BI (match_dup 3) (const_int 0))
-                                       (const_int 1) (const_int 0)))]
-  ""
-  [(set_attr "type" "multiple")]
-)
-
 (define_insn_and_split "andtfbisi3"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
         (if_then_else:SI
           (and:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
                   (match_operand:BI 2 "pr_register_operand" "Rp"))
           (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))
-   (clobber (match_scratch:SI 4 "=Rg"))
-   (clobber (match_scratch:SI 5 "=Rg"))]
+   (clobber (match_scratch:BI 3 "=Rp"))]
   ""
   "#"
   "reload_completed"
-  [(set (match_dup 4) (const_int 1))
-   (set (match_dup 5) (const_int 0))
-   (set (match_dup 3) (and:BI (not:BI (match_dup 1)) (match_dup 2)))
+  [(set (match_dup 3) (and:BI (not:BI (match_dup 1)) (match_dup 2)))
    (set (match_dup 0) (if_then_else:SI (ne:BI (match_dup 3) (const_int 0))
-                                       (match_dup 4) (match_dup 5)))]
+                                       (const_int 1) (const_int 0)))]
   ""
   [(set_attr "type" "multiple")]
 )
@@ -5226,23 +4952,8 @@
                        (match_operand:BI 2 "pr_register_operand" ""))
                (const_int 1) (const_int 0))] UNSPEC_NOP)
           (const_int 0)))]
-  "TARGET_V2_FEATURES"
+  ""
   [(set (match_dup 0) (ior:BI (not:BI (match_dup 2)) (match_dup 1)))]
-  ""
-)
-
-(define_split
-  [(set (match_operand:BI 0 "pr_register_operand" "")
-        (eq:BI
-          (unspec:SI
-            [(if_then_else:SI
-               (and:BI (not:BI (match_operand:BI 1 "pr_register_operand" ""))
-                       (match_operand:BI 2 "pr_register_operand" ""))
-               (const_int 1) (const_int 0))] UNSPEC_NOP)
-          (const_int 0)))]
-  ""
-  [(set (match_dup 0) (and:BI (not:BI (match_dup 1)) (match_dup 2)))
-   (set (match_dup 0) (not:BI (match_dup 0)))]
   ""
 )
 
@@ -5263,40 +4974,19 @@
    (set (match_dup 0) (unspec:SI [(match_dup 0)] UNSPEC_NOP))]
 )
 
-(define_insn_and_split "andffbisi3_v2"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (if_then_else:SI
-          (and:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
-                  (not:BI (match_operand:BI 2 "pr_register_operand" "Rp")))
-          (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))]
-  "TARGET_V2_FEATURES"
-  "#"
-  "reload_completed"
-  [(set (match_dup 3) (ior:BI (match_dup 1) (match_dup 2)))
-   (set (match_dup 0) (if_then_else:SI (eq:BI (match_dup 3) (const_int 0))
-                                       (const_int 1) (const_int 0)))]
-  ""
-  [(set_attr "type" "multiple")]
-)
-
 (define_insn_and_split "andffbisi3"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
         (if_then_else:SI
           (and:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
                   (not:BI (match_operand:BI 2 "pr_register_operand" "Rp")))
           (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))
-   (clobber (match_scratch:SI 4 "=Rg"))
-   (clobber (match_scratch:SI 5 "=Rg"))]
+   (clobber (match_scratch:BI 3 "=Rp"))]
   ""
   "#"
   "reload_completed"
-  [(set (match_dup 4) (const_int 1))
-   (set (match_dup 5) (const_int 0))
-   (set (match_dup 3) (ior:BI (match_dup 1) (match_dup 2)))
+  [(set (match_dup 3) (ior:BI (match_dup 1) (match_dup 2)))
    (set (match_dup 0) (if_then_else:SI (eq:BI (match_dup 3) (const_int 0))
-                                       (match_dup 4) (match_dup 5)))]
+                                       (const_int 1) (const_int 0)))]
   ""
   [(set_attr "type" "multiple")]
 )
@@ -5347,40 +5037,19 @@
    (set (match_dup 0) (unspec:SI [(match_dup 0)] UNSPEC_NOP))]
 )
 
-(define_insn_and_split "iorttbisi3_v2"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (if_then_else:SI
-          (ior:BI (match_operand:BI 1 "pr_register_operand" "Rp")
-                  (match_operand:BI 2 "pr_register_operand" "Rp"))
-          (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))]
-  "TARGET_V2_FEATURES"
-  "#"
-  "reload_completed"
-  [(set (match_dup 3) (ior:BI (match_dup 1) (match_dup 2)))
-   (set (match_dup 0) (if_then_else:SI (ne:BI (match_dup 3) (const_int 0))
-                                       (const_int 1) (const_int 0)))]
-  ""
-  [(set_attr "type" "multiple")]
-)
-
 (define_insn_and_split "iorttbisi3"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
         (if_then_else:SI
           (ior:BI (match_operand:BI 1 "pr_register_operand" "Rp")
                   (match_operand:BI 2 "pr_register_operand" "Rp"))
           (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))
-   (clobber (match_scratch:SI 4 "=Rg"))
-   (clobber (match_scratch:SI 5 "=Rg"))]
+   (clobber (match_scratch:BI 3 "=Rp"))]
   ""
   "#"
   "reload_completed"
-  [(set (match_dup 4) (const_int 1))
-   (set (match_dup 5) (const_int 0))
-   (set (match_dup 3) (ior:BI (match_dup 1) (match_dup 2)))
+  [(set (match_dup 3) (ior:BI (match_dup 1) (match_dup 2)))
    (set (match_dup 0) (if_then_else:SI (ne:BI (match_dup 3) (const_int 0))
-                                       (match_dup 4) (match_dup 5)))]
+                                       (const_int 1) (const_int 0)))]
   ""
   [(set_attr "type" "multiple")]
 )
@@ -5446,14 +5115,14 @@
    (set (match_dup 0) (unspec:SI [(match_dup 0)] UNSPEC_NOP))]
 )
 
-(define_insn_and_split "iortfbisi3_v2"
+(define_insn_and_split "iortfbisi3"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
         (if_then_else:SI
           (ior:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
                   (match_operand:BI 2 "pr_register_operand" "Rp"))
           (const_int 1) (const_int 0)))
    (clobber (match_scratch:BI 3 "=Rp"))]
-  "TARGET_V2_FEATURES"
+  ""
   "#"
   "reload_completed"
   [(set (match_dup 3) (ior:BI (not:BI (match_dup 1)) (match_dup 2)))
@@ -5463,27 +5132,6 @@
   [(set_attr "type" "multiple")]
 )
 
-(define_insn_and_split "iortfbisi3"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (if_then_else:SI
-          (ior:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
-                  (match_operand:BI 2 "pr_register_operand" "Rp"))
-          (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))
-   (clobber (match_scratch:SI 4 "=Rg"))
-   (clobber (match_scratch:SI 5 "=Rg"))]
-  ""
-  "#"
-  "reload_completed"
-  [(set (match_dup 4) (const_int 1))
-   (set (match_dup 5) (const_int 0))
-   (set (match_dup 3) (and:BI (not:BI (match_dup 2)) (match_dup 1)))
-   (set (match_dup 0) (if_then_else:SI (eq:BI (match_dup 3) (const_int 0))
-                                       (match_dup 4) (match_dup 5)))]
-  ""
-  [(set_attr "type" "multiple")]
-)
-
 (define_split
   [(set (match_operand:BI 0 "pr_register_operand" "")
         (ne:BI
@@ -5493,23 +5141,8 @@
                        (match_operand:BI 2 "pr_register_operand" ""))
                (const_int 1) (const_int 0))] UNSPEC_NOP)
           (const_int 0)))]
-  "TARGET_V2_FEATURES"
+  ""
   [(set (match_dup 0) (ior:BI (not:BI (match_dup 1)) (match_dup 2)))]
-  ""
-)
-
-(define_split
-  [(set (match_operand:BI 0 "pr_register_operand" "")
-        (ne:BI
-          (unspec:SI
-            [(if_then_else:SI
-               (ior:BI (not:BI (match_operand:BI 1 "pr_register_operand" ""))
-                       (match_operand:BI 2 "pr_register_operand" ""))
-               (const_int 1) (const_int 0))] UNSPEC_NOP)
-          (const_int 0)))]
-  ""
-  [(set (match_dup 0) (and:BI (not:BI (match_dup 2)) (match_dup 1)))
-   (set (match_dup 0) (not:BI (match_dup 0)))]
   ""
 )
 
@@ -5544,40 +5177,19 @@
    (set (match_dup 0) (unspec:SI [(match_dup 0)] UNSPEC_NOP))]
 )
 
-(define_insn_and_split "iorffbisi3_v2"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (if_then_else:SI
-          (ior:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
-                  (not:BI (match_operand:BI 2 "pr_register_operand" "Rp")))
-          (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))]
-  "TARGET_V2_FEATURES"
-  "#"
-  "reload_completed"
-  [(set (match_dup 3) (and:BI (match_dup 1) (match_dup 2)))
-   (set (match_dup 0) (if_then_else:SI (eq:BI (match_dup 3) (const_int 0))
-                                       (const_int 1) (const_int 0)))]
-  ""
-  [(set_attr "type" "multiple")]
-)
-
 (define_insn_and_split "iorffbisi3"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
         (if_then_else:SI
           (ior:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
                   (not:BI (match_operand:BI 2 "pr_register_operand" "Rp")))
           (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))
-   (clobber (match_scratch:SI 4 "=Rg"))
-   (clobber (match_scratch:SI 5 "=Rg"))]
+   (clobber (match_scratch:BI 3 "=Rp"))]
   ""
   "#"
   "reload_completed"
-  [(set (match_dup 4) (const_int 1))
-   (set (match_dup 5) (const_int 0))
-   (set (match_dup 3) (and:BI (match_dup 1) (match_dup 2)))
+  [(set (match_dup 3) (and:BI (match_dup 1) (match_dup 2)))
    (set (match_dup 0) (if_then_else:SI (eq:BI (match_dup 3) (const_int 0))
-                                       (match_dup 4) (match_dup 5)))]
+                                       (const_int 1) (const_int 0)))]
   ""
   [(set_attr "type" "multiple")]
 )
@@ -5660,40 +5272,19 @@
   ""
 )
 
-(define_insn_and_split "xorttbisi3_v2"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (if_then_else:SI
-          (xor:BI (match_operand:BI 1 "pr_register_operand" "Rp")
-                  (match_operand:BI 2 "pr_register_operand" "Rp"))
-          (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))]
-  "TARGET_V2_FEATURES"
-  "#"
-  "reload_completed"
-  [(set (match_dup 3) (xor:BI (match_dup 1) (match_dup 2)))
-   (set (match_dup 0) (if_then_else:SI (ne:BI (match_dup 3) (const_int 0))
-                                       (const_int 1) (const_int 0)))]
-  ""
-  [(set_attr "type" "multiple")]
-)
-
 (define_insn_and_split "xorttbisi3"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
         (if_then_else:SI
           (xor:BI (match_operand:BI 1 "pr_register_operand" "Rp")
                   (match_operand:BI 2 "pr_register_operand" "Rp"))
           (const_int 1) (const_int 0)))
-   (clobber (match_scratch:BI 3 "=Rp"))
-   (clobber (match_scratch:SI 4 "=Rg"))
-   (clobber (match_scratch:SI 5 "=Rg"))]
+   (clobber (match_scratch:BI 3 "=Rp"))]
   ""
   "#"
   "reload_completed"
-  [(set (match_dup 4) (const_int 1))
-   (set (match_dup 5) (const_int 0))
-   (set (match_dup 3) (xor:BI (match_dup 1) (match_dup 2)))
+  [(set (match_dup 3) (xor:BI (match_dup 1) (match_dup 2)))
    (set (match_dup 0) (if_then_else:SI (ne:BI (match_dup 3) (const_int 0))
-                                       (match_dup 4) (match_dup 5)))]
+                                       (const_int 1) (const_int 0)))]
   ""
   [(set_attr "type" "multiple")]
 )
@@ -5769,36 +5360,17 @@
   ""
 )
 
-(define_insn_and_split "xortfbisi3_v2"
+(define_insn_and_split "xortfbisi3"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
         (eq:SI (match_operand:BI 1 "pr_register_operand" "Rp")
                (match_operand:BI 2 "pr_register_operand" "Rp")))
    (clobber (match_scratch:BI 3 "=Rp"))]
-  "TARGET_V2_FEATURES"
+  ""
   "#"
   "reload_completed"
   [(set (match_dup 3) (xor:BI (match_dup 1) (match_dup 2)))
    (set (match_dup 0) (if_then_else:SI (eq:BI (match_dup 3) (const_int 0))
                                        (const_int 1) (const_int 0)))]
-  ""
-  [(set_attr "type" "multiple")]
-)
-
-(define_insn_and_split "xortfbisi3"
-  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
-        (eq:SI (match_operand:BI 1 "pr_register_operand" "Rp")
-               (match_operand:BI 2 "pr_register_operand" "Rp")))
-   (clobber (match_scratch:BI 3 "=Rp"))
-   (clobber (match_scratch:SI 4 "=Rg"))
-   (clobber (match_scratch:SI 5 "=Rg"))]
-  ""
-  "#"
-  "reload_completed"
-  [(set (match_dup 4) (const_int 1))
-   (set (match_dup 5) (const_int 0))
-   (set (match_dup 3) (xor:BI (match_dup 1) (match_dup 2)))
-   (set (match_dup 0) (if_then_else:SI (eq:BI (match_dup 3) (const_int 0))
-                                       (match_dup 4) (match_dup 5)))]
   ""
   [(set_attr "type" "multiple")]
 )
@@ -6283,7 +5855,7 @@
           (plus:SI (match_operand:SI 1 "gr_register_operand"  "0")
                    (match_operand:SI 2 "gr_register_operand" "Rg"))
           (match_operand:SI 3 "gr_register_operand"          "Rg")))]
-  "TARGET_V2_FEATURES"
+  ""
   "%0 += sub(%2,%3)"
   [(set_attr "type" "X")]
 )
@@ -6296,7 +5868,7 @@
           (match_operand:SI 1 "gr_register_operand"            "0")
           (minus:SI (match_operand:SI 2 "gr_register_operand" "Rg")
                     (match_operand:SI 3 "gr_register_operand" "Rg"))))]
-  "TARGET_V2_FEATURES"
+  ""
   "%0 += sub(%3,%2)"
   [(set_attr "type" "X")]
 )
@@ -7474,7 +7046,7 @@
         (xor:DI (ashift:DI (match_operand:DI 1 "gr_register_operand"   "Rg")
                            (match_operand:SI 2 "u6_const_int_operand" "Iu6"))
                 (match_operand:DI 3 "gr_register_operand"               "0")))]
-  "TARGET_V2_FEATURES"
+  ""
   "%P0 ^= asl(%P1,#%2)"
   [(set_attr "type" "S")]
 )
@@ -7584,7 +7156,7 @@
         (xor:DI (lshiftrt:DI (match_operand:DI 1 "gr_register_operand"   "Rg")
                              (match_operand:SI 2 "u6_const_int_operand" "Iu6"))
                 (match_operand:DI 3 "gr_register_operand"                 "0")))]
-  "TARGET_V2_FEATURES"
+  ""
   "%P0 ^= lsr(%P1,#%2)"
   [(set_attr "type" "S")]
 )
@@ -7821,17 +7393,15 @@
 ;;---------;;
 
 (define_insn "r_cmpsi_eq"
-  [(set (match_operand:SI 0 "gr_register_operand"       "=Rg,Rg,Rg,Rg")
-        (eq:SI (match_operand:SI 1 "gr_register_operand" "Rg,Rg,Rg,Rg")
-               (match_operand:SI 2 "nonmemory_operand"  "Iu2,Is8, i,Rg")))]
+  [(set (match_operand:SI 0 "gr_register_operand"       "=Rg,Rg,Rg")
+        (eq:SI (match_operand:SI 1 "gr_register_operand" "Rg,Rg,Rg")
+               (match_operand:SI 2 "nonmemory_operand"  "Is8, i,Rg")))]
   "TARGET_V4_FEATURES"
   "@
     %0 = cmp.eq(%1,#%2)
-    %0 = cmp.eq(%1,#%2)
     %0 = cmp.eq(%1,##%2)
     %0 = cmp.eq(%1,%2)"
-  [(set_attr "type" "A,A,EA,A")
-   (set_attr "duplex" "no,no,no,no")]
+  [(set_attr "type" "A,EA,A")]
 )
 
 (define_insn "r_cmpsi_ne"
@@ -7999,7 +7569,7 @@
   [(set (match_operand:BI 0 "pr_register_operand"                "=Rp")
         (ior:BI (not:BI (match_operand:BI 1 "pr_register_operand" "Rp"))
                 (match_operand:BI 2 "pr_register_operand"         "Rp")))]
-  "TARGET_V2_FEATURES"
+  ""
   "%0 = or(%2,!%1)"
   [(set_attr "type" "S")]
 )
@@ -8755,12 +8325,7 @@
   ""
   {
     operands[0] = gen_int_mode(INTVAL (operands[0]) - 8, SImode);
-    switch(which_alternative){
-    case 0:
-      return "allocframe(#%0)";
-    case 1:
-      return "allocframe(#%0)";
-    }
+    return "allocframe(#%0)";
   }
   [(set_attr "type" "Store,Store")
    (set_attr "duplex" "no,yes")]
@@ -9475,15 +9040,15 @@
 ; Optimized case for r0 = mux(!p0, r0, r2)
 ; Change to if (p0) r0 = r2
 ; This form can be transformed to a dot-new transfer
-(define_peephole2 
-  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+(define_peephole2
+  [(set (match_operand:SI 0 "gr_register_operand" "")
         (if_then_else:SI
           (eq:BI
-            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (match_operand:BI 1 "pr_register_operand" "")
             (const_int 0))
-	  (match_dup 0)
-          (match_operand:SI 2 "nonmemory_operand"     "Rg")))]
-  "TARGET_PRED_MUX"
+          (match_dup 0)
+          (match_operand:SI 2 "nonmemory_operand" "")))]
+  ""
   [(cond_exec
      (ne:BI (match_dup 1) (const_int 0))
      (set (match_dup 0) (match_dup 2)))]
@@ -9493,15 +9058,15 @@
 ; Optimized case for r0 = mux(!p0, r2, r0)
 ; Change to if (!p0) r0 = r2
 ; This form can be transformed to a dot-new transfer
-(define_peephole2 
-  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+(define_peephole2
+  [(set (match_operand:SI 0 "gr_register_operand" "")
         (if_then_else:SI
           (eq:BI
-            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (match_operand:BI 1 "pr_register_operand" "")
             (const_int 0))
-	  (match_operand:SI 2 "nonmemory_operand"     "Rg")
+          (match_operand:SI 2 "nonmemory_operand" "")
           (match_dup 0)))]
-  "TARGET_PRED_MUX"
+  ""
   [(cond_exec
      (eq:BI (match_dup 1) (const_int 0))
      (set (match_dup 0) (match_dup 2)))]
@@ -9512,15 +9077,15 @@
 ; Optimized case for r0 = mux(p0, r0, r2)
 ; Change to if (!p0) r0 = r2
 ; This form can be transformed to a dot-new transfer
-(define_peephole2 
-  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+(define_peephole2
+  [(set (match_operand:SI 0 "gr_register_operand" "")
         (if_then_else:SI
           (ne:BI
-            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (match_operand:BI 1 "pr_register_operand" "")
             (const_int 0))
-	  (match_dup 0)
-          (match_operand:SI 2 "nonmemory_operand"     "Rg")))]
-  "TARGET_PRED_MUX"
+          (match_dup 0)
+          (match_operand:SI 2 "nonmemory_operand" "")))]
+  ""
   [(cond_exec
      (eq:BI (match_dup 1) (const_int 0))
      (set (match_dup 0) (match_dup 2)))]
@@ -9530,15 +9095,15 @@
 ; Optimized case for r0 = mux(p0, r2, r0)
 ; Change to if (p0) r0 = r2
 ; This form can be transformed to a dot-new transfer
-(define_peephole2 
-  [(set (match_operand:SI 0 "gr_register_operand"    "=Rg")
+(define_peephole2
+  [(set (match_operand:SI 0 "gr_register_operand" "")
         (if_then_else:SI
           (ne:BI
-            (match_operand:BI 1 "pr_register_operand" "Rp")
+            (match_operand:BI 1 "pr_register_operand" "")
             (const_int 0))
-	  (match_operand:SI 2 "nonmemory_operand"     "Rg")
+          (match_operand:SI 2 "nonmemory_operand" "")
           (match_dup 0)))]
-  "TARGET_PRED_MUX"
+  ""
   [(cond_exec
      (ne:BI (match_dup 1) (const_int 0))
      (set (match_dup 0) (match_dup 2)))]
@@ -9711,8 +9276,8 @@
 (define_insn_and_split "combinesi_v4"
   [(set (match_operand:SI 0 "gr_register_operand" "=Rg, Rg, Rg, Rg, Rg, Rg,Rg, Rg, Rg, Rg,Rg,Rg")
         (match_operand:SI 1 "nonmemory_operand"    "Rg,Iu2,Is8,Is8,  i, Rg,Rg,Iu0, Rg,Is8, i, i"))
-   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg, Rg, Rg, Rg, Rg,Rg, Rg, Rg, Rg, Rg,Rg")
-        (match_operand:SI 3 "nonmemory_operand"    "Rg,Iu2,Is8,  i,Is8,Is8, i, Rg,Iu0, Rg, Rg, i"))]
+   (set (match_operand:SI 2 "gr_register_operand" "=Rg, Rg, Rg, Rg, Rg, Rg,Rg, Rg, Rg, Rg,Rg,Rg")
+        (match_operand:SI 3 "nonmemory_operand"    "Rg,Iu2,Is8,  i,Is8,Is8, i, Rg,Iu0, Rg,Rg, i"))]
   "reload_completed && TARGET_V4_FEATURES"
   {
     HOST_WIDE_INT high, low;
@@ -9799,9 +9364,9 @@
   [(set (match_dup 0) (match_dup 1))
    (set (match_dup 2) (match_dup 3))]
   {
-    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1]) 
-                    && REG_P (operands[2]) && REG_P (operands[3])  
-                    && REGNO (operands[0]) == REGNO (operands[3]) 
+    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1])
+                    && REG_P (operands[2]) && REG_P (operands[3])
+                    && REGNO (operands[0]) == REGNO (operands[3])
                     && REGNO (operands[1]) == REGNO (operands[2]) ));
 
     /* When this condition is true, it is likely that we have
@@ -9813,21 +9378,21 @@
        If we do not have this king of assignment:
        parallel [ r0=r2; r2=r0]
        we can reverse the order of instructions in parallel
-       structure as we split it. 
-       See bug 3855 for details. */ 
+       structure as we split it.
+       See bug 3855 for details. */
 
     if((REG_P (operands[0]) && REG_P (operands[3])
         && REGNO (operands[0]) == REGNO (operands[3]))){
 
-        rtx tmp; 
+        rtx tmp;
 
-        tmp = operands[0];   
+        tmp = operands[0];
         operands[0] = operands[2];
-        operands[2] = tmp; 
+        operands[2] = tmp;
 
-        tmp = operands[1]; 
+        tmp = operands[1];
         operands[1] = operands[3];
-        operands[3] = tmp; 
+        operands[3] = tmp;
     }
   }
   [(set_attr "type" "A,A,A,EA,EA,A,EA,A,A,A,EA,Load")
@@ -9889,9 +9454,9 @@
   [(set (match_dup 0) (match_dup 1))
    (set (match_dup 2) (match_dup 3))]
   {
-    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1]) 
-                    && REG_P (operands[2]) && REG_P (operands[3])  
-                    && REGNO (operands[0]) == REGNO (operands[3]) 
+    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1])
+                    && REG_P (operands[2]) && REG_P (operands[3])
+                    && REGNO (operands[0]) == REGNO (operands[3])
                     && REGNO (operands[1]) == REGNO (operands[2]) ));
 
     /* When this condition is true, it is likely that we have
@@ -9903,25 +9468,24 @@
        If we do not have this king of assignment:
        parallel [ r0=r2; r2=r0]
        we can reverse the order of instructions in parallel
-       structure as we split it. 
-       See bug 3855 for details. */ 
+       structure as we split it.
+       See bug 3855 for details. */
 
     if((REG_P (operands[0]) && REG_P (operands[3])
         && REGNO (operands[0]) == REGNO (operands[3]))){
 
-        rtx tmp; 
+        rtx tmp;
 
-        tmp = operands[0];   
+        tmp = operands[0];
         operands[0] = operands[2];
-        operands[2] = tmp; 
+        operands[2] = tmp;
 
-        tmp = operands[1]; 
+        tmp = operands[1];
         operands[1] = operands[3];
-        operands[3] = tmp; 
+        operands[3] = tmp;
     }
   }
-  [(set_attr "type" "A,A,Load")
-   (set_attr "duplex" "no,no,no")]
+  [(set_attr "type" "A,A,Load")]
 )
 
 ;;;---------------------------------
@@ -10124,9 +9688,9 @@
   [(cond_exec (match_op_dup 4 [(match_dup 5) (const_int 0)]) (set (match_dup 0) (match_dup 1)))
    (cond_exec (match_op_dup 4 [(match_dup 5) (const_int 0)]) (set (match_dup 2) (match_dup 3)))]
   {
-    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1]) 
-                    && REG_P (operands[2]) && REG_P (operands[3])  
-                    && REGNO (operands[0]) == REGNO (operands[3]) 
+    gcc_assert(!(   REG_P (operands[0]) && REG_P (operands[1])
+                    && REG_P (operands[2]) && REG_P (operands[3])
+                    && REGNO (operands[0]) == REGNO (operands[3])
                     && REGNO (operands[1]) == REGNO (operands[2]) ));
 
     /* When this condition is true, it is likely that we have
@@ -10138,21 +9702,21 @@
        If we do not have this king of assignment:
        parallel [ r0=r2; r2=r0]
        we can reverse the order of instructions in parallel
-       structure as we split it. 
-       See bug 3855 for details. */ 
+       structure as we split it.
+       See bug 3855 for details. */
 
     if((REG_P (operands[0]) && REG_P (operands[3])
         && REGNO (operands[0]) == REGNO (operands[3]))){
 
-        rtx tmp; 
+        rtx tmp;
 
-        tmp = operands[0];   
+        tmp = operands[0];
         operands[0] = operands[2];
-        operands[2] = tmp; 
+        operands[2] = tmp;
 
-        tmp = operands[1]; 
+        tmp = operands[1];
         operands[1] = operands[3];
-        operands[3] = tmp; 
+        operands[3] = tmp;
     }
   }
   [(set_attr "type" "A")]

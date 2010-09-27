@@ -28,16 +28,6 @@ are used to switch between the two implementations.
 #ifndef GCC_QDSP6_H
 #define GCC_QDSP6_H
 
-#define GCC_3_4_6 0
-
-#if GCC_3_4_6
-/* Define these to enable using the newer conventions in both versions. */
-#define gcc_assert(ASSERTION) ((void) (!(ASSERTION) ? abort(), 0 : 0))
-#define gcc_unreachable abort
-#define MEM_P(X) (GET_CODE (X) == MEM)
-#define CALL_P(X) (GET_CODE (X) == CALL_INSN)
-#endif /* GCC_3_4_6 */
-
 
 /*--------------------------------------------------------
 For documentation, please see the appropriate section of
@@ -96,142 +86,6 @@ Run-time Target Specification
     builtin_define_std ("qdsp6"); \
     builtin_assert ("machine=qdsp6"); \
   }while(0)
-
-#if GCC_3_4_6 
-extern int target_flags;
-
-#define MASK_NO_FALIGN (1 << 0)
-#define TARGET_NO_FALIGN ((target_flags & MASK_NO_FALIGN) != 0)
-
-#define MASK_FALIGN_LOOPS (1 << 1)
-#define TARGET_FALIGN_LOOPS ((target_flags & MASK_FALIGN_LOOPS) != 0)
-
-#define MASK_FALIGN_LABELS (1 << 2)
-#define TARGET_FALIGN_LABELS ((target_flags & MASK_FALIGN_LABELS) != 0)
-
-#define MASK_G0_LIB (1 << 3)
-#define TARGET_G0_LIB \
-  ((target_flags & MASK_G0_LIB) != 0)
-
-#define MASK_BUILDING_MULTILIB (1 << 4)
-#define TARGET_BUILDING_MULTILIB \
-  ((target_flags & MASK_BUILDING_MULTILIB) != 0)
-
-#define MASK_LITERAL_POOL (1 << 5)
-#define TARGET_LITERAL_POOL \
-  ((target_flags & MASK_LITERAL_POOL) != 0)
-
-#define MASK_LITERAL_POOL_ADDRESSES (1 << 6)
-#define TARGET_LITERAL_POOL_ADDRESSES \
-  ((target_flags & MASK_LITERAL_POOL_ADDRESSES) != 0)
-
-#define MASK_HARDWARE_LOOPS (1 << 7)
-#define TARGET_HARDWARE_LOOPS ((target_flags & MASK_HARDWARE_LOOPS) != 0)
-
-#define MASK_DOT_NEW (1 << 8)
-#define TARGET_DOT_NEW ((target_flags & MASK_DOT_NEW) != 0)
-
-#define MASK_PULLUP (1 << 9)
-#define TARGET_PULLUP ((target_flags & MASK_PULLUP) != 0)
-
-#define MASK_LITERAL_INTRINSICS (1 << 10)
-#define TARGET_LITERAL_INTRINSICS \
-  ((target_flags & MASK_LITERAL_INTRINSICS) != 0)
-
-#define MASK_UNCACHED_DATA (1 << 12)
-#define TARGET_UNCACHED_DATA ((target_flags & MASK_UNCACHED_DATA) != 0)
-
-#define MASK_LONG_CALLS (1 << 13)
-#define TARGET_LONG_CALLS ((target_flags & MASK_LONG_CALLS) != 0)
-
-#define MASK_SECTION_SORTING (1 << 14)
-#define TARGET_SECTION_SORTING ((target_flags & MASK_SECTION_SORTING) != 0)
-
-#define MASK_SECTION_SORTING_CODE_SUPPORT (1 << 15)
-#define TARGET_SECTION_SORTING_CODE_SUPPORT ((target_flags & MASK_SECTION_SORTING_CODE_SUPPORT) != 0)
-
-#define TARGET_DEFAULT \
-  (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
-   | MASK_DOT_NEW | MASK_PULLUP | MASK_SECTION_SORTING | MASK_SECTION_SORTING_CODE_SUPPORT )
-
-#define TARGET_SWITCHES                                                     \
-  {                                                                         \
-    {"v1", 0,                                                               \
-     N_("alias for -march=qdsp6v1")},                                       \
-    {"v2", 0,                                                               \
-     N_("alias for -march=qdsp6v2")},                                       \
-    {"v3", 0,                                                               \
-     N_("alias for -march=qdsp6v3")},                                       \
-    {"long-calls",                       MASK_LONG_CALLS,                   \
-     N_("Make all calls indirect except those where the target is known "   \
-        "to be close")},                                                    \
-    {"no-long-calls",                   -MASK_LONG_CALLS,                   \
-     N_("Assume all call targets are close enough to use a PC-relative "    \
-        "call instruction (default)")},                                     \
-    {"no-falign",                        MASK_NO_FALIGN,                    \
-     N_("Do not use the falign directive (default with -O0 or -Os)")},      \
-    {"falign-loops",                     MASK_FALIGN_LOOPS,                 \
-     N_("Use the falign directive before loops (default with -O and not "   \
-        "-Os)")},                                                           \
-    {"falign-labels",                    MASK_FALIGN_LABELS,                \
-     N_("Use the falign directive before all labels")},                     \
-    {"G0lib",                            MASK_G0_LIB,                       \
-     N_("Link with standard libraries compiled with -G 0")},                \
-    {"building-multilib",                MASK_BUILDING_MULTILIB,            \
-     ""},                                                                   \
-    {"literal-pool",                     MASK_LITERAL_POOL,                 \
-     N_("Enable placing literal values into .sdata (default)")},            \
-    {"no-literal-pool",                 -MASK_LITERAL_POOL,                 \
-     N_("Disable placing literal values into .sdata")},                     \
-    {"literal-pool-addresses",           MASK_LITERAL_POOL_ADDRESSES,       \
-     N_("Enable placing literal address values into .sdata (default)")},    \
-    {"no-literal-pool-addresses",       -MASK_LITERAL_POOL_ADDRESSES,       \
-     N_("Disable placing literal address values into .sdata")},             \
-    {"hardware-loops",                   MASK_HARDWARE_LOOPS,               \
-     N_("Enable hardware loops (default)")},                                \
-    {"no-hardware-loops",               -MASK_HARDWARE_LOOPS,               \
-     N_("Disable hardware loops")},                                         \
-    {"dot-new",                          MASK_DOT_NEW,                      \
-     N_("Enable .new instructions (default)")},                             \
-    {"no-dot-new",                       -MASK_DOT_NEW,                     \
-     N_("Disable .new instructions")},                                      \
-    {"pullup",                           MASK_PULLUP,                       \
-     N_("Pull up instructions across basic block boundaries (default)")},   \
-    {"no-pullup",                       -MASK_PULLUP,                       \
-     N_("Do not pull up instructions across basic block boundaries")},      \
-    {"literal-intrinsics",               MASK_LITERAL_INTRINSICS,           \
-     N_("Force intrinsics to mean the corresponding instruction, not just " \
-        "the corresponding operation")},                                    \
-    {"no-literal-intrinsics",           -MASK_LITERAL_INTRINSICS,           \
-     N_("Internally expand some intrinsics into the corresponding "         \
-        "operation to allow optimization (default)")},                      \
-    {"v1-v2-uncached-data",              MASK_UNCACHED_DATA,                \
-     ""},                                                                   \
-    {"no-sort-sda",               -MASK_SECTION_SORTING,              	    \
-     N_("Disable small data sections sorting")},			    \
-    {"no-sort-sda-code-support",  -MASK_SECTION_SORTING_CODE_SUPPORT,       \
-     N_("Disable small data sections sorting code support")},        	    \
-    {"", TARGET_DEFAULT, NULL}                                              \
-  }
-
-#define TARGET_OPTIONS                                                        \
-  {                                                                           \
-    {"arch=", &qdsp6_arch_string,                                             \
-     N_("Generate code for the specified architecture (default qdsp6v2)"),    \
-     NULL},                                                                   \
-    {"cpu=", &qdsp6_arch_string,                                              \
-     N_("currently an alias for march (except that it does not affect which " \
-        "libraries are included)"),                                           \
-     NULL},                                                                   \
-    {"abi=", &qdsp6_abi_string,                                               \
-     N_("Adhere to the specified ABI (default abi1)"),                        \
-     NULL},                                                                   \
-    {"oslib=", &qdsp6_oslib_string,                                           \
-     N_("Add the specified OS library to the link command in such a way "     \
-        "that it can resolve symbols referenced by the C library."),          \
-     NULL},                                                                   \
-  }
-#endif /* GCC_3_4_6 */
 
 /* Append (qdsp6) to the version string. */
 #define TARGET_VERSION fprintf(stderr, " (qdsp6)");
@@ -365,11 +219,6 @@ Storage Layout
   Also, bitfields do not cross the alignment boundaries of their type. */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
-#if GCC_3_4_6
-/* ??? Define this? */
-/*#define VECTOR_MODE_SUPPORTED_P(MODE)*/
-#endif /* GCC_3_4_6 */
-
 /* QDSP6 emulates IEEE floating point. */
 
 /* The prevailing floating point rounding mode is round towards nearest. */
@@ -393,13 +242,6 @@ Layout of Source Language Data Types
 /* As specified by the ABI, the "char" type behaves like the "unsigned char"
    type. */
 #define DEFAULT_SIGNED_CHAR 0
-
-#if GCC_3_4_6
-/* As specified by the ABI, enumerated types behave like the smallest integer
-   type that can hold all of the enumerated constants associated with the
-   enumerated type. */
-#define DEFAULT_SHORT_ENUMS 1
-#endif /* GCC_3_4_6 */
 
 /* GCC uses the following internal structure to represent a 
    pointer-to-member-function:
@@ -700,11 +542,6 @@ enum reg_class {
 
 #define PREFERRED_RELOAD_CLASS(X, CLASS) CLASS
 
-#if GCC_3_4_6
-#define SECONDARY_RELOAD_CLASS(CLASS, MODE, X) \
-  qdsp6_secondary_reload_class(X, CLASS)
-#endif /* GCC_3_4_6 */
-
 /* ??? maybe try this with predicates? */
 /*#define SMALL_REGISTER_CLASSES*/
 /*#define CLASS_LIKELY_SPILLED_P(CLASS)*/
@@ -781,6 +618,9 @@ Basic Stack Layout
 /* See the comment in qdsp6.c containing "QDSP6 stack frames look like:" for a
    diagram of stack frames on QDSP6. */
 #define STACK_GROWS_DOWNWARD 1
+#define FRAME_GROWS_DOWNWARD 1
+
+#define TARGET_LIBC_PROVIDES_SSP 1
 
 #define STARTING_FRAME_OFFSET 0
 
@@ -880,17 +720,6 @@ Passing Arguments in Registers
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED) \
   qdsp6_function_arg(CUM, MODE, TYPE, NAMED)
 
-#if GCC_3_4_6
-#define MUST_PASS_IN_STACK(MODE, TYPE) \
-  qdsp6_must_pass_in_stack(MODE, TYPE)
-#endif /* GCC_3_4_6 */
-
-#if GCC_3_4_6
-#define FUNCTION_ARG_PARTIAL_NREGS(CUM, MODE, TYPE, NAMED) 0
-
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) 0
-#endif /* GCC_3_4_6 */
-
 /* On the QDSP6 this value is an accumulating count of the number of argument
    registers that have been filled with argument values or skipped. */
 #define CUMULATIVE_ARGS int
@@ -920,11 +749,6 @@ Passing Arguments in Registers
 /*-------------------------------------
 How Scalar Function Values Are Returned
 -------------------------------------*/
-
-#if GCC_3_4_6
-#define FUNCTION_VALUE(VALTYPE, FUNC) \
-  qdsp6_function_value(VALTYPE, FUNC, false)
-#endif /* GCC_3_4_6 */
 
 #define LIBCALL_VALUE(MODE) gen_rtx_REG (MODE, RETURN_VALUE_REGNUM)
 
@@ -1018,19 +842,6 @@ Addressing Modes
     goto LABEL; \
   }
 
-#if GCC_3_4_6
-#define REG_OK_FOR_BASE_P(X) \
-  qdsp6_reg_ok_for_base_p(X, REG_OK_STRICT_P)
-#endif /* GCC_3_4_6 */
-
-#if GCC_3_4_6
-#define REG_OK_FOR_INDEX_P(X) 0
-#endif /* GCC_3_4_6 */
-
-#if GCC_3_4_6
-#define LEGITIMIZE_ADDRESS(X, OLDX, MODE, WIN)
-#endif /* GCC_3_4_6 */
-
 #define GO_IF_MODE_DEPENDENT_ADDRESS(ADDR, LABEL) \
   if(GET_CODE (ADDR) == POST_INC || GET_CODE (ADDR) == POST_DEC){ \
     goto LABEL; \
@@ -1079,10 +890,6 @@ Describing Relative Costs of Operations
 /* Direct calls can be executed on more slots than indirect calls. */
 #define NO_FUNCTION_CSE 1
 
-#if GCC_3_4_6
-#define NO_RECURSIVE_FUNCTION_CSE 1
-#endif /* GCC_3_4_6 */
-
 
 /*--------------------------------------------------
 Dividing the Output into Sections (Texts, Data, ...)
@@ -1092,15 +899,11 @@ Dividing the Output into Sections (Texts, Data, ...)
 
 #define DATA_SECTION_ASM_OP "\t.data"
 
-#if !GCC_3_4_6
 #define SDATA_SECTION_ASM_OP "\t.section .sdata"
-#endif /* !GCC_3_4_6 */
 
 #define BSS_SECTION_ASM_OP "\t.section .bss"
 
-#if !GCC_3_4_6
 #define SBSS_SECTION_ASM_OP "\t.section .sbss"
-#endif /* !GCC_3_4_6 */
 
 
 /*----------------------------------------
@@ -1199,44 +1002,6 @@ Assembler Commands for Alignment
 Miscellaneous Parameters
 ----------------------*/
 
-#if GCC_3_4_6
-#define PREDICATE_CODES                                                     \
-  {"gr_register_operand",         {REG, SUBREG}},                           \
-  {"pr_register_operand",         {REG, SUBREG}},                           \
-  {"nongr_register_operand",      {REG, SUBREG}},                           \
-  {"splattable_vector",           {REG, SUBREG}},                           \
-  {"indirect_memory_operand",     {MEM}},                                   \
-  {"call_target_operand",         {SYMBOL_REF, REG, SUBREG}},               \
-  {"sdata_symbolic_operand",      {SYMBOL_REF, CONST}},                     \
-  {"s16_const_int_operand",       {CONST_INT}},                             \
-  {"s12_const_int_operand",       {CONST_INT}},                             \
-  {"s10_const_int_operand",       {CONST_INT}},                             \
-  {"s8_const_int_operand",        {CONST_INT}},                             \
-  {"s7_const_int_operand",        {CONST_INT}},                             \
-  {"s6_const_int_operand",        {CONST_INT}},                             \
-  {"s5_const_int_operand",        {CONST_INT}},                             \
-  {"s4_const_int_operand",        {CONST_INT}},                             \
-  {"u9_const_int_operand",        {CONST_INT}},                             \
-  {"u8_const_int_operand",        {CONST_INT}},                             \
-  {"u7_const_int_operand",        {CONST_INT}},                             \
-  {"u6_const_int_operand",        {CONST_INT}},                             \
-  {"u5_const_int_operand",        {CONST_INT}},                             \
-  {"u3_const_int_operand",        {CONST_INT}},                             \
-  {"u2_const_int_operand",        {CONST_INT}},                             \
-  {"u1_const_int_operand",        {CONST_INT}},                             \
-  {"zero_constant",               {CONST_INT, CONST_DOUBLE, CONST_VECTOR}}, \
-  {"m9_const_int_operand",        {CONST_INT}},                             \
-  {"power_of_two_operand",        {CONST_INT}},                             \
-  {"addasl_const_int_operand",    {CONST_INT}},                             \
-  {"immediate_not_s16_operand",   {CONST_INT, CONST_DOUBLE, CONST_VECTOR,   \
-                                   CONST, LABEL_REF, SYMBOL_REF}},          \
-  {"nongr_reg_or_memory_operand", {REG, SUBREG, MEM}},                      \
-  {"conditional_dest_operand",    {REG, SUBREG, MEM}},                      \
-  {"conditional_add_operand",     {REG, SUBREG, CONST_INT}},                \
-  {"conditional_src_operand",     {REG, SUBREG, MEM, CONST_INT}},           \
-  {"predicate_operator",          {NE, EQ}},
-#endif /* GCC_3_4_6 */
-
 #define CASE_VECTOR_MODE Pmode
 
 /* ??? smaller? */
@@ -1251,10 +1016,8 @@ Miscellaneous Parameters
 
 #define TRULY_NOOP_TRUNCATION(OUTPREC, INPREC) 1
 
-#if !GCC_3_4_6
 /* ??? const1_rtx? */
 /*#define VECTOR_STORE_FLAG_VALUE(MODE)*/
-#endif /* !GCC_3_4_6 */
 
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = 32)
 
@@ -1292,9 +1055,6 @@ enum qdsp6_architecture {
 };
 
 extern enum qdsp6_architecture qdsp6_arch;
-#if GCC_3_4_6
-extern const char *qdsp6_arch_string;
-#endif /* GCC_3_4_6 */
 
 #define QDSP6_FEAT_V1 (1 << QDSP6_ARCH_V1)
 #define QDSP6_FEAT_V2 (1 << QDSP6_ARCH_V2)
@@ -1339,9 +1099,6 @@ enum qdsp6_abi {
 };
 
 extern enum qdsp6_abi qdsp6_abi;
-#if GCC_3_4_6
-extern const char *qdsp6_abi_string;
-#endif /* GCC_3_4_6 */
 
 struct qdsp6_abi_table_entry {
   const char *const name;
@@ -1358,10 +1115,6 @@ struct qdsp6_abi_table_entry {
 #define QDSP6_ABI_TABLE_DEFAULT_INDEX \
   (TARGET_V3_FEATURES ? QDSP6_ABI_2 : QDSP6_ABI_1)
 
-#if GCC_3_4_6
-extern const char *qdsp6_oslib_string;
-#endif /* GCC_3_4_6 */
-
 enum qdsp6_falign {
   QDSP6_NO_FALIGN,
   QDSP6_FALIGN_LOOPS,
@@ -1372,12 +1125,10 @@ enum qdsp6_falign {
 
 extern bool qdsp6_dual_memory_accesses;
 
-#define TARGET_CONST32 \
-  (TARGET_V2_FEATURES && TARGET_LITERAL_POOL \
-   && g_switch_value >= UNITS_PER_WORD)
-#define TARGET_CONST64 \
-  (TARGET_V2_FEATURES && TARGET_LITERAL_POOL \
-   && g_switch_value >= 2 * UNITS_PER_WORD)
+#define TARGET_CONST32 (TARGET_LITERAL_POOL && g_switch_value >= 4)
+#define TARGET_CONST64 (TARGET_LITERAL_POOL && g_switch_value >= 8)
+
+#define TARGET_PACKET_OPTIMIZATIONS (TARGET_PULLUP || TARGET_NEW_VALUE_JUMP)
 
 /* ranges for the various kinds of registers */
 #define G_REGNO_P(REGNO) (IN_RANGE ((REGNO), 0, 31))

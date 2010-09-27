@@ -1649,7 +1649,7 @@ check_either_restrict (tree ref1, tree ref2)
   HOST_WIDE_INT size1 = -1, size2 = -1;
   HOST_WIDE_INT max_size1 = -1, max_size2 = -1;
 
-  if (!flag_resolve_restrict_aliasing)
+  if (!TARGET_RESOLVE_RESTRICT_ALIASING)
     return false;
 
   base1 = ref1;

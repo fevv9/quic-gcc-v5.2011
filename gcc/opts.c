@@ -1,4 +1,3 @@
-
 /* Command line option handling.
    Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
    Free Software Foundation, Inc.
@@ -907,7 +906,7 @@ decode_options (unsigned int argc, const char **argv)
   flag_tree_pre = opt2;
   flag_tree_switch_conversion = 1;
   flag_ipa_cp = opt2;
-  /* flag_resolve_restrict_aliasing = opt2; */
+
   /* Allow more virtual operators to increase alias precision.  */
 
   set_param_value ("max-aliased-vops",

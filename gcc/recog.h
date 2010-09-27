@@ -84,8 +84,8 @@ extern int num_validated_changes (void);
 extern void cancel_changes (int);
 extern int constrain_operands (int);
 extern int constrain_operands_cached (int);
-extern int memory_address_p (enum machine_mode, rtx);
-extern int strict_memory_address_p (enum machine_mode, rtx);
+extern int memory_address_p (enum machine_mode, const_rtx);
+extern int strict_memory_address_p (enum machine_mode, const_rtx);
 extern int validate_replace_rtx (rtx, rtx, rtx);
 extern int validate_replace_rtx_part (rtx, rtx, rtx *, rtx);
 extern int validate_replace_rtx_part_nosimplify (rtx, rtx, rtx *, rtx);
@@ -236,7 +236,7 @@ extern struct operand_alternative recog_op_alt[MAX_RECOG_OPERANDS][MAX_RECOG_ALT
 /* A table defined in insn-output.c that give information about
    each insn-code value.  */
 
-typedef int (*insn_operand_predicate_fn) (rtx, enum machine_mode);
+typedef int (*insn_operand_predicate_fn) (const_rtx, enum machine_mode);
 typedef const char * (*insn_output_fn) (rtx *, rtx);
 typedef rtx (*insn_gen_fn) (rtx, ...);
 
