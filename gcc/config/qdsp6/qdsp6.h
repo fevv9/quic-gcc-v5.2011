@@ -1128,6 +1128,8 @@ extern bool qdsp6_dual_memory_accesses;
 #define TARGET_CONST32 (TARGET_LITERAL_POOL && g_switch_value >= 4)
 #define TARGET_CONST64 (TARGET_LITERAL_POOL && g_switch_value >= 8)
 
+#define TARGET_PACKET_OPTIMIZATIONS (TARGET_PULLUP || TARGET_NEW_VALUE_JUMP)
+
 /* ranges for the various kinds of registers */
 #define G_REGNO_P(REGNO) (IN_RANGE ((REGNO), 0, 31))
 #define P_REGNO_P(REGNO) (IN_RANGE ((REGNO), 32, 35))

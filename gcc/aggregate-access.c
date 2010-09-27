@@ -51,7 +51,7 @@ along with GCC; see the file COPYING3.  If not see
 static bool
 gate_handle_aggregate_access (void)
 {
-  return (optimize > 0 && flag_aggregate_access);
+  return TARGET_AGGREGATE_ACCESS;
 }
 
 /*******************************************************************************************

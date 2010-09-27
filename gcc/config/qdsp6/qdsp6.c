@@ -69,7 +69,6 @@ enum qdsp6_abi qdsp6_abi = QDSP6_ABI_UNSPECIFIED;
 int qdsp6_features;
 enum qdsp6_falign qdsp6_falign = QDSP6_FALIGN_UNSPECIFIED;
 bool qdsp6_dual_memory_accesses = true;
-bool qdsp6_packetize_volatiles = false;
 
 static GTY(()) struct qdsp6_packet_info *qdsp6_head_packet;
 static GTY(()) struct qdsp6_packet_info *qdsp6_tail_packet;
@@ -394,7 +393,8 @@ Run-time Target Specification
 #define TARGET_DEFAULT_TARGET_FLAGS \
   (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
    | MASK_NEW_PREDICATES | MASK_NEW_VALUE_STORES | MASK_BASE_PLUS_INDEX \
-   | MASK_MEMOPS | MASK_SECTION_SORTING | MASK_SECTION_SORTING_CODE_SUPPORT)
+   | MASK_MEMOPS | MASK_SECTION_SORTING | MASK_SECTION_SORTING_CODE_SUPPORT \
+   | MASK_DEEP_PHI_MATCH)
 
 #undef TARGET_HANDLE_OPTION
 #define TARGET_HANDLE_OPTION qdsp6_handle_option
@@ -658,9 +658,6 @@ qdsp6_handle_option(size_t code, const char *arg, int value ATTRIBUTE_UNUSED)
     case OPT_mfalign_all:
       qdsp6_falign = QDSP6_FALIGN_ALL;
       return true;
-    case OPT_mno_packetize_volatiles:
-      qdsp6_packetize_volatiles = false;
-      return true;
   }
   return true;
 }
@@ -702,12 +699,6 @@ qdsp6_override_options(void)
     }
   }
 
-  if(TARGET_COMPRESSED){
-    flag_schedule_insns = 0;
-    flag_schedule_insns_after_reload = 0;
-    target_flags &= ~MASK_PACKETS;
-  }
-
   if(!TARGET_PACKETS){
     target_flags &= ~MASK_PULLUP;
   }
@@ -729,7 +720,16 @@ qdsp6_override_options(void)
   }
 
   if(!TARGET_CONST32 || !TARGET_LITERAL_POOL_ADDRESSES || qdsp6_arch >= QDSP6_ARCH_V4)
-    flag_aggregate_access = 0;
+    target_flags &= ~MASK_AGGREGATE_ACCESS;
+
+  /* Taxis code degraded immensely because of the subreg1 pass.  The pass splits
+     double word opcodes into single words, which resulted in larger packet
+     size.  See Qualcomm Bugzilla #3659 for the details.  To enable the subreg1
+     pass, use -menable-subreg1 */
+  if(!TARGET_ENABLE_SUBREG1){
+    flag_split_wide_types = false;
+  }
+
 }
 
 
@@ -746,18 +746,12 @@ qdsp6_optimization_options(int level, int size)
     target_flags |= MASK_EXTENDED_CROSSJUMPING;
     target_flags |= MASK_LOCAL_COMBINE;
     target_flags |= MASK_DUPLEX_SCHEDULING;
-    flag_aggregate_access = 1;
-  }
-
-  if(level >= 1){
-    target_flags |= MASK_PRED_MUX;
   }
 
   if(level >= 2){
     target_flags |= MASK_PACKETS;
     target_flags |= MASK_PULLUP;
-    flag_optimize_memset = 1;
-    flag_aggregate_access = 1;
+    target_flags |= MASK_AGGREGATE_ACCESS;
   }
 
   qdsp6_falign = QDSP6_NO_FALIGN;
@@ -1430,7 +1424,7 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
     }
     /* Use SP as the base if the offset would be small, making the loads and
        stores candidates for duplexes. */
-    if(!TARGET_COMPRESSED && info->frame_size <= 256){
+    if(info->frame_size <= 256){
       info->base_reg = stack_pointer_rtx;
       info->offset = info->frame_size;
     }
@@ -3079,7 +3073,7 @@ qdsp6_sched_dependencies_eval (rtx head, rtx tail)
 {
   rtx insn, next_tail;
 
-  if (!flag_resolve_restrict_aliasing)
+  if (!TARGET_RESOLVE_RESTRICT_ALIASING)
     return;
 
   next_tail = NEXT_INSN (tail);
@@ -5186,7 +5180,7 @@ qdsp6_machine_dependent_reorg(void)
 #endif /* 0 */
 
   if(cfun->machine->has_hardware_loops
-     || TARGET_PULLUP){
+     || TARGET_PACKET_OPTIMIZATIONS){
     qdsp6_fixup_cfg();
   }
 
@@ -5195,7 +5189,7 @@ qdsp6_machine_dependent_reorg(void)
       qdsp6_local_combine_pass();
     }
 
-  if(TARGET_PULLUP){
+  if(TARGET_PACKET_OPTIMIZATIONS){
     qdsp6_packet_optimizations();
   }
 
@@ -7492,9 +7486,6 @@ qdsp6_expand_setmem(rtx operands[])
   HOST_WIDE_INT align_intval, nbytes_intval, initval_intval;
   rtx destaddr, nbytes, initval, align;
 
-  if (!flag_optimize_memset)
-    return false;
-
   destaddr = operands[0];
   nbytes = operands[1];
   initval = operands[2];
@@ -8681,7 +8672,7 @@ qdsp6_gpr_dot_newable_p(
   rtx pattern;
   rtx set;
 
-  if(!TARGET_NEW_VALUE_STORES && !new_value_jump){
+  if(!TARGET_NEW_VALUE_STORES && !TARGET_NEW_VALUE_JUMP){
     return false;
   }
 
@@ -8690,7 +8681,7 @@ qdsp6_gpr_dot_newable_p(
     return false;
   }
 
- if (new_value_jump && 
+ if (TARGET_NEW_VALUE_JUMP && 
     QDSP6_DIRECT_JUMP_P(consumer) &&
     qdsp6_scan_dot_new_gpr(consumer, dependence)){
   return true;
@@ -8792,7 +8783,7 @@ qdsp6_dot_newify_gpr(
   new_insn_info->flags |= QDSP6_NEW_GPR;
 
 
-  if (new_value_jump && 
+  if (TARGET_NEW_VALUE_JUMP && 
       (INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump ||
        INSN_CODE(insn_info->insn) == CODE_FOR_old_new_value_jump )) 
   {
@@ -8834,7 +8825,7 @@ qdsp6_dot_oldify_gpr(struct qdsp6_insn_info *insn_info)
   rtx pattern;
   rtx new_value;
 
-  if (new_value_jump && INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump) {
+  if (TARGET_NEW_VALUE_JUMP && INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump) {
     pattern = copy_rtx(PATTERN(insn_info->insn));
 
     for_each_rtx(&XVECEXP(pattern,0,0), qdsp6_find_new_value, &new_value);
@@ -9136,7 +9127,7 @@ qdsp6_true_dependencies(
     return dependencies;
   }
 
-  if (!TARGET_V4_FEATURES || !qdsp6_packetize_volatiles){
+  if (!TARGET_V4_FEATURES || !TARGET_PACKETIZE_VOLATILES){
     /* If a memory access is volatile, then it should be the only memory access in
        a packet.  (not really a dependency, but oh well) */
     if((QDSP6_VOLATILE_P (writer) || QDSP6_VOLATILE_P (reader))
@@ -11044,11 +11035,13 @@ qdsp6_packet_optimizations(void)
 
   qdsp6_init_packing_info(true);
   qdsp6_pack_insns(true);
-  if(TARGET_V4_FEATURES && new_value_jump)
-  {
+
+  if (TARGET_V4_FEATURES && TARGET_NEW_VALUE_JUMP)
     qdsp6_new_value_jump();
-  }
-  qdsp6_pull_up_insns();
+
+  if (TARGET_PULLUP)
+    qdsp6_pull_up_insns();
+
   qdsp6_free_packing_info(true);
 }
 
