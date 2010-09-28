@@ -781,6 +781,9 @@ Basic Stack Layout
 /* See the comment in qdsp6.c containing "QDSP6 stack frames look like:" for a
    diagram of stack frames on QDSP6. */
 #define STACK_GROWS_DOWNWARD 1
+#define FRAME_GROWS_DOWNWARD 1
+
+#define TARGET_LIBC_PROVIDES_SSP 1
 
 #define STARTING_FRAME_OFFSET 0
 
