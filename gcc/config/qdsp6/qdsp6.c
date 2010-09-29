@@ -10528,7 +10528,7 @@ qdsp6_get_compare_feeder(struct qdsp6_insn_info *pred_insn)
  
   for (read=pred_insn->reg_reads; read; read = read->next)
   {
-    if ( (read->regno >= 0 && read->regno <= 7 ) || 
+    if ( read->regno <= 7 || 
         (read->regno >= 16 && read->regno <= 23 ))
     {
       return (read);
@@ -11542,7 +11542,7 @@ static void qdsp6_pack_duplex_insns(void)
                  packet */
               struct qdsp6_packet_info *new_packet = 
                 (struct qdsp6_packet_info *)ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
-              struct qdsp6_packet_info **movable_insns[2];
+              struct qdsp6_insn_info *movable_insns[2];
               int num_movable_insns = 0;
 
               for (i = 0; (i < this_packet->num_insns) && 
