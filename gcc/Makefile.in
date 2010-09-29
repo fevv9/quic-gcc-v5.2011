@@ -60,6 +60,8 @@ build=@build@
 host=@host@
 target=@target@
 target_noncanonical:=@target_noncanonical@
+with_newlib = @with_newlib@
+with_dinkumware = @with_dinkumware@
 
 # Sed command to transform gcc to installed name.
 program_transform_name := @program_transform_name@
@@ -308,15 +310,18 @@ INSTALL_HEADERS_DIR = @build_install_headers_dir@
 
 # Header files that are made available under the same name
 # to programs compiled with GCC.
-#USER_H = $(srcdir)/ginclude/float.h \
-#	 $(srcdir)/ginclude/iso646.h \
-#	 $(srcdir)/ginclude/stdarg.h \
-#	 $(srcdir)/ginclude/stdbool.h \
-#	 $(srcdir)/ginclude/stddef.h \
-#	 $(srcdir)/ginclude/varargs.h \
-#	 $(srcdir)/ginclude/stdfix.h \
-#	 $(EXTRA_HEADERS)
+ifneq ($(with_dinkumware),)
 USER_H = $(EXTRA_HEADERS)
+else
+USER_H = $(srcdir)/ginclude/float.h \
+	 $(srcdir)/ginclude/iso646.h \
+	 $(srcdir)/ginclude/stdarg.h \
+	 $(srcdir)/ginclude/stdbool.h \
+	 $(srcdir)/ginclude/stddef.h \
+	 $(srcdir)/ginclude/varargs.h \
+	 $(srcdir)/ginclude/stdfix.h \
+	 $(EXTRA_HEADERS)
+endif
 
 UNWIND_H = $(srcdir)/unwind-generic.h
 

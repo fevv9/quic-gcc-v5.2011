@@ -3946,6 +3946,8 @@ AC_SUBST(c_target_objs)
 AC_SUBST(cxx_target_objs)
 AC_SUBST(fortran_target_objs)
 AC_SUBST(target_cpu_default)
+AC_SUBST(with_newlib)
+AC_SUBST(with_dinkumware)
 
 AC_SUBST_FILE(language_hooks)
 
