@@ -133,7 +133,6 @@ rest_of_handle_aggregate_access (void)
           if (*def_rec && (*(def_rec+1) == 0))
             {
               bool flag_anchor = false;
-              HOST_WIDE_INT new_offset = 0;
               rtx new_reg = 0;
               HOST_WIDE_INT aligned_offset = 0;
 
