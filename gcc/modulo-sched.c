@@ -1088,7 +1088,8 @@ sms_schedule (void)
       unsigned stage_count = 0;
       HOST_WIDEST_INT loop_count = 0;
 
-      int loopnum; int linenum;
+      int loopnum = 0; 
+      int linenum = 0;
 
       if (! (g = g_arr[loop->num]))
         continue;

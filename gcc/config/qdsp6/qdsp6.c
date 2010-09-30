@@ -382,6 +382,9 @@ static bool
 qdsp6_predicate_use_DImode( struct qdsp6_insn_info *insn_info);
 
 
+void 
+qdsp6_duplicate_doloop_begin(basic_block condition_bb, struct loop *loop);
+
 
 /* Initialize the GCC target structure. */
 
