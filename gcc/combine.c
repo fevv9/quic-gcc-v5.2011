@@ -5599,7 +5599,6 @@ simplify_set (rtx x)
     {
       rtx new_x = copy_rtx (x);
       rtx new_src = SET_SRC (new_x);
-      rtx new_dest = SET_DEST (new_x);
 
       /* Make sure simplified operation is available on the target */
       new_src = force_to_mode (new_src, mode, ~(HOST_WIDE_INT) 0, 0);
