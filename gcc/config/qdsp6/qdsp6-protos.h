@@ -74,3 +74,8 @@ extern void qdsp6_fast_math_libfunc(rtx);
 #if defined(TREE_CODE) && defined(RTX_CODE)
 extern rtx  qdsp6_function_arg(CUMULATIVE_ARGS, enum machine_mode, tree, int);
 #endif /* TREE_CODE && RTX_CODE */
+
+/* PIC support */
+extern rtx legitimize_pic_address(rtx, enum machine_mode, rtx);
+extern rtx qdsp6_legitimize_address (rtx, rtx, enum machine_mode);
+extern void require_pic_register (void);

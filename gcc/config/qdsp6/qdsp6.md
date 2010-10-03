@@ -66,7 +66,10 @@
    (UNSPEC_QDSP6_any       152)
    (UNSPEC_QDSP6_all       153)
    (UNSPEC_QDSP6_falign    154)
-   (UNSPEC_DOLOOP_END      160)]
+   (UNSPEC_DOLOOP_END      160)
+   (UNSPEC_PIC_SYM_GOTOFF  161)   ; For PIC GOTOFF symbols
+   (UNSPEC_PIC_SYM_GOT     162)   ; For PIC GOT symbols
+ ]
 )
 
 
@@ -520,10 +523,63 @@
 ;;---------------;;
 
 
-
 ;;----------------;;
 ;; Standard Names ;;
 ;;----------------;;
+
+;;---------;;
+;; PIC mov ;;
+;;---------;;
+
+;;
+;; Compute offset for PIC mode via @GOTOFF
+;;
+
+(define_insn "pic_movsi_hi_gotoff"
+  [(set (match_operand:SI 0 "gr_register_operand"      "=Rg")
+        (high:SI (unspec:SI [(match_operand:SI 1 "sym_or_lab_operand" "")] UNSPEC_PIC_SYM_GOTOFF)))]
+  "flag_pic"
+  "%0.h = #HI(%1@GOTOFF)"
+  [(set_attr "type" "A")]
+)
+
+(define_insn "pic_movsi_lo_gotoff"
+  [(set (match_operand:SI 0 "gr_register_operand"          "=Rg")
+	(lo_sum:SI (match_operand:SI 1 "gr_register_operand" "0")
+                   (unspec:SI [(match_operand:SI 2 "sym_or_lab_operand" "")] UNSPEC_PIC_SYM_GOTOFF)))]
+  "flag_pic"
+  "%0.l = #LO(%2@GOTOFF)"
+  [(set_attr "type" "A")]
+)
+
+;;
+;; Compute global offset for PIC mode via @GOT
+;;
+
+(define_insn "pic_movsi"
+  [(set (match_operand:SI 0 "gr_register_operand"      "=Rg")
+        (unspec:SI [(match_operand:SI 1 "" "")] UNSPEC_PIC_SYM_GOT))]
+  "flag_pic"
+  "%0 = #%1@GOT"
+  [(set_attr "type" "A")]
+)
+
+(define_insn "pic_movsi_hi_got"
+  [(set (match_operand:SI 0 "gr_register_operand"      "=Rg")
+        (high:SI (unspec:SI [(match_operand:SI 1 "sym_or_lab_operand" "")] UNSPEC_PIC_SYM_GOT)))]
+  "flag_pic"
+  "%0.h = #HI(%1@GOT)"
+  [(set_attr "type" "A")]
+)
+
+(define_insn "pic_movsi_lo_got"
+  [(set (match_operand:SI 0 "gr_register_operand"          "=Rg")
+	(lo_sum:SI (match_operand:SI 1 "gr_register_operand" "0")
+                   (unspec:SI [(match_operand:SI 2 "sym_or_lab_operand" "")] UNSPEC_PIC_SYM_GOT)))]
+  "flag_pic"
+  "%0.l = #LO(%2@GOT)"
+  [(set_attr "type" "A")]
+)
 
 
 ;;--------;;
@@ -877,6 +933,15 @@
              && s8_const_int_operand(operands[1], SImode)))){
       operands[1] = force_reg(SImode, operands[1]);
     }
+    
+    if(flag_pic 
+       && (CONSTANT_P (operands[1])
+           || symbol_mentioned_p (operands[1])
+           || label_mentioned_p (operands[1]))){
+      operands[1] = legitimize_pic_address (operands[1], SImode,
+                                            (can_create_pseudo_p()
+                                             ? NULL_RTX : operands[0]));
+    }
   }
 )
 
@@ -1179,6 +1244,12 @@
                                            || reload_completed, "si")
              && CONST_DOUBLE_OK_FOR_LETTER_P (operands[1], 'G')))){
       operands[1] = force_reg(SFmode, operands[1]);
+    }
+
+    if(flag_pic && CONSTANT_P (operands[1])){
+      operands[1] = legitimize_pic_address (operands[1], SImode,
+                                            (can_create_pseudo_p()
+                                             ? NULL_RTX : operands[0]));
     }
   }
 )
@@ -3924,6 +3995,13 @@
     if(TARGET_LONG_CALLS && !REG_P (XEXP (operands[0], 0))){
       XEXP (operands[0], 0) = force_reg(Pmode, XEXP (operands[0], 0));
     }
+    else {
+      if (flag_pic) {
+        operands[0] = legitimize_pic_address(operands[0], SImode,
+                                             (can_create_pseudo_p()
+                                              ? NULL_RTX : operands[0]));
+      }
+    }
   }
 )
 
@@ -3932,10 +4010,34 @@
          (match_operand 1 "" ""))
    (clobber (reg:SI LINK_REGNUM))]
   "!TARGET_LONG_CALLS"
-  "@
-   call %0
-   callr %0"
+  {
+    if (which_alternative == 0){
+      if (flag_pic) {  
+        return "call %0@PLT";
+      }
+      else {
+        return "call %0";
+      }
+    }
+    else{
+      return "callr %0";
+    }
+  }
   [(set_attr "type" "J,JR")]
+)
+
+(define_expand  "call_register_expand"
+  [(call (mem:HI (match_operand:SI 0 "gr_register_operand" "Rg"))
+         (match_operand 1 "" ""))
+   (clobber (reg:SI LINK_REGNUM))]
+  ""
+  {
+    if (flag_pic){
+      operands[0] = legitimize_pic_address(operands[0], SImode,
+                                           (can_create_pseudo_p()
+                                            ? NULL_RTX : operands[0]));
+    }
+  }
 )
 
 (define_insn "call_register"
@@ -3960,9 +4062,19 @@
          (match_operand 1 "" ""))
    (return)]
   "!TARGET_LONG_CALLS"
-  "@
-   jump %0
-   jumpr %0"
+  {
+    if (which_alternative == 0){
+      if (flag_pic){
+        return "jump %0@PLT";
+      }
+      else{
+	return "jump %0";
+      }
+    }
+    else{
+      return "jumpr %0";
+    }
+  }
   [(set_attr "type" "J,JR")
    (set_attr "duplex" "no,no")]
 )
@@ -3994,9 +4106,19 @@
               (match_operand 2 "" "")))
    (clobber (reg:SI LINK_REGNUM))]
   "!TARGET_LONG_CALLS"
-  "@
-   call %1
-   callr %1"
+  {
+    if (which_alternative == 0){
+      if (flag_pic){  
+        return "call %1@PLT";
+      } 
+      else{
+	return "call %1";
+       }
+    }
+    else{
+      return "callr %1";
+    }
+  }
   [(set_attr "type" "J,JR")]
 )
 
@@ -4029,9 +4151,19 @@
               (match_operand 2 "" "")))
    (return)]
   "!TARGET_LONG_CALLS"
-  "@
-   jump %1
-   jumpr %1"
+  {
+    if (which_alternative == 0){
+      if (flag_pic){  
+        return "jump %1@PLT";
+      }
+      else{
+	return "jump %1";
+      }
+    }
+    else{
+      return "jumpr %1";
+    }
+  }
   [(set_attr "type" "J,JR")
    (set_attr "duplex" "no,no")]
 )
@@ -4185,7 +4317,27 @@
 ;; tablejump ;;
 ;;-----------;;
 
-(define_insn "tablejump"
+(define_expand "tablejump"
+ [(set (pc) (match_operand:SI 0 "nonimmediate_operand" "Rg"))
+   (use (label_ref (match_operand 1 "" "")))]
+ ""
+ {
+   if (flag_pic){
+     rtx addend;
+     require_pic_register();
+     addend = gen_reg_rtx(SImode);
+     emit_insn(gen_addsi3(addend, operands[0], pic_offset_table_rtx));
+     emit_jump_insn(gen_tablejump_real(addend, operands[1]));
+     DONE;
+   }
+   else{
+     emit_jump_insn(gen_tablejump_real(operands[0], operands[1]));
+     DONE;
+   }
+ }
+)
+
+(define_insn "tablejump_real"
   [(set (pc) (match_operand:SI 0 "nonimmediate_operand" "Rg"))
    (use (label_ref (match_operand 1 "" "")))]
   ""
@@ -4387,22 +4539,44 @@
     }
     else {
       if(which_alternative == 0){
-        return "%2 = %0\;"
-               "{\;"
-               "  lc0 = %2\;"
-               "  %2.h = #HI(%1)\;"
-               "}\;"
-               "%2.l = #LO(%1)\;"
-               "sa0 = %2";
+        if(flag_pic) {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "sa0 = %2";
+	}
+        else {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1)\;"
+                 "}\;"
+                 "%2.l = #LO(%1)\;"
+                 "sa0 = %2";
+        }
       }
       else {
-        return "%2 = #%0\;"
-               "{\;"
-               "  lc0 = %2\;"
-               "  %2.h = #HI(%1)\;"
-               "}\;"
-               "%2.l = #LO(%1)\;"
-               "sa0 = %2";
+        if(flag_pic) {
+          return "%2 = #%0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "sa0 = %2";
+        }
+	else {
+          return "%2 = #%0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1)\;"
+                 "}\;"
+                 "%2.l = #LO(%1)\;"
+                 "sa0 = %2";
+        }
       }
     }
   }
@@ -4429,7 +4603,7 @@
   [(set (reg:SI LC1_REGNUM) (match_operand:SI 0 "nonmemory_operand" "Rg,Iu10"))
    (set (reg:SI SA1_REGNUM) (label_ref (match_operand 1 "" "")))
    (clobber (match_scratch:SI 2 "=&Rg,&Rg"))]
-  ""
+  "!flag_pic"
   {
     if(get_attr_length(insn) == 4){
       if(which_alternative == 0){
@@ -4441,22 +4615,44 @@
     }
     else {
       if(which_alternative == 0){
-        return "%2 = %0\;"
-               "{\;"
-               "  lc1 = %2\;"
-               "  %2.h = #HI(%1)\;"
-               "}\;"
-               "%2.l = #LO(%1)\;"
-               "sa1 = %2";
+        if(flag_pic) {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "sa1 = %2";
+        }
+	else {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1)\;"
+                 "}\;"
+                 "%2.l = #LO(%1)\;"
+                 "sa1 = %2";
+        }
       }
       else {
-        return "%2 = #%0\;"
-               "{\;"
-               "  lc1 = %2\;"
-               "  %2.h = #HI(%1)\;"
-               "}\;"
-               "%2.l = #LO(%1)\;"
-               "sa1 = %2";
+        if(flag_pic) {
+          return "%2 = #%0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "sa1 = %2";
+        }
+	else {
+         return "%2 = #%0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1)\;"
+                 "}\;"
+                 "%2.l = #LO(%1)\;"
+                 "sa1 = %2";
+         }
       }
     }
   }
@@ -8494,7 +8690,14 @@
    (clobber (reg:SI 28))
    (clobber (reg:SI LINK_REGNUM))]
   ""
-  "call __save_r24_through_r27"
+  {
+    if (flag_pic){
+      return "call __save_r27_through_r24@PLT";
+    }
+    else{
+      return "call __save_r27_through_r24";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8575,7 +8778,14 @@
    (clobber (reg:SI 28))
    (clobber (reg:SI LINK_REGNUM))]
   ""
-  "call __save_r16_through_r19"
+  {
+    if (flag_pic){
+      return "call __save_r16_through_r19@PLT";
+    }
+    else{
+      return "call __save_r16_through_r19";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8590,7 +8800,14 @@
    (clobber (reg:SI 28))
    (clobber (reg:SI LINK_REGNUM))]
   ""
-  "call __save_r16_through_r21"
+  {
+    if (flag_pic){
+      return "call __save_r16_through_r21@PLT";
+    }
+    else{
+      return "call __save_r16_through_r21";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8607,7 +8824,14 @@
    (clobber (reg:SI 28))
    (clobber (reg:SI LINK_REGNUM))]
   ""
-  "call __save_r16_through_r23"
+  {
+    if (flag_pic){
+      return "call __save_r16_through_r23@PLT";
+    }
+    else{
+      return "call __save_r16_through_r23";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8626,7 +8850,14 @@
    (clobber (reg:SI 28))
    (clobber (reg:SI LINK_REGNUM))]
   ""
-  "call __save_r16_through_r25"
+  {
+    if (flag_pic){
+      return "call __save_r16_through_r25@PLT";
+    }
+    else{
+      return "call __save_r16_through_r25";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8647,7 +8878,14 @@
    (clobber (reg:SI 28))
    (clobber (reg:SI LINK_REGNUM))]
   ""
-  "call __save_r16_through_r27"
+  {
+    if (flag_pic){
+      return "call __save_r16_through_r27@PLT";
+    }
+    else{
+      return "call __save_r16_through_r27";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8673,7 +8911,14 @@
         (mem:SI (reg:SI FP_REGNUM)))
    (clobber (reg:SI 28))]
   ""
-  "call __restore_r16_through_r27_and_deallocframe_before_tailcall"
+  {
+    if (flag_pic){
+      return "call __restore_r16_through_r27_and_deallocframe_before_tailcall@PLT";
+    }
+    else{
+      return "call __restore_r16_through_r27_and_deallocframe_before_tailcall";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8697,7 +8942,14 @@
         (mem:SI (reg:SI FP_REGNUM)))
    (clobber (reg:SI 28))]
   ""
-  "call __restore_r16_through_r25_and_deallocframe_before_tailcall"
+  {
+    if (flag_pic){
+      return "call __restore_r16_through_r25_and_deallocframe_before_tailcall@PLT";
+    }
+    else{
+      return "call __restore_r16_through_r25_and_deallocframe_before_tailcall";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8719,7 +8971,14 @@
         (mem:SI (reg:SI FP_REGNUM)))
    (clobber (reg:SI 28))]
   ""
-  "call __restore_r16_through_r23_and_deallocframe_before_tailcall"
+  {
+    if (flag_pic){
+      return "call __restore_r16_through_r23_and_deallocframe_before_tailcall@PLT";
+    }
+    else{
+      return "call __restore_r16_through_r23_and_deallocframe_before_tailcall";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8739,7 +8998,14 @@
         (mem:SI (reg:SI FP_REGNUM)))
    (clobber (reg:SI 28))]
   ""
-  "call __restore_r16_through_r21_and_deallocframe_before_tailcall"
+  {
+    if (flag_pic){
+      return "call __restore_r16_through_r21_and_deallocframe_before_tailcall@PLT";
+    }
+    else{
+      return "call __restore_r16_through_r21_and_deallocframe_before_tailcall";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8757,7 +9023,14 @@
         (mem:SI (reg:SI FP_REGNUM)))
    (clobber (reg:SI 28))]
   ""
-  "call __restore_r16_through_r19_and_deallocframe_before_tailcall"
+  {
+    if (flag_pic){
+      return "call __restore_r16_through_r19_and_deallocframe_before_tailcall@PLT";
+    }
+    else{
+      return "call __restore_r16_through_r19_and_deallocframe_before_tailcall";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8773,7 +9046,14 @@
         (mem:SI (reg:SI FP_REGNUM)))
    (clobber (reg:SI 28))]
   ""
-  "call __restore_r16_through_r17_and_deallocframe_before_tailcall"
+  {
+    if (flag_pic){
+      return "call __restore_r16_through_r17_and_deallocframe_before_tailcall@PLT";
+    }
+    else{
+      return "call __restore_r16_through_r17_and_deallocframe_before_tailcall";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8799,7 +9079,14 @@
    (set (reg:SI FP_REGNUM)
         (mem:SI (reg:SI FP_REGNUM)))]
   ""
-  "jump __restore_r16_through_r27_and_deallocframe"
+  {
+    if (flag_pic){
+      return "jump __restore_r16_through_r27_and_deallocframe@PLT";
+    }
+    else{
+      return "jump __restore_r16_through_r27_and_deallocframe";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8823,8 +9110,15 @@
    (set (reg:SI FP_REGNUM)
         (mem:SI (reg:SI FP_REGNUM)))]
   ""
-  "jump __restore_r16_through_r25_and_deallocframe"
-  [(set_attr "type" "J")
+  {
+    if (flag_pic){
+      return "jump __restore_r16_through_r25_and_deallocframe@PLT";
+    }
+    else{
+      return "jump __restore_r16_through_r25_and_deallocframe";
+    }
+  } 
+ [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
 
@@ -8845,7 +9139,14 @@
    (set (reg:SI FP_REGNUM)
         (mem:SI (reg:SI FP_REGNUM)))]
   ""
-  "jump __restore_r16_through_r23_and_deallocframe"
+  {
+    if (flag_pic){
+      return "jump __restore_r16_through_r23_and_deallocframe@PLT";
+    }
+    else{
+      return "jump __restore_r16_through_r23_and_deallocframe";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8865,7 +9166,14 @@
    (set (reg:SI FP_REGNUM)
         (mem:SI (reg:SI FP_REGNUM)))]
   ""
-  "jump __restore_r16_through_r21_and_deallocframe"
+  {
+    if (flag_pic){
+      return "jump __restore_r16_through_r21_and_deallocframe@PLT";
+    }
+    else{
+      return "jump __restore_r16_through_r21_and_deallocframe";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8883,7 +9191,14 @@
    (set (reg:SI FP_REGNUM)
         (mem:SI (reg:SI FP_REGNUM)))]
   ""
-  "jump __restore_r16_through_r19_and_deallocframe"
+  {
+    if (flag_pic){
+      return "jump __restore_r16_through_r19_and_deallocframe@PLT";
+    }
+    else{
+      return "jump __restore_r16_through_r19_and_deallocframe";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8899,7 +9214,14 @@
    (set (reg:SI FP_REGNUM)
         (mem:SI (reg:SI FP_REGNUM)))]
   ""
-  "jump __restore_r16_through_r17_and_deallocframe"
+  {
+    if (flag_pic){
+      return "jump __restore_r16_through_r17_and_deallocframe@PLT";
+    }
+    else{
+      return "jump __restore_r16_through_r17_and_deallocframe";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -8927,7 +9249,14 @@
    (set (reg:SI FP_REGNUM)
         (mem:SI (reg:SI FP_REGNUM)))]
   "!TARGET_V4_FEATURES"
-  "jump __deallocframe"
+  {
+    if (flag_pic){
+      return "jump __deallocframe@PLT";
+    }
+    else{
+      return "jump  __deallocframe";
+    }
+  }
   [(set_attr "type" "J")
    (set_attr "emulation_call" "yes")]
 )
@@ -9729,6 +10058,19 @@
 ;; Other ;;
 ;;-------;;
 
+;;
+;; Instructions emitted in function prologue to compute GOT base
+;;
+(define_insn "compute_got_base"
+  [(set (match_operand:SI 0 "register_operand" "") (pc))
+   (use (label_ref (match_operand 1 "" "")))]
+   "flag_pic"
+   { 
+     return "\n# setup %0 as the GOT pointer\n%l1:\;%0 = pc\";
+   }
+  ;; We don't want this instruction to be packetized
+  [(set_attr "type" "multiple")]
+)
 
 
 ;; Pseudo instruction that prevents the scheduler from moving code above this

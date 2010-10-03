@@ -2593,7 +2593,11 @@ case "${target}" in
     fi
     ;;
   qdsp6-*-linux*)
-    noconfigdirs="$noconfigdirs ${libgcj} target-newlib target-libgloss target-libiberty gdb"
+#    noconfigdirs="$noconfigdirs ${libgcj} target-newlib target-libgloss target-libiberty gdb"
+    noconfigdirs="$noconfigdirs ${libgcj} gdb target-libmudflap target-libgloss target-libiberty target-libgomp"
+    if test x$with_dinkumware = xyes ; then
+    skipdirs="$skipdirs target-libiberty target-libgcc target-libstdc++-v3"
+    fi
     ;;
   rs6000-*-lynxos*)
     noconfigdirs="$noconfigdirs target-newlib gprof ${libgcj}"
