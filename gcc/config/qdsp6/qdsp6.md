@@ -8692,10 +8692,10 @@
   ""
   {
     if (flag_pic){
-      return "call __save_r27_through_r24@PLT";
+      return "call __save_r24_through_r27@PLT";
     }
     else{
-      return "call __save_r27_through_r24";
+      return "call __save_r24_through_r27";
     }
   }
   [(set_attr "type" "J")
