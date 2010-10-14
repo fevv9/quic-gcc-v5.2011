@@ -10,8 +10,8 @@ $(T)crtn.o: $(srcdir)/config/qdsp6/crtn.asm $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
 	-c -o $(T)crtn.o -x assembler $(srcdir)/config/qdsp6/crtn.asm
 
-MULTILIB_OPTIONS    = march=qdsp6v3/march=qdsp6v4 mG0lib fpic
-MULTILIB_DIRNAMES   = v3 v4 G0 fpic
+MULTILIB_OPTIONS    = march=qdsp6v3 mG0lib fpic
+MULTILIB_DIRNAMES   = v3 G0 fpic
 MULTILIB_MATCHES    = fpic=fPIC
 MULTILIB_EXCEPTIONS =
 MULTILIB_EXTRA_OPTS = mbuilding-multilib G0
