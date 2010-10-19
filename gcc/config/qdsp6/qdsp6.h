@@ -85,6 +85,9 @@ Run-time Target Specification
     } \
     builtin_define_std ("qdsp6"); \
     builtin_assert ("machine=qdsp6"); \
+    if (flag_pic){ \
+      builtin_define_std ("__PIC__"); \
+    } \
   }while(0)
 
 /* Append (qdsp6) to the version string. */

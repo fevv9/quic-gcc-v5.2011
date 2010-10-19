@@ -544,7 +544,11 @@ FUNC_START qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 		r0 -= add(r2,#-8)
 		jumpr r31
 	}
+#ifdef __PIC__
+2:	jump memcpy@PLT
+#else
 2:	jump memcpy
+#endif
 FUNC_END qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 #else
 FUNC_START qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
@@ -584,7 +588,11 @@ FUNC_START qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 		r0 -= add(r2,#-8)
 		jumpr r31
 	}
+#ifdef __PIC__	
+2:	jump memcpy@PLT
+#else	
 2:	jump memcpy
+#endif
 FUNC_END qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 #endif /* __QDSP6_ARCH__ >= 4 */
 #endif /* L_qdsp_memcpy_likely_aligned_min32bytes_mult8bytes */
