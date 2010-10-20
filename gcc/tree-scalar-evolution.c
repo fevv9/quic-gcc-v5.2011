@@ -1457,7 +1457,8 @@ static gimple
 descend_phi_chain (gimple root_phi, gimple gimple_array[], 
                     int *counter, int level){
 
- unsigned int i,j; 
+ unsigned int i;
+ int j; 
  gimple low_ssa = root_phi;
    
   if(!root_phi 
@@ -1511,10 +1512,10 @@ descend_phi_chain (gimple root_phi, gimple gimple_array[],
         i.0_3              = (unsigned int) i_20
 */ 
 static t_bool
-analyze_possible_phi_aliasing (struct loop *loop,
+analyze_possible_phi_aliasing (struct loop *loop ATTRIBUTE_UNUSED,
             gimple first_phi,
             gimple second_phi,
-            tree *evolution_of_loop, int limit)
+            tree *evolution_of_loop ATTRIBUTE_UNUSED, int limit ATTRIBUTE_UNUSED)
 {
   int i;
 
