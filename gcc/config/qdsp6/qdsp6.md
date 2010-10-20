@@ -415,7 +415,7 @@
 
 (define_insn_reservation "v4_XJ"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "XJ"))
- "(Slot2 + slot3) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+ "(Slot2 + Slot3) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
 
 
 (define_insn_reservation "v4_M"          1 (and (eq_attr "arch" "v4")
