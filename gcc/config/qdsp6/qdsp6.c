@@ -3937,8 +3937,9 @@ qdsp6_asm_select_rtx_section(
 extern void switch_to_section (section *);                 
 
 #define MAX_DECLARE_RECURSION   1024
-static tree  list_of_visited_declaration [MAX_DECLARE_RECURSION];
-static int     list_of_visited_declaration_counter;
+static tree  *list_of_visited_declaration;
+static int	 max_list_of_visited_declaration_counter;
+static int   list_of_visited_declaration_counter;
 
 bool
 has_this_tree_been_visited(tree node){
@@ -3950,9 +3951,6 @@ has_this_tree_been_visited(tree node){
    return 0;
 }
 
-
-
-
 void
 remember_this_tree(tree node){
    int i;
@@ -3962,15 +3960,17 @@ remember_this_tree(tree node){
    }
    /* No, have not seen it, so remember visiting it */
    list_of_visited_declaration[list_of_visited_declaration_counter++]   = node;
-   if(list_of_visited_declaration_counter >= MAX_DECLARE_RECURSION){
-        fprintf(stderr,"Error. Declaration recursion overflow (%d)\n",MAX_DECLARE_RECURSION);
-        abort();
+   if(list_of_visited_declaration_counter >= 
+	  max_list_of_visited_declaration_counter){
+		/* We have exceeded original MAX_DECLARE_RECURSION */ 
+		max_list_of_visited_declaration_counter = 
+			max_list_of_visited_declaration_counter*2; 
+		list_of_visited_declaration = (tree *) ggc_realloc 
+			(list_of_visited_declaration, 
+			max_list_of_visited_declaration_counter * sizeof(tree *));
    }
    return;
 }
-
-
-
 
 /* descent_smallest designed to identify the smallest addressable entity
    in a declaration. Used for sdata elements sorting */ 
@@ -4111,6 +4111,9 @@ unsigned HOST_WIDE_INT
 smallest_accessable_entity_in_declaration(tree decl)
 {
    list_of_visited_declaration_counter  = 0;
+   max_list_of_visited_declaration_counter	= MAX_DECLARE_RECURSION; 
+   list_of_visited_declaration = (tree *)ggc_alloc(max_list_of_visited_declaration_counter * sizeof(tree *));
+   
    /* Here I assume there are no atomic data types larger than 128 bytes in this machine */ 
    return descent_smallest(" top ", decl, DEFAULT_LARGEST_ALIGNMENT); 
 }
