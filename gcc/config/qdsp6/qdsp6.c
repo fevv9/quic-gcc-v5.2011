@@ -1395,7 +1395,7 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
   unsigned int j;
 
   /* Select the set of prologue and epilogue functions for the target ABI. */
-  if(qdsp6_abi == QDSP6_ABI_2){
+  if(qdsp6_abi != QDSP6_ABI_1){
     prologue_epilogue_functions = prologue_epilogue_functions_abi2;
     max_function_saved_pairs = ARRAY_SIZE (prologue_epilogue_functions_abi2)
                                - 1;
