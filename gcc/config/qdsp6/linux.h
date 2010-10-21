@@ -40,3 +40,7 @@ Controlling the Compilation Driver, gcc
 
 #undef LIB_SPEC
 #define LIB_SPEC "-lc"
+
+#undef QDSP6_ABI_TABLE_DEFAULT_INDEX
+#define QDSP6_ABI_TABLE_DEFAULT_INDEX QDSP6_ABI_LINUX
+
