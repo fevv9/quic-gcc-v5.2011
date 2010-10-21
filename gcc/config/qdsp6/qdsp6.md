@@ -85,7 +85,7 @@
 ;; Used to determine which slots an insn can use when scheduling insns
 
 (define_attr "type"
-             "A,X,Load,Store,Memop,NewValue,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR,multiple,J_dotnew,NewValueJump,NewValueJumpPlus,AJ"
+             "A,X,Load,Store,Memop,NewValue,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR,multiple,J_dotnew,NewValueJump,ENewValueJump,AJ,XJ"
              (const_string "multiple"))
 
 
@@ -402,16 +402,21 @@
 
 (define_insn_reservation "v4_NewValueJump"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "NewValueJump"))
- "Slot0 + Store0 + Store1 + PCadder +  control")
+ "Slot0 + Store0 + Store1 + PCadder + ( control | control_dualjumps ) ")
 
-(define_insn_reservation "v4_NewValueJumpPlus"   1 (and (eq_attr "arch" "v4")
-                                                (eq_attr "type" "NewValueJumpPlus"))
- "Slot0 + Store0 + Store1 + PCadder +  control + ( Slot1 | Slot2 | Slot3 )")
+(define_insn_reservation "v4_ENewValueJump"   1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "ENewValueJump"))
+ "Slot0 + Store0 + Store1 + PCadder + ( control | control_dualjumps ) + ( Slot1 | Slot2 | Slot3 )")
 
 
 (define_insn_reservation "v4_AJ"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "AJ"))
- "((Slot2 + (Slot0 | Slot1 | Slot3)) | (Slot3 + (Slot0 | Slot1 | Slot2))) + PCadder + control")
+ "((Slot2 + (Slot0 | Slot1 | Slot3)) | (Slot3 + (Slot0 | Slot1 | Slot2))) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+
+(define_insn_reservation "v4_XJ"     1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "XJ"))
+ "(Slot2 + Slot3) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+
 
 (define_insn_reservation "v4_M"          1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "M"))
@@ -3850,20 +3855,177 @@
                       (const_string "8")))]
 )
 
-(define_insn "new_value_jump"
-  [(parallel [(set (pc)
+(define_insn "new_value_jump_tstbit"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "predicate_operator"
+                        [(zero_extract:SI (unspec:SI [(match_operand:SI 1 "gr_register_operand" "Rg, Rg")]
+                                           UNSPEC_NEW_VALUE)
+                                          (const_int 1)
+                                          (match_operand:SI 2 "nonmemory_operand"  "Iu5,Rg"))
+                         (const_int 0)
+                        ]
+                      )
+                      (label_ref (match_operand 3 "" ""))
+                      (pc)))
+  (set  (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
+        (match_op_dup:BI 0 
+          [(zero_extract:SI (unspec:SI [(match_dup 1)] UNSPEC_NEW_VALUE) 
+                             (const_int 1) 
+                             (match_dup 2))
+           (const_int 0)
+          ])
+  )
+  ]
+  "TARGET_V4_FEATURES"
+  {
+    rtx prediction;
+    int predict_taken;
+    enum rtx_code code;
+
+    predict_taken = 0;
+    code = GET_CODE(operands[0]);
+    prediction = find_reg_note(insn, REG_BR_PROB, 0);
+    predict_taken = (prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2);
+ 
+    if (GET_CODE(operands[2]) == CONST_INT) 
+    {
+      switch(code)
+      {
+        case EQ: {
+          if (predict_taken)
+            return "if (tstbit(%1.new,#%2)) jump:t %l3";
+          else 
+            return "if (tstbit(%1.new,#%2)) jump:nt %l3";
+        }
+        case NE: {
+          if (predict_taken)
+            return "if (!tstbit(%1.new,#%2)) jump:t %l3"; 
+          else
+            return "if (!tstbit(%1.new,#%2)) jump:nt %l3"; 
+        }
+        default:
+          gcc_unreachable();
+      }
+    }
+    else 
+    {
+      switch(code)
+      {
+        case EQ: {
+          if (predict_taken)
+            return "if (tstbit(%1.new,%2)) jump:t %l3";
+          else
+            return "if (tstbit(%1.new,%2)) jump:nt %l3";
+        }
+        case NE: {
+          if (predict_taken)
+            return "if (!tstbit(%1.new,%2)) jump:t %l3"; 
+          else
+            return "if (!tstbit(%1.new,%2)) jump:nt %l3"; 
+        }
+        default:
+          gcc_unreachable();
+      }
+    }
+  }
+  [(set_attr "type" "NewValueJump,ENewValueJump")
+   (set (attr "type")
+        (if_then_else (eq_attr "length" "4")
+                      (const_string "NewValueJump")
+                      (const_string "ENewValueJump")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
+                      (const_string "4")
+                      (const_string "8")))]
+)
+
+(define_insn "compare_and_jump_tstbit"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "predicate_operator"
+                        [(zero_extract:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
+                                          (const_int 1)
+                                          (match_operand:SI 2 "nonmemory_operand"  "Iu5,Rg"))
+                         (const_int 0)
+                        ]
+                      )
+                      (label_ref (match_operand 3 "" ""))
+                      (pc)))
+  (set  (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
+        (match_op_dup:BI 0 
+          [(zero_extract:SI  (match_dup 1) 
+                             (const_int 1) 
+                             (match_dup 2))
+           (const_int 0)
+          ])
+  )
+  ]
+  "TARGET_V4_FEATURES && crtl->combine_completed"
+  {
+    rtx prediction;
+    int predict_taken;
+    enum rtx_code code;
+
+    predict_taken = 0;
+    code = GET_CODE(operands[0]);
+    prediction = find_reg_note(insn, REG_BR_PROB, 0);
+    predict_taken = (prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2);
+    if (GET_CODE(operands[2]) == CONST_INT) {
+      switch(code) {
+        case EQ: {
+           if (predict_taken)
+             return "%4 = tstbit(%1,#%2); if (%4.new) jump:t %l3"; 
+           else
+             return "%4 = tstbit(%1,#%2); if (%4.new) jump:nt %l3"; 
+        }
+        case NE: {
+          if (predict_taken)
+            return "%4 = tstbit(%1,#%2); if (!%4.new) jump:t %l3"; 
+          else 
+            return "%4 = tstbit(%1,#%2); if (!%4.new) jump:nt %l3"; 
+        }
+        default:
+          gcc_unreachable();
+      }
+    }
+    else {
+      switch(code) {
+        case EQ: {
+          if (predict_taken)
+            return "%4 = tstbit(%1,%2); if (%4.new) jump:t %l3"; 
+          else
+            return "%4 = tstbit(%1,%2); if (%4.new) jump:nt %l3"; 
+        }
+        case NE: {
+          if (predict_taken)
+            return "%4 = tstbit(%1,%2); if (!%4.new) jump:t %l3"; 
+          else
+            return "%4 = tstbit(%1,%2); if (!%4.new) jump:nt %l3"; 
+        }
+        default:
+          gcc_unreachable();
+      }
+    }
+  }
+  [(set_attr "type" "XJ")]
+)
+
+
+(define_insn "new_value_jump1"
+  [(set (pc)
         (if_then_else (match_operator:BI 0 "comparison_operator"
                         [(unspec:SI [(match_operand:SI 1 "gr_register_operand" "Rg,Rg")] 
                           UNSPEC_NEW_VALUE)
-                         (match_operand:SI 2 "nonmemory_operand"  "i,Rg")])
+                         (match_operand:SI 2 "nonmemory_operand"  "Iu5K-1,Rg")
+                         ])
                       (label_ref (match_operand 3 "" ""))
                       (pc)))
   (set  (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
             (match_op_dup:BI 0 
               [(unspec:SI [(match_dup 1)] UNSPEC_NEW_VALUE) 
-            (match_dup 2)])
+               (match_dup 2)
+              ])
   )
-  ])]
+  ]
   "TARGET_V4_FEATURES"
   {
     operands[5] = qdsp6_branch_hint(insn);
@@ -3893,11 +4055,11 @@
       }
     }
   }
-  [(set_attr "type" "NewValueJump,NewValueJumpPlus")
+  [(set_attr "type" "NewValueJump,ENewValueJump")
    (set (attr "type")
         (if_then_else (eq_attr "length" "4")
                       (const_string "NewValueJump")
-                      (const_string "NewValueJumpPlus")))
+                      (const_string "ENewValueJump")))
    (set (attr "length")
         (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
                       (const_string "4")
@@ -3906,17 +4068,17 @@
 )
 
 
-(define_insn "old_new_value_jump"
-  [(parallel [(set (pc)
+(define_insn "compare_and_jump1"
+  [(set (pc)
         (if_then_else (match_operator:BI 0 "comparison_operator"
                         [(match_operand:SI 1 "gr_register_operand" "Rg,Rg") 
-                        (match_operand:SI 2 "nonmemory_operand"  "i,Rg")])
+                         (match_operand:SI 2 "nonmemory_operand"  "Iu5K-1,Rg")])
                       (label_ref (match_operand 3 "" ""))
                       (pc)))
   ( set (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
         (match_op_dup:BI 0 [(match_dup 1) (match_dup 2)])
   )
-  ])]
+  ]
   "TARGET_V4_FEATURES && crtl->combine_completed"
   {
     operands[5] = qdsp6_branch_hint(insn);
@@ -3948,6 +4110,108 @@
   }
   [(set_attr "type" "AJ")]
 )
+
+(define_insn "new_value_jump2"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "comparison_operator"
+                        [(match_operand:SI 1 "nonmemory_operand" "Iu5k-1,Rg") 
+                         (unspec:SI [(match_operand:SI 2 "gr_register_operand"  "Rg,Rg")]
+                          UNSPEC_NEW_VALUE)
+                         ])
+                      (label_ref (match_operand 3 "" ""))
+                      (pc)))
+  (set  (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
+            (match_op_dup:BI 0 
+              [(match_dup 1)
+              (unspec:SI [(match_dup 2)] UNSPEC_NEW_VALUE) 
+              ])
+  )
+  ]
+  "TARGET_V4_FEATURES"
+  {
+    operands[5] = qdsp6_branch_hint(insn);
+    enum rtx_code code = GET_CODE(operands[0]);
+    if (GET_CODE(operands[1]) == CONST_INT) {
+      switch(code) {
+        case EQ: return "if (cmp.eq(#%1,%2.new)) jump%h5 %l3"; 
+        case NE: return "if (!cmp.eq(#%%1,%2.new)) jump%h5 %l3"; 
+        case GT: return "if (cmp.gt(#%%1,%2.new)) jump%h5 %l3"; 
+        case LE: return "if (!cmp.gt(#%%1,%2.new)) jump%h5 %l3"; 
+        case GTU: return "if (cmp.gtu(#%%1,%2.new)) jump%h5 %l3"; 
+        case LEU: return "if (!cmp.gtu(#%%1,%2.new)) jump%h5 %l3"; 
+        default:
+          gcc_unreachable();
+      }
+    }
+    else {
+      switch(code) {
+        case EQ: return "if (cmp.eq(%1,%2.new)) jump%h5 %l3"; 
+        case NE: return "if (!cmp.eq(%1,%2.new)) jump%h5 %l3"; 
+        case GT: return "if (cmp.gt(%1,%2.new)) jump%h5 %l3"; 
+        case LE: return "if (!cmp.gt(%1,%2.new)) jump%h5 %l3"; 
+        case GTU: return "if (cmp.gtu(%1,%2.new)) jump%h5 %l3"; 
+        case LEU: return "if (!cmp.gtu(%1,%2.new)) jump%h5 %l3"; 
+        default:
+          gcc_unreachable();
+      }
+    }
+  }
+  [(set_attr "type" "NewValueJump,ENewValueJump")
+   (set (attr "type")
+        (if_then_else (eq_attr "length" "4")
+                      (const_string "NewValueJump")
+                      (const_string "ENewValueJump")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
+                      (const_string "4")
+                      (const_string "8")))]
+
+)
+
+
+(define_insn "compare_and_jump2"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "comparison_operator"
+                        [(match_operand:SI 1 "nonmemory_operand"  "Iu5K-1,Rg")
+                        (match_operand:SI 2 "gr_register_operand" "Rg,Rg")])
+                      (label_ref (match_operand 3 "" ""))
+                      (pc)))
+  ( set (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
+        (match_op_dup:BI 0 [(match_dup 1) (match_dup 2)])
+  )
+  ]
+  "TARGET_V4_FEATURES && crtl->combine_completed"
+  {
+    operands[5] = qdsp6_branch_hint(insn);
+    enum rtx_code code = GET_CODE(operands[0]);
+    if (GET_CODE(operands[1]) == CONST_INT) {
+      switch(code) {
+        case EQ: return "%4 = cmp.eq(#%1, %2); if (%4.new) jump%h5 %l3"; 
+        case NE: return "%4 = cmp.eq(#%1, %2); if (!%4.new) jump%h5 %l3"; 
+        case GT: return "%4 = cmp.gt(#%1, %2); if (%4.new) jump%h5 %l3"; 
+        case LE: return "%4 = cmp.gt(#%1, %2); if (!%4.new) jump%h5 %l3"; 
+        case GTU: return "%4 = cmp.gtu(#%1, %2); if (%4.new) jump%h5 %l3"; 
+        case LEU: return "%4 = cmp.gtu(#%1, %2); if (!%4.new) jump%h5 %l3"; 
+        default:
+          gcc_unreachable();
+      }
+    }
+    else {
+      switch(code) {
+        case EQ: return "%4 = cmp.eq(%1, %2); if (%4.new) jump%h5 %l3"; 
+        case NE: return "%4 = cmp.eq(%1, %2); if (!%4.new) jump%h5 %l3"; 
+        case GT: return "%4 = cmp.gt(%1, %2); if (%4.new) jump%h5 %l3"; 
+        case LE: return "%4 = cmp.gt(%1, %2); if (!%4.new) jump%h5 %l3"; 
+        case GTU: return "%4 = cmp.gtu(%1, %2); if (%4.new) jump%h5 %l3"; 
+        case LEU: return "%4 = cmp.gtu(%1, %2); if (!%4.new) jump%h5 %l3"; 
+        default:
+          gcc_unreachable();
+      }
+    }
+  }
+  [(set_attr "type" "AJ")]
+)
+ 
  
 ;;----------------;;
 ;; cbranch{mode}4 ;;
