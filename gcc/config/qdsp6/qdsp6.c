@@ -7899,6 +7899,7 @@ qdsp6_expand_compare(enum rtx_code code)
     }
 
     op1 = plus_constant(op1, offset);
+    op1 = gen_int_mode(INTVAL(op1), GET_MODE(op0));
 
     if(GET_CODE (op1) != CONST_INT
        || !IN_RANGE (INTVAL (op1), compare_code == GTU ? 0 : -512, 511)){
