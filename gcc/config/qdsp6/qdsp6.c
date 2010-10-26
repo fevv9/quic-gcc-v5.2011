@@ -11546,9 +11546,6 @@ qdsp6_nvj_compare_p(rtx insn)
   code = GET_CODE(XEXP(pattern,1));
   mode = GET_MODE(XEXP(pattern,1));
 
-  operand1 = XEXP(SET_SRC(pattern),0);
-  operand2 = XEXP(SET_SRC(pattern),1);
-
   if (mode != BImode)
   {
     return (false);
@@ -11561,6 +11558,10 @@ qdsp6_nvj_compare_p(rtx insn)
   {
     return (false);
   }
+
+  /*now that we know it is a compare instruction, get the operands */
+  operand1 = XEXP(SET_SRC(pattern),0);
+  operand2 = XEXP(SET_SRC(pattern),1);
 
   /* for tstbit, only #0 comparison is permitted*/
   if (GET_CODE(operand1) == ZERO_EXTRACT &&
