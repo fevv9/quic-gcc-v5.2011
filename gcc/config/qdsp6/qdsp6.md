@@ -563,7 +563,7 @@
 
 (define_insn "pic_movsi"
   [(set (match_operand:SI 0 "gr_register_operand"      "=Rg")
-        (unspec:SI [(match_operand:SI 1 "" "")] UNSPEC_PIC_SYM_GOT))]
+        (unspec:SI [(match_operand:HI 1 "general_operand" "")] UNSPEC_PIC_SYM_GOT))]
   "flag_pic"
   "%0 = #%1@GOT"
   [(set_attr "type" "A")]
@@ -585,7 +585,6 @@
   "%0.l = #LO(%2@GOT)"
   [(set_attr "type" "A")]
 )
-
 
 ;;--------;;
 ;; mov{m} ;;

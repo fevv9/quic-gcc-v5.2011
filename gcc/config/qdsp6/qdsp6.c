@@ -2611,7 +2611,7 @@ legitimize_pic_address(rtx orig, enum machine_mode mode, rtx reg)
       else {
 	if (flag_pic == 1) {
 	  /* rx = #addr@GOT */
-	  emit_insn (gen_pic_movsi(address, gen_rtx_CONST(SImode, orig)));
+	  emit_insn (gen_pic_movsi(address, gen_rtx_CONST(HImode, orig)));
 	} 
 	else {
 	  /* rx.h = #HI(addr@GOT); rx.l = #LO(addr@GOT) */
