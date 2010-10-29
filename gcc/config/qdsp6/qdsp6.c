@@ -1288,6 +1288,10 @@ qdsp6_save_register_p(unsigned int regno)
     }while(eh_regno != INVALID_REGNUM);
   }
 
+  if (flag_pic && regno == PIC_OFFSET_TABLE_REGNUM && df_regs_ever_live_p(regno)) {
+    return true;  
+  }
+
   /* The return address and frame pointer are treated separately.  Don't
      consider them here. */
   return regno != LINK_REGNUM
