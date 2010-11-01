@@ -8938,7 +8938,8 @@
    (set (reg:SI LINK_REGNUM)
         (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
    (set (reg:SI FP_REGNUM)
-        (mem:SI (reg:SI FP_REGNUM)))]
+        (mem:SI (reg:SI FP_REGNUM)))
+   (clobber (mem:BLK (scratch)))]
   ""
   "deallocframe"
   [(set_attr "type" "Load")
