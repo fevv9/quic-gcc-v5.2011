@@ -70,7 +70,22 @@ typedef struct convert_optab *convert_optab;
 
 /* Given an enum insn_code, access the function to construct
    the body of that kind of insn.  */
-#define GEN_FCN(CODE) (insn_data[CODE].genfun)
+typedef rtx (*insn_gen_fn_1) (rtx);
+typedef rtx (*insn_gen_fn_2) (rtx, rtx);
+typedef rtx (*insn_gen_fn_3) (rtx, rtx, rtx);
+typedef rtx (*insn_gen_fn_4) (rtx, rtx, rtx, rtx);
+typedef rtx (*insn_gen_fn_5) (rtx, rtx, rtx, rtx, rtx);
+typedef rtx (*insn_gen_fn_6) (rtx, rtx, rtx, rtx, rtx, rtx);
+typedef rtx (*insn_gen_fn_7) (rtx, rtx, rtx, rtx, rtx, rtx, rtx);
+
+#define GEN_FCN1(CODE) ((const insn_gen_fn_1) (insn_data[CODE].genfun))
+#define GEN_FCN2(CODE) ((const insn_gen_fn_2) (insn_data[CODE].genfun))
+#define GEN_FCN3(CODE) ((const insn_gen_fn_3) (insn_data[CODE].genfun))
+#define GEN_FCN4(CODE) ((const insn_gen_fn_4) (insn_data[CODE].genfun))
+#define GEN_FCN5(CODE) ((const insn_gen_fn_5) (insn_data[CODE].genfun))
+#define GEN_FCN6(CODE) ((const insn_gen_fn_6) (insn_data[CODE].genfun))
+#define GEN_FCN7(CODE) ((const insn_gen_fn_7) (insn_data[CODE].genfun))
+
 
 /* Enumeration of valid indexes into optab_table.  */
 enum optab_index

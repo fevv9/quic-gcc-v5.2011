@@ -1012,7 +1012,7 @@ move_by_pieces (rtx to, rtx from, unsigned HOST_WIDE_INT len,
 
       icode = optab_handler (mov_optab, mode)->insn_code;
       if (icode != CODE_FOR_nothing && align >= GET_MODE_ALIGNMENT (mode))
-	move_by_pieces_1 (GEN_FCN (icode), mode, &data);
+	move_by_pieces_1 (GEN_FCN2 (icode), mode, &data);
 
       max_size = GET_MODE_SIZE (mode);
     }
@@ -1361,20 +1361,20 @@ emit_block_move_via_movmem (rtx x, rtx y, rtx size, unsigned int align, bool tai
 	  switch (insn_data[(int) code].n_operands)
 	    {
 	    case 4:
-	      pat = GEN_FCN ((int) code) (x, y, op2, opalign);
+	      pat = GEN_FCN4 ((int) code) (x, y, op2, opalign);
 	      break;
 	    case 6:
-	      pat = GEN_FCN ((int) code) (x, y, op2, opalign,
-					  GEN_INT (expected_align
+	      pat = GEN_FCN6 ((int) code) (x, y, op2, opalign,
+					   GEN_INT (expected_align
 						   / BITS_PER_UNIT),
-					  GEN_INT (expected_size));
+					   GEN_INT (expected_size));
 	      break;
 	    case 7:
-	      pat = GEN_FCN ((int) code) (x, y, op2, opalign,
-					  GEN_INT (expected_align
+	      pat = GEN_FCN7 ((int) code) (x, y, op2, opalign,
+				 	   GEN_INT (expected_align
 						   / BITS_PER_UNIT),
-					  GEN_INT (expected_size),
-					  GEN_INT (tailcall));
+					   GEN_INT (expected_size),
+					   GEN_INT (tailcall));
 	      break;
 	    default:
 	      gcc_unreachable ();
@@ -2559,7 +2559,7 @@ store_by_pieces_1 (struct store_by_pieces *data ATTRIBUTE_UNUSED,
 
       icode = optab_handler (mov_optab, mode)->insn_code;
       if (icode != CODE_FOR_nothing && align >= GET_MODE_ALIGNMENT (mode))
-	store_by_pieces_2 (GEN_FCN (icode), mode, data);
+	store_by_pieces_2 (GEN_FCN2 (icode), mode, data);
 
       max_size = GET_MODE_SIZE (mode);
     }
@@ -2818,12 +2818,12 @@ set_storage_via_setmem (rtx object, rtx size, rtx val, unsigned int align,
 	    }
 
 	  if (insn_data[(int) code].n_operands == 4)
-	    pat = GEN_FCN ((int) code) (object, opsize, opchar, opalign);
+	    pat = GEN_FCN4 ((int) code) (object, opsize, opchar, opalign);
 	  else
-	    pat = GEN_FCN ((int) code) (object, opsize, opchar, opalign,
-					GEN_INT (expected_align
-						 / BITS_PER_UNIT),
-					GEN_INT (expected_size));
+	    pat = GEN_FCN6 ((int) code) (object, opsize, opchar, opalign,
+					 GEN_INT (expected_align
+						  / BITS_PER_UNIT),
+					 GEN_INT (expected_size));
 	  if (pat)
 	    {
 	      emit_insn (pat);
@@ -3035,7 +3035,7 @@ emit_move_via_integer (enum machine_mode mode, rtx x, rtx y, bool force)
   y = emit_move_change_mode (imode, mode, y, force);
   if (y == NULL_RTX)
     return NULL_RTX;
-  return emit_insn (GEN_FCN (code) (x, y));
+  return emit_insn (GEN_FCN2 (code) (x, y));
 }
 
 /* A subroutine of emit_move_insn_1.  X is a push_operand in MODE.
@@ -3231,7 +3231,7 @@ emit_move_ccmode (enum machine_mode mode, rtx x, rtx y)
 	{
 	  x = emit_move_change_mode (CCmode, mode, x, true);
 	  y = emit_move_change_mode (CCmode, mode, y, true);
-	  return emit_insn (GEN_FCN (code) (x, y));
+	  return emit_insn (GEN_FCN2 (code) (x, y));
 	}
     }
 
@@ -3368,7 +3368,7 @@ emit_move_insn_1 (rtx x, rtx y)
 
   code = optab_handler (mov_optab, mode)->insn_code;
   if (code != CODE_FOR_nothing)
-    return emit_insn (GEN_FCN (code) (x, y));
+    return emit_insn (GEN_FCN2 (code) (x, y));
 
   /* Expand complex moves by moving real part and imag part.  */
   if (COMPLEX_MODE_P (mode))
@@ -3622,7 +3622,7 @@ emit_single_push_insn (enum machine_mode mode, rtx x, tree type)
       if (((pred = insn_data[(int) icode].operand[0].predicate)
 	   && !((*pred) (x, mode))))
 	x = force_reg (mode, x);
-      emit_insn (GEN_FCN (icode) (x));
+      emit_insn (GEN_FCN1 (icode) (x));
       return;
     }
   if (GET_MODE_SIZE (mode) == rounded_size)
@@ -4440,7 +4440,7 @@ emit_storent_insn (rtx to, rtx from)
 	return false;
     }
 
-  pattern = GEN_FCN (code) (to, from);
+  pattern = GEN_FCN2 (code) (to, from);
   if (pattern == NULL_RTX)
     return false;
 
@@ -5702,7 +5702,7 @@ store_constructor (tree exp, rtx target, int cleared, HOST_WIDE_INT size)
 	  }
 
 	if (vector)
-	  emit_insn (GEN_FCN (icode)
+	  emit_insn (GEN_FCN2 (icode)
 		     (target,
 		      gen_rtx_PARALLEL (GET_MODE (target), vector)));
 	break;
@@ -7574,7 +7574,7 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
 	    reg = gen_reg_rtx (mode);
 
 	    /* Nor can the insn generator.  */
-	    insn = GEN_FCN (icode) (reg, temp);
+	    insn = GEN_FCN2 (icode) (reg, temp);
 	    emit_insn (insn);
 
 	    return reg;
