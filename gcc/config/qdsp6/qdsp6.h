@@ -1009,6 +1009,7 @@ Output of Dispatch Tables
 #define ASM_OUTPUT_ADDR_VEC_ELT(STREAM, VALUE) \
   fprintf(STREAM, "\t.word .L%d\n", VALUE)
 
+#define JUMP_TABLES_IN_TEXT_SECTION (flag_pic)
 
 /*------------------------------
 Assembler Commands for Alignment

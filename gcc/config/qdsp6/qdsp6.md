@@ -4587,11 +4587,12 @@
  ""
  {
    if (flag_pic){
-     rtx addend;
-     require_pic_register();
-     addend = gen_reg_rtx(SImode);
-     emit_insn(gen_addsi3(addend, operands[0], pic_offset_table_rtx));
-     emit_jump_insn(gen_tablejump_real(addend, operands[1]));
+     rtx label, addend;
+     label = gen_reg_rtx(SImode);
+     addend = gen_reg_rtx (SImode);
+     emit_move_insn (label, gen_rtx_LABEL_REF (SImode, operands[1]));
+     emit_insn (gen_addsi3 (addend, operands[0], label));
+     emit_jump_insn (gen_tablejump_real(addend, operands[1]));
      DONE;
    }
    else{
