@@ -443,7 +443,7 @@ store_bit_field_1 (rtx str_rtx, unsigned HOST_WIDE_INT bitsize,
       gcc_assert ((*insn_data[icode].operand[0].predicate) (dest, mode0)
 		  && (*insn_data[icode].operand[1].predicate) (src, mode1)
 		  && (*insn_data[icode].operand[2].predicate) (rtxpos, mode2));
-      pat = GEN_FCN (icode) (dest, src, rtxpos);
+      pat = GEN_FCN3 (icode) (dest, src, rtxpos);
       seq = get_insns ();
       end_sequence ();
       if (pat)
@@ -556,7 +556,7 @@ store_bit_field_1 (rtx str_rtx, unsigned HOST_WIDE_INT bitsize,
 	  arg0 = SUBREG_REG (op0);
 	}
 
-      insn = (GEN_FCN (icode)
+      insn = (GEN_FCN2 (icode)
 		 (gen_rtx_SUBREG (fieldmode, arg0,
 				  (bitnum % BITS_PER_WORD) / BITS_PER_UNIT
 				  + (offset * UNITS_PER_WORD)),
@@ -1268,7 +1268,7 @@ extract_bit_field_1 (rtx str_rtx, unsigned HOST_WIDE_INT bitsize,
 		  && (*insn_data[icode].operand[1].predicate) (src, mode1)
 		  && (*insn_data[icode].operand[2].predicate) (rtxpos, mode2));
 
-      pat = GEN_FCN (icode) (dest, src, rtxpos);
+      pat = GEN_FCN3 (icode) (dest, src, rtxpos);
       seq = get_insns ();
       end_sequence ();
       if (pat)
@@ -5335,7 +5335,7 @@ emit_store_flag (rtx target, enum rtx_code code, rtx op0, rtx op1,
       if (optimize || ! (*pred) (subtarget, compare_mode))
 	subtarget = gen_reg_rtx (compare_mode);
 
-      pattern = GEN_FCN (icode) (subtarget);
+      pattern = GEN_FCN1 (icode) (subtarget);
       if (pattern)
 	{
 	  emit_insn (pattern);
@@ -5389,8 +5389,8 @@ emit_store_flag (rtx target, enum rtx_code code, rtx op0, rtx op1,
 			    (subtarget, result_mode)))
 	    subtarget = gen_reg_rtx (result_mode);
 
-	  pattern = GEN_FCN (icode) (subtarget, comparison, cstore_op0,
-				     cstore_op1);
+	  pattern = GEN_FCN4 (icode) (subtarget, comparison, cstore_op0,
+				      cstore_op1);
 
 	  if (pattern)
 	    {

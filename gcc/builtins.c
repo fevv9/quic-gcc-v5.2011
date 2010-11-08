@@ -3202,8 +3202,8 @@ expand_builtin_strlen (tree exp, rtx target,
 							    char_mode))
 	char_rtx = copy_to_mode_reg (char_mode, char_rtx);
 
-      pat = GEN_FCN (icode) (result, gen_rtx_MEM (BLKmode, src_reg),
-			     char_rtx, GEN_INT (align));
+      pat = GEN_FCN4 (icode) (result, gen_rtx_MEM (BLKmode, src_reg),
+			      char_rtx, GEN_INT (align));
       if (! pat)
 	return NULL_RTX;
       emit_insn (pat);
@@ -6203,7 +6203,7 @@ expand_builtin_lock_release (enum machine_mode mode, tree exp)
       if (!insn_data[icode].operand[1].predicate (val, mode))
 	val = force_reg (mode, val);
 
-      insn = GEN_FCN (icode) (mem, val);
+      insn = GEN_FCN2 (icode) (mem, val);
       if (insn)
 	{
 	  emit_insn (insn);

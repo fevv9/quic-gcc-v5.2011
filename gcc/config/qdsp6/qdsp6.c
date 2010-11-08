@@ -1288,6 +1288,10 @@ qdsp6_save_register_p(unsigned int regno)
     }while(eh_regno != INVALID_REGNUM);
   }
 
+  if (flag_pic && regno == PIC_OFFSET_TABLE_REGNUM && df_regs_ever_live_p(regno)) {
+    return true;  
+  }
+
   /* The return address and frame pointer are treated separately.  Don't
      consider them here. */
   return regno != LINK_REGNUM
@@ -2611,7 +2615,7 @@ legitimize_pic_address(rtx orig, enum machine_mode mode, rtx reg)
       else {
 	if (flag_pic == 1) {
 	  /* rx = #addr@GOT */
-	  emit_insn (gen_pic_movsi(address, gen_rtx_CONST(SImode, orig)));
+	  emit_insn (gen_pic_movsi(address, gen_rtx_CONST(HImode, orig)));
 	} 
 	else {
 	  /* rx.h = #HI(addr@GOT); rx.l = #LO(addr@GOT) */
@@ -5913,38 +5917,38 @@ expand_one_builtin(enum insn_code icode, rtx target, tree exp, int nargs)
   }
   switch(nargs){
     case 0:
-      patrick = GEN_FCN (icode)(target);
+      patrick = GEN_FCN1 (icode)(target);
       break;
     case 1:
       if(target) {
-        patrick = GEN_FCN (icode)(target, op[0]);
+        patrick = GEN_FCN2 (icode)(target, op[0]);
       }
       else {
-        patrick = GEN_FCN (icode)(op[0]);
+        patrick = GEN_FCN1 (icode)(op[0]);
       }
       break;
     case 2:
       if(target) {
-        patrick = GEN_FCN (icode)(target, op[0], op[1]);
+        patrick = GEN_FCN3 (icode)(target, op[0], op[1]);
       }
       else {
-        patrick = GEN_FCN (icode)(op[0], op[1]);
+        patrick = GEN_FCN2 (icode)(op[0], op[1]);
       }
       break;
     case 3:
       if(target) {
-        patrick = GEN_FCN (icode)(target, op[0], op[1], op[2]);
+        patrick = GEN_FCN4 (icode)(target, op[0], op[1], op[2]);
       }
       else {
-        patrick = GEN_FCN (icode)(op[0], op[1], op[2]);
+        patrick = GEN_FCN3 (icode)(op[0], op[1], op[2]);
       }
       break;
     case 4:
       if(target) {
-        patrick = GEN_FCN (icode)(target, op[0], op[1], op[2], op[3]);
+        patrick = GEN_FCN5 (icode)(target, op[0], op[1], op[2], op[3]);
       }
       else {
-        patrick = GEN_FCN (icode)(op[0], op[1], op[2], op[3]);
+        patrick = GEN_FCN4 (icode)(op[0], op[1], op[2], op[3]);
       }
       break;
     default:
@@ -7099,7 +7103,7 @@ qdsp6_allocate_stack(unsigned HOST_WIDE_INT size, int allocate_stack_insn){
     size = 0;
   }
 
-  emit_insn(GEN_FCN (allocate_stack_insn)(offset));
+  emit_insn(GEN_FCN1 (allocate_stack_insn)(offset));
 
   if(size > 0){
     offset = gen_int_mode(-size, Pmode);
@@ -7126,7 +7130,7 @@ qdsp6_expand_prologue(void)
   /* Do we need to use the allocframe instruction? */
   if(frame->use_allocframe){
     rtx allocframe_size = gen_int_mode(frame->allocframe_size, SImode);
-    emit_insn(GEN_FCN (frame->allocframe_insn)(allocframe_size));
+    emit_insn(GEN_FCN1 (frame->allocframe_insn)(allocframe_size));
   }
 
   /* Allocate any remaning stack space. */
@@ -7134,7 +7138,7 @@ qdsp6_expand_prologue(void)
 
   /* Save callee-save registers. */
   if(frame->prologue_function != CODE_FOR_nothing){
-    emit_insn(GEN_FCN (frame->prologue_function)(NULL_RTX));
+    emit_insn(GEN_FCN1 (frame->prologue_function)(NULL_RTX));
   }
   base_reg = frame->base_reg;
   offset = frame->offset;
@@ -7261,11 +7265,11 @@ qdsp6_expand_epilogue(bool sibcall)
   }
   /* Otherwise, call a function if doing so will save code size. */
   else if(!sibcall && frame->epilogue_function != CODE_FOR_nothing){
-    emit_jump_insn(GEN_FCN (frame->epilogue_function)(NULL_RTX));
+    emit_jump_insn(GEN_FCN1 (frame->epilogue_function)(NULL_RTX));
     emit_return = false;
   }
   else if(sibcall && frame->sibcall_epilogue_function != CODE_FOR_nothing){
-    emit_insn(GEN_FCN (frame->sibcall_epilogue_function)(NULL_RTX));
+    emit_insn(GEN_FCN1 (frame->sibcall_epilogue_function)(NULL_RTX));
   }
   /* Otherwise, on V4 and up, use the dealloc_return instruction if possible. */
   else if(TARGET_V4_FEATURES && emit_return
@@ -7378,6 +7382,9 @@ qdsp6_expand_compare(enum rtx_code code)
     }
 
     op1 = plus_constant(op1, offset);
+    if ( (GET_CODE (op1) == CONST_INT) && (offset != 0) ){
+      op1 = gen_int_mode(INTVAL(op1), GET_MODE(op0));
+    }
 
     if(GET_CODE (op1) != CONST_INT
        || !IN_RANGE (INTVAL (op1), compare_code == GTU ? 0 : -512, 511)){
