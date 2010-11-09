@@ -1,0 +1,48 @@
+#!/bin/bash
+##################################################################
+# Copyright (c) \$Date\$ QUALCOMM INCORPORATED.
+# All Rights Reserved.
+# Modified by QUALCOMM INCORPORATED on \$Date\$
+##################################################################
+
+
+# set value for --prefix option
+if [ "$1" != "" ]; then
+  PREFIX=$1
+else
+  PLATFORM=`uname`
+  if [ "${PLATFORM}" = "CYGWIN_NT-5.1" ]; then
+    PREFIX=/usr/local/qdsp6/gnu
+  else
+    if [ "${PLATFORM}" = "Linux" ]; then
+      PREFIX=${HOME}/qdsp6/gnu
+    else
+      echo platform ${PLATFORM} not supported
+      exit 1
+    fi
+  fi
+fi
+
+#
+# enums being alloted to the smallest possible size was causing problems for
+# some bitfield declarations (e.g. line 2587 in c-parse.y).  There are some 
+# warnings coming out about a size mismatch, but I don't know if they are 
+# related.
+#
+GCC_FOR_TARGET=qdsp6-gcc \
+CC='qdsp6-gcc' \
+CFLAGS='-O2 -mlong-calls -fno-short-enums' \
+CXXFLAGS='-O2 -mlong-calls -fno-short-enums' \
+bash `dirname $0`/configure \
+  --disable-shared \
+  --disable-libssp \
+  --prefix=${PREFIX} \
+  --program-prefix= \
+  --build=x86_64-unknown-linux-gnu \
+  --host=qdsp6 \
+  --target=qdsp6-linux \
+  --with-sysroot=/prj/qct/coredev/hexagon/austin/scratch/users/adasgupt/self_hosting_44/install_dynamic \
+  --with-uclibc \
+  --enable-languages=c \
+  --without-fp \
+  --disable-nls
