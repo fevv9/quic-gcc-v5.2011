@@ -4926,6 +4926,13 @@ qdsp6_print_operand(FILE *stream, const_rtx x, int code)
       /* handled below */
       break;
 
+    case 'p':
+      {
+	// output the pic register
+	fprintf(stream, "%s", reg_names[PIC_OFFSET_TABLE_REGNUM]);
+      }
+      return;
+
     case 0:
       /* handled below */
       break;

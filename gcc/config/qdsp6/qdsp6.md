@@ -4804,12 +4804,14 @@
     else {
       if(which_alternative == 0){
         if(flag_pic) {
+          require_pic_register();
           return "%2 = %0\;"
                  "{\;"
                  "  lc0 = %2\;"
                  "  %2.h = #HI(%1@GOTOFF)\;"
                  "}\;"
                  "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa0 = %2";
 	}
         else {
@@ -4824,12 +4826,14 @@
       }
       else {
         if(flag_pic) {
+          require_pic_register();
           return "%2 = #%0\;"
                  "{\;"
                  "  lc0 = %2\;"
                  "  %2.h = #HI(%1@GOTOFF)\;"
                  "}\;"
                  "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa0 = %2";
         }
 	else {
@@ -4880,12 +4884,14 @@
     else {
       if(which_alternative == 0){
         if(flag_pic) {
+          require_pic_register();
           return "%2 = %0\;"
                  "{\;"
                  "  lc1 = %2\;"
                  "  %2.h = #HI(%1@GOTOFF)\;"
                  "}\;"
                  "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa1 = %2";
         }
 	else {
@@ -4900,12 +4906,14 @@
       }
       else {
         if(flag_pic) {
+          require_pic_register();
           return "%2 = #%0\;"
                  "{\;"
                  "  lc1 = %2\;"
                  "  %2.h = #HI(%1@GOTOFF)\;"
                  "}\;"
                  "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa1 = %2";
         }
 	else {
