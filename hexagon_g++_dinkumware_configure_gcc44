@@ -1,0 +1,36 @@
+#!/bin/bash
+##################################################################
+
+# set value for --prefix option
+if [ "$1" != "" ]; then
+  PREFIX=$1
+else
+  PLATFORM=`uname`
+  if [ "${PLATFORM}" = "CYGWIN_NT-5.1" ]; then
+    PREFIX=/usr/local/hexagon
+  else
+  	if [ "${PLATFORM}" = "MINGW32_NT-5.1" ]; then
+   	 PREFIX=/usr/local/hexagon
+  	else
+   	 if [ "${PLATFORM}" = "Linux" ]; then
+   	   PREFIX=${HOME}/hexagon
+   	 else
+   	   echo platform ${PLATFORM} not supported
+   	   exit 1
+		 fi
+    fi
+  fi
+fi
+
+bash `dirname $0`/configure \
+  --prefix=${PREFIX} \
+  --target=hexagon \
+  --program-prefix=hexagon- \
+  --program-suffix=44 \
+  --enable-checking=assert,misc,tree,gc,rtlflag,runtime,df \
+  --enable-languages=c,c++ \
+  --without-fp \
+  --disable-sjlj-exceptions \
+  --disable-nls \
+  --disable-libssp \
+  --with-dinkumware
