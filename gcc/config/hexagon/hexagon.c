@@ -5923,38 +5923,38 @@ expand_one_builtin(enum insn_code icode, rtx target, tree exp, int nargs)
   }
   switch(nargs){
     case 0:
-      patrick = GEN_FCN (icode)(target);
+      patrick = GEN_FCN1 (icode)(target);
       break;
     case 1:
       if(target) {
-        patrick = GEN_FCN (icode)(target, op[0]);
+        patrick = GEN_FCN2 (icode)(target, op[0]);
       }
       else {
-        patrick = GEN_FCN (icode)(op[0]);
+        patrick = GEN_FCN1 (icode)(op[0]);
       }
       break;
     case 2:
       if(target) {
-        patrick = GEN_FCN (icode)(target, op[0], op[1]);
+        patrick = GEN_FCN3 (icode)(target, op[0], op[1]);
       }
       else {
-        patrick = GEN_FCN (icode)(op[0], op[1]);
+        patrick = GEN_FCN2 (icode)(op[0], op[1]);
       }
       break;
     case 3:
       if(target) {
-        patrick = GEN_FCN (icode)(target, op[0], op[1], op[2]);
+        patrick = GEN_FCN4 (icode)(target, op[0], op[1], op[2]);
       }
       else {
-        patrick = GEN_FCN (icode)(op[0], op[1], op[2]);
+        patrick = GEN_FCN3 (icode)(op[0], op[1], op[2]);
       }
       break;
     case 4:
       if(target) {
-        patrick = GEN_FCN (icode)(target, op[0], op[1], op[2], op[3]);
+        patrick = GEN_FCN5 (icode)(target, op[0], op[1], op[2], op[3]);
       }
       else {
-        patrick = GEN_FCN (icode)(op[0], op[1], op[2], op[3]);
+        patrick = GEN_FCN4 (icode)(op[0], op[1], op[2], op[3]);
       }
       break;
     default:
@@ -7109,7 +7109,7 @@ hexagon_allocate_stack(unsigned HOST_WIDE_INT size, int allocate_stack_insn){
     size = 0;
   }
 
-  emit_insn(GEN_FCN (allocate_stack_insn)(offset));
+  emit_insn(GEN_FCN1 (allocate_stack_insn)(offset));
 
   if(size > 0){
     offset = gen_int_mode(-size, Pmode);
@@ -7136,7 +7136,7 @@ hexagon_expand_prologue(void)
   /* Do we need to use the allocframe instruction? */
   if(frame->use_allocframe){
     rtx allocframe_size = gen_int_mode(frame->allocframe_size, SImode);
-    emit_insn(GEN_FCN (frame->allocframe_insn)(allocframe_size));
+    emit_insn(GEN_FCN1 (frame->allocframe_insn)(allocframe_size));
   }
 
   /* Allocate any remaning stack space. */
@@ -7144,7 +7144,7 @@ hexagon_expand_prologue(void)
 
   /* Save callee-save registers. */
   if(frame->prologue_function != CODE_FOR_nothing){
-    emit_insn(GEN_FCN (frame->prologue_function)(NULL_RTX));
+    emit_insn(GEN_FCN1 (frame->prologue_function)(NULL_RTX));
   }
   base_reg = frame->base_reg;
   offset = frame->offset;
@@ -7271,11 +7271,11 @@ hexagon_expand_epilogue(bool sibcall)
   }
   /* Otherwise, call a function if doing so will save code size. */
   else if(!sibcall && frame->epilogue_function != CODE_FOR_nothing){
-    emit_jump_insn(GEN_FCN (frame->epilogue_function)(NULL_RTX));
+    emit_jump_insn(GEN_FCN1 (frame->epilogue_function)(NULL_RTX));
     emit_return = false;
   }
   else if(sibcall && frame->sibcall_epilogue_function != CODE_FOR_nothing){
-    emit_insn(GEN_FCN (frame->sibcall_epilogue_function)(NULL_RTX));
+    emit_insn(GEN_FCN1 (frame->sibcall_epilogue_function)(NULL_RTX));
   }
   /* Otherwise, on V4 and up, use the dealloc_return instruction if possible. */
   else if(TARGET_V4_FEATURES && emit_return

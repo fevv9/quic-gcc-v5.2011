@@ -489,6 +489,11 @@ powerpcle-*-eabisim*)
 	;;
 powerpcle-*-eabi*)
 	;;
+hexagon-*-elf*)
+	;;
+hexagon-*-linux*)
+	extra_parts=
+	;;
 qdsp6-*-elf*)
 	;;
 qdsp6-*-linux*)

@@ -1195,6 +1195,7 @@ enum hexagon_builtins {
 #define BUILTIN_INFO_NONCONST(TAG, TYPE, NARGS) HEXAGON_BUILTIN_##TAG,
 #include "builtins.def"
 #include "manual_builtins.def"
+#include "qdsp6_compat.h"
 #undef BUILTIN_INFO
 #undef BUILTIN_INFO_NONCONST
   HEXAGON_BUILTIN_NONEXISTANT_THING_TO_SHUT_UP_GCC_WARNING
@@ -1402,32 +1403,6 @@ struct hexagon_dependence GTY((chain_next ("%h.next"))) {
 #define HEXAGON_NEW_GPR_P(INSN)       (((INSN)->flags & HEXAGON_NEW_GPR) != 0)
 
 #define HEXAGON_MOVED_P(INSN)  (((INSN)->flags & HEXAGON_MOVED) != 0)
-
-#define QDSP6_COMPAT_MACROS \
-    if (hexagon_qdsp6_compat){ \
-      switch(hexagon_arch){ \
-        case HEXAGON_ARCH_V1: \
-          builtin_define_std ("__QDSP6_V1__"); \
-          builtin_define_std ("__QDSP6_ARCH__=1"); \
-          break; \
-        case HEXAGON_ARCH_V2: \
-          builtin_define_std ("__QDSP6_V2__"); \
-          builtin_define_std ("__QDSP6_ARCH__=2"); \
-          break; \
-        case HEXAGON_ARCH_V3: \
-          builtin_define_std ("__QDSP6_V3__"); \
-          builtin_define_std ("__QDSP6_ARCH__=3"); \
-          break; \
-        case HEXAGON_ARCH_V4: \
-          builtin_define_std ("__QDSP6_V4__"); \
-          builtin_define_std ("__QDSP6_ARCH__=4"); \
-          break; \
-        default: \
-          abort(); \
-      } \
-      builtin_define_std ("__qdsp6__"); \
-      builtin_define_std ("qdsp6"); \
-    };
 
 #endif /* !USED_FOR_TARGET */
 
