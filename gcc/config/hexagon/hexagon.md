@@ -4586,15 +4586,12 @@
  ""
  {
    if (flag_pic){
-     rtx addend;
-     require_pic_register();
-     addend = gen_reg_rtx(SImode);
-     emit_insn(gen_addsi3(addend, operands[0], pic_offset_table_rtx));
-     emit_jump_insn(gen_tablejump_real(addend, operands[1]));
-     DONE;
-   }
-   else{
-     emit_jump_insn(gen_tablejump_real(operands[0], operands[1]));
+     rtx label, addend;
+     label = gen_reg_rtx(SImode);
+     addend = gen_reg_rtx (SImode);
+     emit_move_insn (label, gen_rtx_LABEL_REF (SImode, operands[1]));
+     emit_insn (gen_addsi3 (addend, operands[0], label));
+     emit_jump_insn (gen_tablejump_real(addend, operands[1]));
      DONE;
    }
  }
@@ -4803,6 +4800,7 @@
     else {
       if(which_alternative == 0){
         if(flag_pic) {
+          require_pic_register();
           return "%2 = %0\;"
                  "{\;"
                  "  lc0 = %2\;"
@@ -4818,17 +4816,20 @@
                  "  %2.h = #HI(%1)\;"
                  "}\;"
                  "%2.l = #LO(%1)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa0 = %2";
         }
       }
       else {
         if(flag_pic) {
+          require_pic_register();
           return "%2 = #%0\;"
                  "{\;"
                  "  lc0 = %2\;"
                  "  %2.h = #HI(%1@GOTOFF)\;"
                  "}\;"
                  "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa0 = %2";
         }
 	else {
@@ -4879,12 +4880,14 @@
     else {
       if(which_alternative == 0){
         if(flag_pic) {
+          require_pic_register();
           return "%2 = %0\;"
                  "{\;"
                  "  lc1 = %2\;"
                  "  %2.h = #HI(%1@GOTOFF)\;"
                  "}\;"
                  "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa1 = %2";
         }
 	else {
@@ -4899,12 +4902,14 @@
       }
       else {
         if(flag_pic) {
+          require_pic_register();
           return "%2 = #%0\;"
                  "{\;"
                  "  lc1 = %2\;"
                  "  %2.h = #HI(%1@GOTOFF)\;"
                  "}\;"
                  "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa1 = %2";
         }
 	else {

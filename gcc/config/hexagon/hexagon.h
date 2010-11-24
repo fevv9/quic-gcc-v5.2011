@@ -89,7 +89,7 @@ Run-time Target Specification
   }while(0)
 
 /* Append (hexagon_) to the version string. */
-#define TARGET_VERSION fprintf(stderr, " (hexagon_)");
+#define TARGET_VERSION fprintf(stderr, " (hexagon)");
 
 #define OVERRIDE_OPTIONS \
   hexagon_override_options()
