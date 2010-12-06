@@ -4594,6 +4594,10 @@
      emit_jump_insn (gen_tablejump_real(addend, operands[1]));
      DONE;
    }
+   else{
+     emit_jump_insn(gen_tablejump_real(operands[0], operands[1]));
+     DONE;
+   }
  }
 )
 
@@ -4807,6 +4811,7 @@
                  "  %2.h = #HI(%1@GOTOFF)\;"
                  "}\;"
                  "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
                  "sa0 = %2";
 	}
         else {
@@ -4816,7 +4821,6 @@
                  "  %2.h = #HI(%1)\;"
                  "}\;"
                  "%2.l = #LO(%1)\;"
-                 "%2 = add(%2, %p0)\;"
                  "sa0 = %2";
         }
       }
