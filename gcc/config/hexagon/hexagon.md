@@ -1,4 +1,4 @@
-;; QDSP6 machine description.
+;; HEXAGON machine description.
 ;; Copyright (C) 1998, 1999, 2000, 2002 Free Software Foundation, Inc.
 
 ;; This file is part of GCC.
@@ -61,11 +61,11 @@
    (UNSPEC_NOP             112)   ; nop for appeasing Combine
    (UNSPEC_NEW_VALUE       114)   ; R.new
    (UNSPEC_MOVSI_CONST32   115)   ; const32 a + b
-   (UNSPEC_QDSP6_vcmpb_eq  150)
-   (UNSPEC_QDSP6_vcmpb_gtu 151)
-   (UNSPEC_QDSP6_any       152)
-   (UNSPEC_QDSP6_all       153)
-   (UNSPEC_QDSP6_falign    154)
+   (UNSPEC_HEXAGON_vcmpb_eq  150)
+   (UNSPEC_HEXAGON_vcmpb_gtu 151)
+   (UNSPEC_HEXAGON_any       152)
+   (UNSPEC_HEXAGON_all       153)
+   (UNSPEC_HEXAGON_falign    154)
    (UNSPEC_DOLOOP_END      160)
    (UNSPEC_PIC_SYM_GOTOFF  161)   ; For PIC GOTOFF symbols
    (UNSPEC_PIC_SYM_GOT     162)   ; For PIC GOT symbols
@@ -81,7 +81,7 @@
 
 ;; The architecture currently being compiled for
 
-(define_attr "arch" "v1,v2,v3,v4" (const (symbol_ref "qdsp6_arch")))
+(define_attr "arch" "v1,v2,v3,v4" (const (symbol_ref "hexagon_arch")))
 
 
 ;; Used to determine which slots an insn can use when scheduling insns
@@ -120,7 +120,7 @@
 ;; Defines the resources of the machine and which insns use which resources
 ;; based on the insn attributes
 
-(define_automaton "qdsp6")
+(define_automaton "hexagon")
 
 (automata_option "ndfa")
 
@@ -128,7 +128,7 @@
                   Store0,Store1,
                   PCadder,PCadder_dualjumps,
                   endloop0,endloop1,endloop0_dualjumps,endloop1_dualjumps"
-                 "qdsp6")
+                 "hexagon")
 
 
 (define_reservation "control" "(endloop0 + endloop1)")
@@ -156,14 +156,14 @@
                  "Slot2 | Slot3")
 
 (define_insn_reservation "v1_Load"
-                         1 (and (ne (symbol_ref "qdsp6_dual_memory_accesses")
+                         1 (and (ne (symbol_ref "hexagon_dual_memory_accesses")
                                     (const_int 0))
                                 (and (eq_attr "arch" "v1")
                                      (eq_attr "type" "Load")))
  "Slot0 | Slot1")
 
 (define_insn_reservation "v1_possibly_uncached_Load"
-                         1 (and (eq (symbol_ref "qdsp6_dual_memory_accesses")
+                         1 (and (eq (symbol_ref "hexagon_dual_memory_accesses")
                                     (const_int 0))
                                 (and (eq_attr "arch" "v1")
                                      (eq_attr "type" "Load")))
@@ -231,14 +231,14 @@
                  "Slot2 | Slot3")
 
 (define_insn_reservation "v2_Load"
-                         1 (and (ne (symbol_ref "qdsp6_dual_memory_accesses")
+                         1 (and (ne (symbol_ref "hexagon_dual_memory_accesses")
                                     (const_int 0))
                                 (and (eq_attr "arch" "v2")
                                      (eq_attr "type" "Load")))
  "Slot0 | Slot1")
 
 (define_insn_reservation "v2_possibly_uncached_Load"
-                         1 (and (eq (symbol_ref "qdsp6_dual_memory_accesses")
+                         1 (and (eq (symbol_ref "hexagon_dual_memory_accesses")
                                     (const_int 0))
                                 (and (eq_attr "arch" "v2")
                                      (eq_attr "type" "Load")))
@@ -665,7 +665,7 @@
     }
     if(!(register_operand(operands[0], QImode)
          || (TARGET_V4_FEATURES && MEM_P (operands[0])
-             && qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+             && hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                            reload_in_progress
                                            || reload_completed, "si")
              && immediate_operand(operands[1], QImode)))){
@@ -680,7 +680,7 @@
   "TARGET_V4_FEATURES
    && (!memory_operand(operands[0], QImode)
        || gr_register_operand(operands[1], QImode)
-       || (qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+       || (hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                       reload_in_progress || reload_completed,
                                       \"si\")
            && immediate_operand(operands[1], QImode)))"
@@ -740,7 +740,7 @@
   "!memory_operand(operands[0], QImode)
    || gr_register_operand(operands[1], QImode)
    || (TARGET_V4_FEATURES
-       && qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+       && hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                      reload_in_progress || reload_completed,
                                      \"csi\")
        && immediate_operand(operands[1], QImode))"
@@ -798,7 +798,7 @@
     }
     if(!(register_operand(operands[0], HImode)
          || (TARGET_V4_FEATURES && MEM_P (operands[0])
-             && qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+             && hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                            reload_in_progress
                                            || reload_completed, "si")
              && s8_const_int_operand(operands[1], HImode)))){
@@ -813,7 +813,7 @@
   "TARGET_V4_FEATURES
    && (!memory_operand(operands[0], HImode)
        || gr_register_operand(operands[1], HImode)
-       || (qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+       || (hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                       reload_in_progress || reload_completed,
                                       \"si\")
            && immediate_operand(operands[1], HImode)
@@ -870,7 +870,7 @@
   "!memory_operand(operands[0], HImode)
    || gr_register_operand(operands[1], HImode)
    || (TARGET_V4_FEATURES
-       && qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+       && hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                      reload_in_progress || reload_completed,
                                      \"csi\")
        && immediate_operand(operands[1], HImode)
@@ -931,7 +931,7 @@
     }
     if(!(register_operand(operands[0], SImode)
          || (TARGET_V4_FEATURES && MEM_P (operands[0])
-             && qdsp6_legitimate_address_p(SImode, XEXP (operands[0], 0),
+             && hexagon_legitimate_address_p(SImode, XEXP (operands[0], 0),
                                            reload_in_progress
                                            || reload_completed, "si")
              && s8_const_int_operand(operands[1], SImode)))){
@@ -974,7 +974,7 @@
   "TARGET_V4_FEATURES
    && (!memory_operand(operands[0], SImode)
        || gr_register_operand(operands[1], SImode)
-       || (qdsp6_legitimate_address_p(SImode, XEXP (operands[0], 0),
+       || (hexagon_legitimate_address_p(SImode, XEXP (operands[0], 0),
                                       reload_in_progress || reload_completed,
                                       \"si\")
            && immediate_operand(operands[1], SImode)
@@ -1081,7 +1081,7 @@
   "!memory_operand(operands[0], SImode)
    || gr_register_operand(operands[1], SImode)
    || (TARGET_V4_FEATURES
-       && qdsp6_legitimate_address_p(SImode, XEXP (operands[0], 0),
+       && hexagon_legitimate_address_p(SImode, XEXP (operands[0], 0),
                                      reload_in_progress || reload_completed,
                                      \"csi\")
        && immediate_operand(operands[1], SImode)
@@ -1243,7 +1243,7 @@
     }
     if(!(register_operand(operands[0], SFmode)
          || (TARGET_V4_FEATURES && MEM_P (operands[0])
-             && qdsp6_legitimate_address_p(SFmode, XEXP (operands[0], 0),
+             && hexagon_legitimate_address_p(SFmode, XEXP (operands[0], 0),
                                            reload_in_progress
                                            || reload_completed, "si")
              && CONST_DOUBLE_OK_FOR_LETTER_P (operands[1], 'G')))){
@@ -1264,7 +1264,7 @@
   "TARGET_V4_FEATURES
    && (!memory_operand(operands[0], SFmode)
        || gr_register_operand(operands[1], SFmode)
-       || (qdsp6_legitimate_address_p(SFmode, XEXP (operands[0], 0),
+       || (hexagon_legitimate_address_p(SFmode, XEXP (operands[0], 0),
                                       reload_in_progress || reload_completed,
                                       \"si\")
            && immediate_operand(operands[1], SFmode)
@@ -1355,7 +1355,7 @@
   "!memory_operand(operands[0], SFmode)
    || gr_register_operand(operands[1], SFmode)
    || (TARGET_V4_FEATURES
-       && qdsp6_legitimate_address_p(SFmode, XEXP (operands[0], 0),
+       && hexagon_legitimate_address_p(SFmode, XEXP (operands[0], 0),
                                      reload_in_progress || reload_completed,
                                      \"csi\")
        && immediate_operand(operands[1], SFmode)
@@ -1581,7 +1581,7 @@
    memw(%E0) += %2"
   "&& !reload_completed
    && memory_operand(operands[0], SImode)
-   && !qdsp6_legitimate_address_p(SImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(SImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0) (plus:SI (match_dup 0) (match_dup 2)))]
@@ -1696,7 +1696,7 @@
    memw(%E0) -= %2"
   "&& !reload_completed
    && memory_operand(operands[0], SImode)
-   && !qdsp6_legitimate_address_p(SImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(SImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0) (minus:SI (match_dup 0) (match_dup 2)))]
@@ -1962,7 +1962,7 @@
    memw(%E0) &= %2"
   "&& !reload_completed
    && memory_operand(operands[0], SImode)
-   && !qdsp6_legitimate_address_p(SImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(SImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0) (and:SI (match_dup 0) (match_dup 2)))]
@@ -2062,7 +2062,7 @@
    memw(%E0) |= %2"
   "&& !reload_completed
    && memory_operand(operands[0], SImode)
-   && !qdsp6_legitimate_address_p(SImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(SImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0) (ior:SI (match_dup 0) (match_dup 2)))]
@@ -3040,7 +3040,7 @@
    (use (match_operand:SI 6 "const_int_operand" ""))]
   ""
   {
-    if(qdsp6_expand_movmem(operands)){
+    if(hexagon_expand_movmem(operands)){
       DONE;
     }
     else {
@@ -3068,7 +3068,7 @@
    (use (match_operand:SI 5 "const_int_operand" ""))]
   "optimize && !optimize_size"
   {
-    if(qdsp6_expand_setmem(operands)){
+    if(hexagon_expand_setmem(operands)){
       DONE;
     }
     else {
@@ -3096,7 +3096,7 @@
 ;;  "optimize && !optimize_size"
 ;;  {
 ;;    fprintf(stderr, "\ncmpSTRsi\n");
-;;    if(qdsp6_expand_cmpstr(operands)){
+;;    if(hexagon_expand_cmpstr(operands)){
 ;;      DONE;
 ;;    }
 ;;    else {
@@ -3119,7 +3119,7 @@
 ;;  "optimize && !optimize_size"
 ;;  {
 ;;    fprintf(stderr, "\ncmpMEMsi\n");
-;;    if(qdsp6_expand_cmpstr(operands)){
+;;    if(hexagon_expand_cmpstr(operands)){
 ;;      DONE;
 ;;    }
 ;;    else {
@@ -3140,7 +3140,7 @@
 ;;   (use (match_operand:SI 3 "const_int_operand" ""))]
 ;;  "optimize && !optimize_size"
 ;;  {
-;;    if(qdsp6_expand_strlen(operands)){
+;;    if(hexagon_expand_strlen(operands)){
 ;;      DONE;
 ;;    }
 ;;    else {
@@ -3454,7 +3454,7 @@
                          (match_operand:SI 3 "nonmemory_operand" "")))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GET_CODE (operands[1]));
+    operands[1] = hexagon_expand_compare(GET_CODE (operands[1]));
   }
 )
 
@@ -3557,7 +3557,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(EQ);
+    operands[1] = hexagon_expand_compare(EQ);
   }
 )
 
@@ -3566,7 +3566,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(NE);
+    operands[1] = hexagon_expand_compare(NE);
   }
 )
 
@@ -3575,7 +3575,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(LT);
+    operands[1] = hexagon_expand_compare(LT);
   }
 )
 
@@ -3584,7 +3584,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(LE);
+    operands[1] = hexagon_expand_compare(LE);
   }
 )
 
@@ -3593,7 +3593,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GT);
+    operands[1] = hexagon_expand_compare(GT);
   }
 )
 
@@ -3602,7 +3602,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GE);
+    operands[1] = hexagon_expand_compare(GE);
   }
 )
 
@@ -3613,7 +3613,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(LTU);
+    operands[1] = hexagon_expand_compare(LTU);
   }
 )
 
@@ -3622,7 +3622,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(LEU);
+    operands[1] = hexagon_expand_compare(LEU);
   }
 )
 
@@ -3631,7 +3631,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GTU);
+    operands[1] = hexagon_expand_compare(GTU);
   }
 )
 
@@ -3640,7 +3640,7 @@
         (if_then_else:SI (match_dup 1) (const_int 1) (const_int 0)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GEU);
+    operands[1] = hexagon_expand_compare(GEU);
   }
 )
 
@@ -3659,7 +3659,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(EQ);
+    operands[1] = hexagon_expand_compare(EQ);
   }
 )
 
@@ -3670,7 +3670,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(NE);
+    operands[1] = hexagon_expand_compare(NE);
   }
 )
 
@@ -3681,7 +3681,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(LT);
+    operands[1] = hexagon_expand_compare(LT);
   }
 )
 
@@ -3692,7 +3692,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(LE);
+    operands[1] = hexagon_expand_compare(LE);
   }
 )
 
@@ -3703,7 +3703,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GT);
+    operands[1] = hexagon_expand_compare(GT);
   }
 )
 
@@ -3714,7 +3714,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GE);
+    operands[1] = hexagon_expand_compare(GE);
   }
 )
 
@@ -3727,7 +3727,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(LTU);
+    operands[1] = hexagon_expand_compare(LTU);
   }
 )
 
@@ -3738,7 +3738,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(LEU);
+    operands[1] = hexagon_expand_compare(LEU);
   }
 )
 
@@ -3749,7 +3749,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GTU);
+    operands[1] = hexagon_expand_compare(GTU);
   }
 )
 
@@ -3760,7 +3760,7 @@
                       (pc)))]
   ""
   {
-    operands[1] = qdsp6_expand_compare(GEU);
+    operands[1] = hexagon_expand_compare(GEU);
   }
 )
 
@@ -3784,7 +3784,7 @@
     prediction = find_reg_note(insn, REG_BR_PROB, 0);
     predict_taken = (prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2);
 
-#define QDSP6_FIXUP_GPR_JUMP(string) ((get_attr_length(insn) == 4) \
+#define HEXAGON_FIXUP_GPR_JUMP(string) ((get_attr_length(insn) == 4) \
                                       ? string \
                                       : "jump %l4\n%l2:\;jump %l3\n%l4:\;" string)
 
@@ -3797,34 +3797,34 @@
 
     if(GET_CODE(operands[0]) == EQ){
       if(predict_taken){
-        return QDSP6_FIXUP_GPR_JUMP("if (%1==#0) jump:t %l2");
+        return HEXAGON_FIXUP_GPR_JUMP("if (%1==#0) jump:t %l2");
       }
       else {
-        return QDSP6_FIXUP_GPR_JUMP("if (%1==#0) jump:nt %l2");
+        return HEXAGON_FIXUP_GPR_JUMP("if (%1==#0) jump:nt %l2");
       }
     }
     else if(GET_CODE(operands[0]) == NE){
       if(predict_taken){
-        return QDSP6_FIXUP_GPR_JUMP("if (%1!=#0) jump:t %l2");
+        return HEXAGON_FIXUP_GPR_JUMP("if (%1!=#0) jump:t %l2");
       }
       else {
-        return QDSP6_FIXUP_GPR_JUMP("if (%1!=#0) jump:nt %l2");
+        return HEXAGON_FIXUP_GPR_JUMP("if (%1!=#0) jump:nt %l2");
       }
     }
     else if(GET_CODE(operands[0]) == GE){
       if(predict_taken){
-        return QDSP6_FIXUP_GPR_JUMP("if (%1>=#0) jump:t %l2");
+        return HEXAGON_FIXUP_GPR_JUMP("if (%1>=#0) jump:t %l2");
       }
       else {
-        return QDSP6_FIXUP_GPR_JUMP("if (%1>=#0) jump:nt %l2");
+        return HEXAGON_FIXUP_GPR_JUMP("if (%1>=#0) jump:nt %l2");
       }
     }
     else if(GET_CODE(operands[0]) == LE){
       if(predict_taken){
-        return QDSP6_FIXUP_GPR_JUMP("if (%1<=#0) jump:t %l2");
+        return HEXAGON_FIXUP_GPR_JUMP("if (%1<=#0) jump:t %l2");
       }
       else {
-        return QDSP6_FIXUP_GPR_JUMP("if (%1<=#0) jump:nt %l2");
+        return HEXAGON_FIXUP_GPR_JUMP("if (%1<=#0) jump:nt %l2");
       }
     }
     else {
@@ -3852,7 +3852,7 @@
   ""
   {
     if(get_attr_length(insn) == 4){
-      operands[3] = qdsp6_branch_hint(insn);
+      operands[3] = hexagon_branch_hint(insn);
       return "if (%C0) jump%h3 %l2";
     }
     else {
@@ -4043,7 +4043,7 @@
   ]
   "TARGET_V4_FEATURES"
   {
-    operands[5] = qdsp6_branch_hint(insn);
+    operands[5] = hexagon_branch_hint(insn);
     enum rtx_code code = GET_CODE(operands[0]);
     if (GET_CODE(operands[2]) == CONST_INT) {
       switch(code) {
@@ -4096,7 +4096,7 @@
   ]
   "TARGET_V4_FEATURES && crtl->combine_completed"
   {
-    operands[5] = qdsp6_branch_hint(insn);
+    operands[5] = hexagon_branch_hint(insn);
     enum rtx_code code = GET_CODE(operands[0]);
     if (GET_CODE(operands[2]) == CONST_INT) {
       switch(code) {
@@ -4144,7 +4144,7 @@
   ]
   "TARGET_V4_FEATURES"
   {
-    operands[5] = qdsp6_branch_hint(insn);
+    operands[5] = hexagon_branch_hint(insn);
     enum rtx_code code = GET_CODE(operands[0]);
     if (GET_CODE(operands[1]) == CONST_INT) {
       switch(code) {
@@ -4197,7 +4197,7 @@
   ]
   "TARGET_V4_FEATURES && crtl->combine_completed"
   {
-    operands[5] = qdsp6_branch_hint(insn);
+    operands[5] = hexagon_branch_hint(insn);
     enum rtx_code code = GET_CODE(operands[0]);
     if (GET_CODE(operands[1]) == CONST_INT) {
       switch(code) {
@@ -4355,7 +4355,7 @@
   ""
   {
     if (flag_unsafe_math_optimizations){
-       qdsp6_fast_math_libfunc (operands[1]);
+       hexagon_fast_math_libfunc (operands[1]);
     }
     if(TARGET_LONG_CALLS && !REG_P (XEXP (operands[1], 0))){
       XEXP (operands[1], 0) = force_reg(Pmode, XEXP (operands[1], 0));
@@ -4403,7 +4403,7 @@
   "!TARGET_LONG_CALLS"
   {
     if (flag_unsafe_math_optimizations){
-       qdsp6_fast_math_libfunc (operands[1]);
+       hexagon_fast_math_libfunc (operands[1]);
     }
   }
 )
@@ -4453,7 +4453,7 @@
 
 (define_expand "return"
   [(return)]
-  "qdsp6_direct_return()"
+  "hexagon_direct_return()"
   {
     if(cfun->machine->frame_info.use_allocframe){
       gcc_assert(TARGET_V4_FEATURES);
@@ -4472,9 +4472,9 @@
                          (const_int 0)])
                       (return)
                       (pc)))]
-  "qdsp6_direct_return()"
+  "hexagon_direct_return()"
   {
-    operands[2] = qdsp6_branch_hint(insn);
+    operands[2] = hexagon_branch_hint(insn);
     return "if (%C0) jumpr%h2 r31";
   }
   "cfun->machine->frame_info.use_allocframe"
@@ -4514,9 +4514,9 @@
              (mem:SI (plus:SI (reg:SI FP_REGNUM) (const_int 4))))
         (set (reg:SI FP_REGNUM)
              (mem:SI (reg:SI FP_REGNUM)))]))]
-  "qdsp6_direct_return()"
+  "hexagon_direct_return()"
   {
-    operands[2] = qdsp6_branch_hint(insn);
+    operands[2] = hexagon_branch_hint(insn);
     return "if (%C0) dealloc_return%h2";
   }
   [(set_attr "type" "NewValue")
@@ -4563,7 +4563,7 @@
                       (pc)))]
   ""
   {
-    operands[3] = qdsp6_branch_hint(insn);
+    operands[3] = hexagon_branch_hint(insn);
     return "if (%C0) jumpr%h3 %2";
   }
   [(set_attr "type" "JR")
@@ -4646,7 +4646,7 @@
     else {
       FAIL;
     }
-    qdsp6_hardware_loop();
+    hexagon_hardware_loop();
     DONE;
   }
 )
@@ -5027,7 +5027,7 @@
   [(clobber (const_int 0))]
   ""
   {
-    qdsp6_expand_prologue();
+    hexagon_expand_prologue();
     DONE;
   }
 )
@@ -5041,7 +5041,7 @@
   [(return)]
   ""
   {
-    qdsp6_expand_epilogue(false);
+    hexagon_expand_epilogue(false);
     DONE;
   }
 )
@@ -5055,7 +5055,7 @@
   [(return)]
   ""
   {
-    qdsp6_expand_epilogue(true);
+    hexagon_expand_epilogue(true);
     DONE;
   }
 )
@@ -8350,7 +8350,7 @@
    %0 = add(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], QImode)
-   && !qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8378,7 +8378,7 @@
    %0 = add(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], QImode)
-   && !qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8411,7 +8411,7 @@
    %0 = add(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], HImode)
-   && !qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8439,7 +8439,7 @@
    %0 = add(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], HImode)
-   && !qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8467,7 +8467,7 @@
    %0 = sub(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], QImode)
-   && !qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8494,7 +8494,7 @@
    %0 = sub(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], HImode)
-   && !qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8525,7 +8525,7 @@
    %0 = and(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], QImode)
-   && !qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8553,7 +8553,7 @@
    %0 = and(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], QImode)
-   && !qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8584,7 +8584,7 @@
    %0 = and(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], HImode)
-   && !qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8612,7 +8612,7 @@
    %0 = and(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], HImode)
-   && !qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8643,7 +8643,7 @@
    %0 = or(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], QImode)
-   && !qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8671,7 +8671,7 @@
    %0 = or(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], QImode)
-   && !qdsp6_legitimate_address_p(QImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(QImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8702,7 +8702,7 @@
    %0 = or(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], HImode)
-   && !qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -8730,7 +8730,7 @@
    %0 = or(%1,%2)"
   "&& !reload_completed
    && memory_operand(operands[0], HImode)
-   && !qdsp6_legitimate_address_p(HImode, XEXP (operands[0], 0),
+   && !hexagon_legitimate_address_p(HImode, XEXP (operands[0], 0),
                                   reload_in_progress || reload_completed,
                                   \"ememop\")"
   [(set (match_dup 0)
@@ -9535,7 +9535,7 @@
 )
 
 (define_insn "falign"
-  [(unspec_volatile [(const_int 0)] UNSPEC_QDSP6_falign)]
+  [(unspec_volatile [(const_int 0)] UNSPEC_HEXAGON_falign)]
   ""
   ".falign"
   [(set_attr "length" "12")]
@@ -9586,7 +9586,7 @@
         (unspec:BI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
           (match_operand:DI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_vcmpb_eq))]
+        ] UNSPEC_HEXAGON_vcmpb_eq))]
   ""
   "%0 = vcmpb.eq(%P1,%P2)"
   [(set_attr "type" "X")]
@@ -9597,7 +9597,7 @@
         (unspec:BI [
           (match_operand:DI 1 "gr_register_operand" "Rg")
           (match_operand:DI 2 "gr_register_operand" "Rg")
-        ] UNSPEC_QDSP6_vcmpb_gtu))]
+        ] UNSPEC_HEXAGON_vcmpb_gtu))]
   ""
   "%0 = vcmpb.gtu(%P1,%P2)"
   [(set_attr "type" "X")]
@@ -9607,7 +9607,7 @@
   [(set (match_operand:BI 0 "pr_register_operand"  "=Rp")
         (unspec:BI [
           (match_operand:BI 1 "pr_register_operand" "Rp")
-        ] UNSPEC_QDSP6_any))]
+        ] UNSPEC_HEXAGON_any))]
   ""
   "%0 = any8(%1)"
   [(set_attr "type" "S")]
@@ -9617,7 +9617,7 @@
   [(set (match_operand:BI 0 "pr_register_operand"  "=Rp")
         (unspec:BI [
           (match_operand:BI 1 "pr_register_operand" "Rp")
-        ] UNSPEC_QDSP6_all))]
+        ] UNSPEC_HEXAGON_all))]
   ""
   "%0 = all8(%1)"
   [(set_attr "type" "S")]
