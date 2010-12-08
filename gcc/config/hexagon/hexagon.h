@@ -647,8 +647,10 @@ Exception Handling Support
 #define EH_RETURN_HANDLER_RTX \
   gen_rtx_MEM (Pmode, plus_constant(hard_frame_pointer_rtx, UNITS_PER_WORD))
 
+#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) \
+  ((flag_pic || GLOBAL) ? DW_EH_PE_aligned : DW_EH_PE_absptr)
+
 /* ??? do we want this? */
-/*#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL)*/
 /*#define ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX(FILE, ENCODING, SIZE, ADDR, DONE)*/
 
 
