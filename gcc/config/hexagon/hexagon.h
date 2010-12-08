@@ -88,7 +88,7 @@ Run-time Target Specification
     builtin_assert ("machine=hexagon"); \
   }while(0)
 
-/* Append (hexagon_) to the version string. */
+/* Append (hexagon) to the version string. */
 #define TARGET_VERSION fprintf(stderr, " (hexagon)");
 
 #define OVERRIDE_OPTIONS \
@@ -1010,6 +1010,7 @@ Output of Dispatch Tables
 #define ASM_OUTPUT_ADDR_VEC_ELT(STREAM, VALUE) \
   fprintf(STREAM, "\t.word .L%d\n", VALUE)
 
+#define JUMP_TABLES_IN_TEXT_SECTION (flag_pic)
 
 /*------------------------------
 Assembler Commands for Alignment
