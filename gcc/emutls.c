@@ -68,7 +68,11 @@ emutls_destroy (void *ptr)
   pointer size = arr->size;
   pointer i;
 
-  for (i = 0; i < size; ++i)
+  /* arr->size is the total size of area that 'arr' is pointing to.
+   * The size of 'arr->data' is one less than that.
+   * Properly, its (&arr->data[0]-arr)/sizeof(void *) = 1 less.
+   */
+  for (i = 0; i < size-1; ++i)
     {
       if (arr->data[i])
 	free (arr->data[i][-1]);
