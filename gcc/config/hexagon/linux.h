@@ -32,11 +32,12 @@ Controlling the Compilation Driver, gcc
 #define STARTFILE_SPEC \
   "%{msys-crt0=*: %*} %{!msys-crt0=*:%{!shared:crt1%O%s}} \
    %{msys-crt0=: %eYou need a C startup file for -msys-crt0=} \
-   %{!shared:crti%\O%s} %{!shared:crtbegin%O%s}"
+   crti%\O%s \
+   %{!shared:crtbegin%O%s} %{shared:crtbeginS%O%s}"
 
 #undef ENDFILE_SPEC
 #define ENDFILE_SPEC \
- "%{!shared:crtend%O%s crtn%O%s}"
+ "%{!shared:crtend%O%s} %{shared:crtendS%O%s} crtn%O%s"
 
 #undef LIB_SPEC
 #define LIB_SPEC "-lc"
