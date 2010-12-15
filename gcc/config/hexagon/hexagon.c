@@ -1294,7 +1294,12 @@ hexagon_save_register_p(unsigned int regno)
     }while(eh_regno != INVALID_REGNUM);
   }
 
-  if (flag_pic && regno == PIC_OFFSET_TABLE_REGNUM && df_regs_ever_live_p(regno)) {
+  /* Handle the pic register differently since it is a call_used_reg
+     and a fixed_reg.  Also, check both df_regs_ever_live_p and
+     uses_pic_offset_table in the odd case that uses_pic_offset_table
+     is set, but df_regs_ever_live_p is not. */
+  if (flag_pic && regno == PIC_OFFSET_TABLE_REGNUM && 
+      (df_regs_ever_live_p(regno) || crtl->uses_pic_offset_table)) {
     return true;  
   }
 
@@ -2528,7 +2533,12 @@ void
 require_pic_register (void)
 {
   /* Set gcc global flag */
-  crtl->uses_pic_offset_table = 1;
+  /* Do not mark that the function access the pic register when called as 
+     part of the cost-estimation process.  Otherwise, we'll generate the pic
+     set-up code when we may not need it.  Arm also does this. */
+  if (current_ir_type() != IR_GIMPLE) {
+    crtl->uses_pic_offset_table = 1;
+  }
 }
 
 
