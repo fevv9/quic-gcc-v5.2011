@@ -125,7 +125,7 @@ struct store_by_pieces
 static unsigned HOST_WIDE_INT move_by_pieces_ninsns (unsigned HOST_WIDE_INT,
 						     unsigned int,
 						     unsigned int);
-static void move_by_pieces_1 (rtx (*) (rtx, ...), enum machine_mode,
+static void move_by_pieces_1 (insn_gen_fn_2, enum machine_mode,
 			      struct move_by_pieces *);
 static bool block_move_libcall_safe_for_call_parm (void);
 static bool emit_block_move_via_movmem (rtx, rtx, rtx, unsigned, bool, unsigned, HOST_WIDE_INT);
@@ -134,7 +134,7 @@ static void emit_block_move_via_loop (rtx, rtx, rtx, unsigned);
 static rtx clear_by_pieces_1 (void *, HOST_WIDE_INT, enum machine_mode);
 static void clear_by_pieces (rtx, unsigned HOST_WIDE_INT, unsigned int);
 static void store_by_pieces_1 (struct store_by_pieces *, unsigned int);
-static void store_by_pieces_2 (rtx (*) (rtx, ...), enum machine_mode,
+static void store_by_pieces_2 (insn_gen_fn_2, enum machine_mode,
 			       struct store_by_pieces *);
 static tree clear_storage_libcall_fn (int);
 static rtx compress_float_constant (rtx, rtx);
@@ -1106,7 +1106,7 @@ move_by_pieces_ninsns (unsigned HOST_WIDE_INT l, unsigned int align,
    to make a move insn for that mode.  DATA has all the other info.  */
 
 static void
-move_by_pieces_1 (rtx (*genfun) (rtx, ...), enum machine_mode mode,
+move_by_pieces_1 (insn_gen_fn_2 genfun, enum machine_mode mode,
 		  struct move_by_pieces *data)
 {
   unsigned int size = GET_MODE_SIZE (mode);
@@ -2573,7 +2573,7 @@ store_by_pieces_1 (struct store_by_pieces *data ATTRIBUTE_UNUSED,
    to make a move insn for that mode.  DATA has all the other info.  */
 
 static void
-store_by_pieces_2 (rtx (*genfun) (rtx, ...), enum machine_mode mode,
+store_by_pieces_2 (insn_gen_fn_2 genfun, enum machine_mode mode,
 		   struct store_by_pieces *data)
 {
   unsigned int size = GET_MODE_SIZE (mode);
