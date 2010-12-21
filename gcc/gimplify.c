@@ -2272,6 +2272,28 @@ gimplify_arg (tree *arg_p, gimple_seq *pre_p, location_t call_location)
   return gimplify_expr (arg_p, pre_p, NULL, test, fb);
 }
 
+tree tree_packed = NULL_TREE;
+
+bool
+check_formal_packed_attr (tree arg)
+{
+  tree inner = arg;
+  while (TREE_CODE (inner) == NOP_EXPR)
+    inner = TREE_OPERAND (inner, 0);
+
+  if (TREE_CODE (inner) != ADDR_EXPR)
+    {
+      return false;
+    }
+
+  tree addr = TREE_OPERAND (inner, 0);
+  if (contains_packed_reference (addr))
+    {
+      return true;
+    }
+
+  return false;
+}
 
 /* Gimplify the CALL_EXPR node *EXPR_P into the GIMPLE sequence PRE_P.
    WANT_VALUE is true if the result of the call is desired.  */
@@ -2291,6 +2313,41 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
      every call_expr be annotated with file and line.  */
   if (! EXPR_HAS_LOCATION (*expr_p))
     SET_EXPR_LOCATION (*expr_p, input_location);
+
+  fndecl = get_callee_fndecl (*expr_p);
+  if (fndecl && DECL_BUILT_IN (fndecl))
+    {
+      unsigned int fcode = DECL_FUNCTION_CODE (fndecl);
+
+      if (fcode >= BUILT_IN_BCMP && fcode <= BUILT_IN_STRSTR)
+        {
+          bool flag_builtin = 1;
+          nargs = call_expr_nargs (*expr_p);
+          for (i = 0; i < nargs; i++)
+            {
+              tree arg = CALL_EXPR_ARG (*expr_p, i);
+              if (check_formal_packed_attr (arg))
+                {
+                  flag_builtin = 0;
+                  break;
+                }
+            }
+
+          if (!flag_builtin)
+            {
+              tree_packed = copy_node (fndecl);
+              DECL_BUILT_IN_CLASS (tree_packed) = NOT_BUILT_IN;
+
+              if (fcode == BUILT_IN_MEMCPY && !qdsp6_dual_memory_accesses)
+                {
+                  tree memcpy_v = get_identifier ("memcpy_v");
+                  DECL_NAME (tree_packed) = memcpy_v;
+                }
+              tree addr = CALL_EXPR_FN (*expr_p);
+              TREE_OPERAND (addr, 0) = tree_packed;
+            }
+        }
+    }
 
   /* This may be a call to a builtin function.
 
