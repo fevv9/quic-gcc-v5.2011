@@ -4582,4 +4582,6 @@ gimple_alloc_kind (enum gimple_code code)
 
 extern void dump_gimple_statistics (void);
 
+extern bool qdsp6_dual_memory_accesses;
+
 #endif  /* GCC_GIMPLE_H */
