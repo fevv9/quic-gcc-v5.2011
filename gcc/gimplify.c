@@ -54,7 +54,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "vec.h"
 #include "gimple.h"
 
-
 enum gimplify_omp_var_data
 {
   GOVD_SEEN = 1,
@@ -2272,11 +2271,14 @@ gimplify_arg (tree *arg_p, gimple_seq *pre_p, location_t call_location)
   return gimplify_expr (arg_p, pre_p, NULL, test, fb);
 }
 
-tree tree_packed = NULL_TREE;
+/* Check for packed attribute in ARG. Return true if so. */
 
-bool
+static bool
 check_formal_packed_attr (tree arg)
 {
+  if (TREE_CODE (arg) == POINTER_PLUS_EXPR)
+    arg = TREE_OPERAND (arg, 0);
+
   tree inner = arg;
   while (TREE_CODE (inner) == NOP_EXPR)
     inner = TREE_OPERAND (inner, 0);
@@ -2292,6 +2294,38 @@ check_formal_packed_attr (tree arg)
       return true;
     }
 
+  return false;
+}
+
+/* Check for volatile attribute in ARG. Return true if so. */
+
+static bool
+check_formal_volatile_attr (tree arg)
+{
+  HOST_WIDE_INT bitsize, bitpos;
+  tree offset;
+  enum machine_mode mode;
+  int unsignedp, volatilep = 0;
+
+  if (TREE_CODE (arg) == POINTER_PLUS_EXPR)
+    arg = TREE_OPERAND (arg, 0);
+
+  tree inner = arg;
+  while (TREE_CODE (inner) == NOP_EXPR)
+    inner = TREE_OPERAND (inner, 0);
+
+  if (TREE_CODE (inner) != ADDR_EXPR)
+    {
+      return false;
+    }
+
+  tree addr = TREE_OPERAND (inner, 0);
+  get_inner_reference (addr, &bitsize, &bitpos, &offset,
+                       &mode, &unsignedp, &volatilep, false);
+  if (volatilep)
+    {
+      return true;
+    }
   return false;
 }
 
@@ -2314,31 +2348,43 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
   if (! EXPR_HAS_LOCATION (*expr_p))
     SET_EXPR_LOCATION (*expr_p, input_location);
 
+  /* Fix for a FSF bug in gcc when handling packed struct members in
+     memcpy and other builtins. The compiler is dropping the packed
+     attribute and aligning members based on their type information.  */
   fndecl = get_callee_fndecl (*expr_p);
   if (fndecl && DECL_BUILT_IN (fndecl))
     {
       unsigned int fcode = DECL_FUNCTION_CODE (fndecl);
 
+      /* Check for str and mem builtins. */
       if (fcode >= BUILT_IN_BCMP && fcode <= BUILT_IN_STRSTR)
         {
-          bool flag_builtin = 1;
+          bool flag_packed = 0;
+          bool flag_volatile = 0;
           nargs = call_expr_nargs (*expr_p);
           for (i = 0; i < nargs; i++)
             {
               tree arg = CALL_EXPR_ARG (*expr_p, i);
+              /* See if arg has packed attribute. */
               if (check_formal_packed_attr (arg))
                 {
-                  flag_builtin = 0;
-                  break;
+                  flag_packed = 1;
+                }
+              /* See if arg has volatile attribute. */
+              if (check_formal_volatile_attr (arg))
+                {
+                  flag_volatile = 1;
                 }
             }
 
-          if (!flag_builtin)
+          if (flag_packed)
             {
-              tree_packed = copy_node (fndecl);
+              /* Copy original fndecl and create a new node without the builtin bit. */
+              tree tree_packed = copy_node (fndecl);
               DECL_BUILT_IN_CLASS (tree_packed) = NOT_BUILT_IN;
 
-              if (fcode == BUILT_IN_MEMCPY && !qdsp6_dual_memory_accesses)
+              /* Decide between memcpy and memcpy_v calls. */
+              if (fcode == BUILT_IN_MEMCPY && (!hexagon_dual_memory_accesses || flag_volatile))
                 {
                   tree memcpy_v = get_identifier ("memcpy_v");
                   DECL_NAME (tree_packed) = memcpy_v;
