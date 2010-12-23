@@ -8151,10 +8151,21 @@
         (gtu:BI (match_operand:QI 1 "gr_register_operand" "Rg,Rg,Rg")
                 (match_operand:QI 2 "nonmemory_operand"  "Iu7, i,Rg")))]
   "TARGET_V4_FEATURES"
-  "@
-   %0 = cmpb.gtu(%1,#%2)
-   %0 = cmpb.gtu(%1,##%2)
-   %0 = cmpb.gtu(%1,%2)"
+  {
+    switch(which_alternative){
+    case 0:
+       return "%0 = cmpb.gtu(%1,#%2)";
+    case 1:
+       gcc_assert(const_int_operand(operands[2], QImode));
+       unsigned int low = INTVAL (operands[2]);
+       operands[2] = gen_int_mode(low & 0x000000FFUL, SImode);
+       return "%0 = cmpb.gtu(%1,##%2)";
+    case 2:
+       return "%0 = cmpb.gtu(%1,%2)";
+    default:
+       gcc_unreachable();
+    }
+  }
   [(set_attr "type" "X,EX,X")]
 )
 
@@ -8180,10 +8191,21 @@
         (eq:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg,Rg")
                (match_operand:HI 2 "nonmemory_operand"  "Is8, i,Rg")))]
   "TARGET_V4_FEATURES"
-  "@
-   %0 = cmph.eq(%1,#%2)
-   %0 = cmph.eq(%1,##%2)
-   %0 = cmph.eq(%1,%2)"
+  {
+    switch(which_alternative){
+    case 0:
+      return "%0 = cmph.eq(%1,#%2)";
+    case 1:
+      gcc_assert(const_int_operand(operands[2], HImode));
+      int low = INTVAL (operands[2]);
+      operands[2] = gen_int_mode(low , SImode);
+      return "%0 = cmph.eq(%1,##%2)";
+    case 2:
+      return "%0 = cmph.eq(%1,%2)";
+    default:
+      gcc_unreachable();
+    }
+  }
   [(set_attr "type" "X,EX,X")]
 )
 
@@ -8221,10 +8243,21 @@
         (gtu:BI (match_operand:HI 1 "gr_register_operand" "Rg,Rg,Rg")
                 (match_operand:HI 2 "nonmemory_operand"  "Iu7, i,Rg")))]
   "TARGET_V4_FEATURES"
-  "@
-   %0 = cmph.gtu(%1,#%2)
-   %0 = cmph.gtu(%1,##%2)
-   %0 = cmph.gtu(%1,%2)"
+  {
+     switch(which_alternative){
+     case 0:
+       return "%0 = cmph.gtu(%1,#%2)";
+     case 1:
+       gcc_assert(const_int_operand(operands[2], HImode));
+       unsigned int low = INTVAL (operands[2]);
+       operands[2] = gen_int_mode(low & 0x0000FFFFUL, SImode);
+       return "%0 = cmph.gtu(%1,##%2)";
+     case 2:
+       return "%0 = cmph.gtu(%1,%2)";
+     default:
+       gcc_unreachable();
+     }
+  }
   [(set_attr "type" "X,EX,X")]
 )
 
