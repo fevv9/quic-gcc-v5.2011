@@ -9205,11 +9205,11 @@ hexagon_dot_newify_gpr(
       (INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump1   ||
        INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump2   ||
        INSN_CODE(insn_info->insn) == CODE_FOR_compare_and_jump1 || 
-       INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump2)
+       INSN_CODE(insn_info->insn) == CODE_FOR_compare_and_jump2)
      ) 
   {
     rtx original_insn = insn;
-    if ((insn = hexagon_nvj_swap_operands(original_insn))==NULL);
+    if ((insn = hexagon_nvj_swap_operands(original_insn))==NULL)
       insn = original_insn;
   }
 
@@ -9222,7 +9222,7 @@ hexagon_dot_newify_gpr(
       (INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump1   ||
        INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump2   ||
        INSN_CODE(insn_info->insn) == CODE_FOR_compare_and_jump1 || 
-       INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump2   ||
+       INSN_CODE(insn_info->insn) == CODE_FOR_compare_and_jump2 ||
        INSN_CODE(insn_info->insn) == CODE_FOR_new_value_jump_tstbit   ||
        INSN_CODE(insn_info->insn) == CODE_FOR_compare_and_jump_tstbit )) 
   {
@@ -10946,7 +10946,7 @@ hexagon_nvj_move_possible(
       if (*op_cnt==0)
         nvj_instruction =  gen_new_value_jump1( *oper, *op1, *op2, *b_lab, *pred ); 
       else
-        nvj_instruction =  gen_new_value_jump2( *oper, *op1, *op2, *b_lab, *pred ); 
+        nvj_instruction =  gen_new_value_jump2( *oper, *op2, *op1, *b_lab, *pred ); 
     }
 
     nvj_insn_rtx = emit_jump_insn ( nvj_instruction );

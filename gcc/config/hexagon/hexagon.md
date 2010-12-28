@@ -4149,11 +4149,11 @@
     if (GET_CODE(operands[1]) == CONST_INT) {
       switch(code) {
         case EQ: return "if (cmp.eq(#%1,%2.new)) jump%h5 %l3"; 
-        case NE: return "if (!cmp.eq(#%%1,%2.new)) jump%h5 %l3"; 
-        case GT: return "if (cmp.gt(#%%1,%2.new)) jump%h5 %l3"; 
-        case LE: return "if (!cmp.gt(#%%1,%2.new)) jump%h5 %l3"; 
-        case GTU: return "if (cmp.gtu(#%%1,%2.new)) jump%h5 %l3"; 
-        case LEU: return "if (!cmp.gtu(#%%1,%2.new)) jump%h5 %l3"; 
+        case NE: return "if (!cmp.eq(#%1,%2.new)) jump%h5 %l3"; 
+        case GT: return "if (cmp.gt(#%1,%2.new)) jump%h5 %l3"; 
+        case LE: return "if (!cmp.gt(#%1,%2.new)) jump%h5 %l3"; 
+        case GTU: return "if (cmp.gtu(#%1,%2.new)) jump%h5 %l3"; 
+        case LEU: return "if (!cmp.gtu(#%1,%2.new)) jump%h5 %l3"; 
         default:
           gcc_unreachable();
       }
