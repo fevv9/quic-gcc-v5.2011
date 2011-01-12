@@ -1974,7 +1974,8 @@ expand_builtin_mathfn (tree exp, rtx target, rtx subtarget)
     errno_set = false;
 
   /* Before working hard, check whether the instruction is available.  */
-  if (optab_handler (builtin_optab, mode)->insn_code != CODE_FOR_nothing)
+  if (optab_handler (builtin_optab, mode)->insn_code != CODE_FOR_nothing
+      || optab_libfunc (builtin_optab, mode))
     {
       target = gen_reg_rtx (mode);
 

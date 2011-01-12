@@ -116,9 +116,9 @@ static void hexagon_asm_function_prologue(FILE *file, HOST_WIDE_INT size);
 
 static bool hexagon_function_ok_for_sibcall(tree decl, tree exp);
 
-#if HEXAGON_DINKUMWARE
+#if HEXAGON_DINKUMWARE || HEXAGON_NEWLIB
 static void hexagon_init_libfuncs(void);
-#endif /* HEXAGON_DINKUMWARE */
+#endif /* HEXAGON_DINKUMWARE  || HEXAGON_NEWLIB */
 
 static bool hexagon_legit_addr_const_p(
               HOST_WIDE_INT value,
@@ -249,11 +249,19 @@ static bool hexagon_gpr_dot_newable_p(
               struct hexagon_insn_info *producer,
               struct hexagon_insn_info *consumer,
               struct hexagon_dependence *dependence);
+static int hexagon_dot_newify_rtx(rtx *x, void *voidp_use);
 static struct hexagon_insn_info *hexagon_dot_newify_gpr(
                                  struct hexagon_insn_info *insn_info,
                                  struct hexagon_dependence *dependence);
+static bool hexagon_mem_dot_newable_p(
+              struct hexagon_insn_info *producer,
+              struct hexagon_insn_info *consumer,
+              struct hexagon_dependence *dependence);
+static struct hexagon_insn_info *hexagon_dot_newify_mem(
+                                 struct hexagon_insn_info *insn_info,
+                                 struct hexagon_dependence *dependence);
 static int hexagon_find_new_value(rtx *x, void *y);
-static void hexagon_dot_oldify_gpr(struct hexagon_insn_info *insn_info);
+static void hexagon_dot_oldify_insn(struct hexagon_insn_info *insn_info);
 static bool hexagon_predicate_dot_newable_p(struct hexagon_insn_info *insn_info);
 static struct hexagon_insn_info *hexagon_dot_newify_predicate(
                                  struct hexagon_insn_info *insn_info);
@@ -413,9 +421,9 @@ Run-time Target Specification
 #undef TARGET_DEFAULT_TARGET_FLAGS
 #define TARGET_DEFAULT_TARGET_FLAGS \
   (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
-   | MASK_NEW_PREDICATES | MASK_NEW_VALUE_STORES | MASK_BASE_PLUS_INDEX \
-   | MASK_MEMOPS | MASK_SECTION_SORTING | MASK_SECTION_SORTING_CODE_SUPPORT \
-   | MASK_DEEP_PHI_MATCH)
+   | MASK_NEW_PREDICATES | MASK_NEW_VALUE_STORES | MASK_NEW_MEMORY_LOADS \
+   | MASK_BASE_PLUS_INDEX | MASK_MEMOPS | MASK_SECTION_SORTING \
+   | MASK_SECTION_SORTING_CODE_SUPPORT | MASK_DEEP_PHI_MATCH)
 
 #undef TARGET_HANDLE_OPTION
 #define TARGET_HANDLE_OPTION hexagon_handle_option
@@ -512,10 +520,10 @@ Implementing the Varargs Macros
 Implicit Calls to Library Routines
 --------------------------------*/
 
-#if HEXAGON_DINKUMWARE
+#if HEXAGON_DINKUMWARE || HEXAGON_NEWLIB
 #undef TARGET_INIT_LIBFUNCS
 #define TARGET_INIT_LIBFUNCS hexagon_init_libfuncs
-#endif /* HEXAGON_DINKUMWARE */
+#endif /* HEXAGON_DINKUMWARE || HEXAGON_NEWLIB */
 
 
 /*--------------
@@ -2142,6 +2150,167 @@ hexagon_init_libfuncs(void)
   set_conv_libfunc(ufloat_optab, DFmode, SImode, "__hexagon_floatunsidf");
   set_conv_libfunc(ufloat_optab, DFmode, DImode, "__hexagon_floatundidf");
 }
+
+#elif HEXAGON_NEWLIB
+
+static void
+hexagon_init_libfuncs(void)
+{
+  set_optab_libfunc(sdiv_optab, SImode, "__divsi3");
+  set_optab_libfunc(sdiv_optab, DImode, "__divdi3");
+
+  set_optab_libfunc(udiv_optab, SImode, "__udivsi3");
+  set_optab_libfunc(udiv_optab, DImode, "__udivdi3");
+
+  set_optab_libfunc(smod_optab, SImode, "__modsi3");
+  set_optab_libfunc(smod_optab, DImode, "__moddi3");
+
+  set_optab_libfunc(umod_optab, SImode, "__umodsi3");
+  set_optab_libfunc(umod_optab, DImode, "__umoddi3");
+
+  set_optab_libfunc(sdivmod_optab, SImode, "__divmodsi4");
+  set_optab_libfunc(sdivmod_optab, DImode, "__divmoddi4");
+
+  set_optab_libfunc(udivmod_optab, SImode, "__udivmodsi4");
+  set_optab_libfunc(udivmod_optab, DImode, "__udivmoddi4");
+
+  if (0 && flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(add_optab, DFmode, "__fast_adddf3");
+    }
+  else 
+    {
+      set_optab_libfunc(add_optab, DFmode, "__adddf3");
+    }
+
+  set_optab_libfunc(add_optab, SFmode, "__addsf3");
+
+  if (0 && flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(sub_optab, DFmode, "__fast_subdf3");
+    }
+  else
+    {
+      set_optab_libfunc(sub_optab, DFmode, "__subdf3");
+    }
+
+  set_optab_libfunc(sub_optab, SFmode, "__subsf3");
+
+  if (0 && flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(smul_optab, DFmode, "__fast_muldf3");
+    }
+  else
+    {
+      set_optab_libfunc(smul_optab, DFmode, "__muldf3");
+    }
+
+  set_optab_libfunc(smul_optab, SFmode, "__mulsf3");
+    
+  if (0 && flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(sdiv_optab, DFmode, "__fast_divdf3");
+    }
+  else
+    {
+      set_optab_libfunc(sdiv_optab, DFmode, "__divdf3");
+    }
+
+  set_optab_libfunc(sdiv_optab, SFmode, "__divsf3");
+
+  if (TARGET_V5_FEATURES)
+    {
+      set_optab_libfunc(sdiv_optab, SFmode, "__hexagon_divsf3_opt");
+      set_optab_libfunc(sdiv_optab, DFmode, "__hexagon_divdf3_opt");
+
+      set_optab_libfunc(sqrt_optab, SFmode, "__hexagon_sqrtsf_opt");
+      set_optab_libfunc(sqrt_optab, DFmode, "__hexagon_sqrtdf_opt");
+    }
+  
+  if (0 && flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(neg_optab, DFmode, "__fast_negdf2");
+    }
+  else
+    {
+      set_optab_libfunc(neg_optab, DFmode, "__negdf2");
+    }
+
+  set_optab_libfunc(neg_optab, SFmode, "__negsf3");
+
+  set_optab_libfunc(cmp_optab, SFmode, "__cmpsf2");
+  set_optab_libfunc(cmp_optab, DFmode, "__cmpdf2");
+
+  set_optab_libfunc(unord_optab, SFmode, "__unordsf2");
+  set_optab_libfunc(unord_optab, DFmode, "__unorddf2");
+
+  set_optab_libfunc(eq_optab, SFmode, "__eqsf2");
+  set_optab_libfunc(eq_optab, DFmode, "__eqdf2");
+
+  set_optab_libfunc(ne_optab, SFmode, "__nesf2");
+  set_optab_libfunc(ne_optab, DFmode, "__nedf2");
+
+  set_optab_libfunc(ge_optab, SFmode, "__gesf2");
+  set_optab_libfunc(ge_optab, DFmode, "__gedf2");
+
+  if (0 && flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(lt_optab, DFmode, "__fast_ltdf2");
+    }
+  else
+    {
+      set_optab_libfunc(lt_optab, DFmode, "__ltdf2");
+    }
+
+  set_optab_libfunc(lt_optab, SFmode, "__ltsf2");
+
+  set_optab_libfunc(le_optab, SFmode, "__lesf2");
+  set_optab_libfunc(le_optab, DFmode, "__ledf2");
+
+  if (0 && flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(gt_optab, DFmode, "__fast_gtdf2");
+    }
+  else 
+    {
+      set_optab_libfunc(gt_optab, DFmode, "__gtdf2");
+    }
+
+  set_optab_libfunc(gt_optab, SFmode, "__gtsf2");
+
+  set_conv_libfunc(sext_optab, DFmode, SFmode, "__extendsfdf2");
+  set_conv_libfunc(trunc_optab, SFmode, DFmode, "__truncdfsf2");
+
+  set_conv_libfunc(sfix_optab, SImode, SFmode, "__fixsfsi");
+  set_conv_libfunc(sfix_optab, DImode, SFmode, "__fixsfdi");
+
+  set_conv_libfunc(sfix_optab, SImode, DFmode, "__fixdfsi");
+  set_conv_libfunc(sfix_optab, DImode, DFmode, "__fixdfdi");
+
+  set_conv_libfunc(ufix_optab, SImode, SFmode, "__fixunssfsi");
+  set_conv_libfunc(ufix_optab, DImode, SFmode, "__fixunssfdi");
+
+  set_conv_libfunc(ufix_optab, SImode, DFmode, "__fixunsdfsi");
+  set_conv_libfunc(ufix_optab, DImode, DFmode, "__fixunsdfdi");
+
+  set_conv_libfunc(sfloat_optab, SFmode, SImode, "__floatsisf");
+  set_conv_libfunc(sfloat_optab, SFmode, DImode, "__floatdisf");
+
+  set_conv_libfunc(sfloat_optab, DFmode, SImode, "__floatsidf");
+  set_conv_libfunc(sfloat_optab, DFmode, DImode, "__floatdidf");
+
+  if (0 && flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(sqrt_optab, DFmode, "__fast_sqrt_df");
+    }
+
+  set_conv_libfunc(ufloat_optab, SFmode, SImode, "__floatunsisf");
+  set_conv_libfunc(ufloat_optab, SFmode, DImode, "__floatundisf");
+
+  set_conv_libfunc(ufloat_optab, DFmode, SImode, "__floatunsidf");
+  set_conv_libfunc(ufloat_optab, DFmode, DImode, "__floatundidf");
+}
+
 #endif /* HEXAGON_DINKUMWARE */
 
 
@@ -4712,6 +4881,7 @@ hexagon_final_prescan_insn(
   final_info->print_endloop1 = false;
   final_info->print_falign = false;
   final_info->dot_new_gpr_p = false;
+  final_info->dot_new_mem_p = false;
   final_info->dot_new_predicate_p = false;
 
   gcc_assert(hexagon_head_packet && hexagon_head_packet->num_insns > 0);
@@ -4749,6 +4919,9 @@ hexagon_final_prescan_insn(
   }
   if(HEXAGON_NEW_GPR_P (current_packet->insns[current_insn])){
     final_info->dot_new_gpr_p = true;
+  }
+  if(HEXAGON_NEW_MEM_P (current_packet->insns[current_insn])){
+    final_info->dot_new_mem_p = true;
   }
 
   /* If this is the first insn in a packet, then start the packet. */
@@ -8002,6 +8175,12 @@ hexagon_print_insn_info(FILE *file, struct hexagon_insn_info *insn_info)
     }
     fputs("gpr.new", file);
   }
+  if(HEXAGON_NEW_MEM_P (insn_info)){
+    if(!first){
+      fputs(", ", file);
+    }
+    fputs("mem.new", file);
+  }
   fputs(")\n", file);
 
   fputs(";; register reads:", file);
@@ -8943,6 +9122,9 @@ hexagon_predicate_insn(
   if(HEXAGON_NEW_GPR_P (insn_info)){
     new_insn_info->flags |= HEXAGON_NEW_GPR;
   }
+  if(HEXAGON_NEW_MEM_P (insn_info)){
+    new_insn_info->flags |= HEXAGON_NEW_MEM;
+  }
   if(HEXAGON_MOVED_P (insn_info)){
     new_insn_info->flags |= HEXAGON_MOVED;
   }
@@ -9091,6 +9273,9 @@ hexagon_gpr_dot_newable_p(
   return !insn_invalid_p(insn);
 }
 
+
+
+
   /* get compare portion of the nvj*/
   /* get compare - cmp.XX(Ns.new, YY) */
 static rtx 
@@ -9170,6 +9355,8 @@ hexagon_nvj_swap_operands( rtx insn )
 }
 
 
+
+
 static struct hexagon_insn_info *
 hexagon_dot_newify_gpr(
   struct hexagon_insn_info *insn_info,
@@ -9232,6 +9419,87 @@ hexagon_dot_newify_gpr(
   if(HEXAGON_NEW_PREDICATE_P (insn_info)){
     new_insn_info->flags |= HEXAGON_NEW_PREDICATE;
   }
+  if(HEXAGON_NEW_MEM_P (insn_info)){
+    new_insn_info->flags |= HEXAGON_NEW_MEM;
+  }
+  if(HEXAGON_MOVED_P (insn_info)){
+    new_insn_info->flags |= HEXAGON_MOVED;
+  }
+  set_block_for_insn(new_insn_info->insn, BLOCK_FOR_INSN (insn_info->insn));
+
+  return new_insn_info;
+}
+
+
+
+
+static bool
+hexagon_mem_dot_newable_p(
+  struct hexagon_insn_info *producer,
+  struct hexagon_insn_info *consumer,
+  struct hexagon_dependence *dependence
+)
+{
+  return TARGET_V5_FEATURES && TARGET_NEW_MEMORY_LOADS
+         && consumer->loads && !consumer->loads->next && !consumer->stores;
+}
+
+
+
+
+static int
+hexagon_dot_newify_rtx(rtx *x, void *voidp_use)
+{
+  rtx use = (rtx) voidp_use;
+  if(rtx_equal_p(*x, use)){
+    *x = gen_rtx_UNSPEC (GET_MODE (use),
+                         gen_rtvec(1, copy_rtx(use)),
+                         UNSPEC_NEW_VALUE);
+    return -1;
+  }
+  return 0;
+}
+
+
+
+
+static struct hexagon_insn_info *
+hexagon_dot_newify_mem(
+  struct hexagon_insn_info *insn_info,
+  struct hexagon_dependence *dependence
+)
+{
+  struct hexagon_insn_info *new_insn_info;
+  rtx insn;
+  rtx pattern;
+
+  pattern = copy_rtx(PATTERN (insn_info->insn));
+  for_each_rtx(&pattern, hexagon_dot_newify_rtx, dependence->use);
+
+  start_sequence();
+  if(JUMP_P (insn_info->insn)){
+    emit_jump_insn(pattern);
+  }
+  else if(CALL_P (insn_info->insn)){
+    emit_call_insn(pattern);
+  }
+  else {
+    emit_insn(pattern);
+  }
+  insn = get_insns();
+  end_sequence();
+
+  new_insn_info = hexagon_get_insn_info(insn);
+  new_insn_info->stack = insn_info;
+  new_insn_info->flags |= HEXAGON_NEW_MEM;
+
+
+  if(HEXAGON_NEW_PREDICATE_P (insn_info)){
+    new_insn_info->flags |= HEXAGON_NEW_PREDICATE;
+  }
+  if(HEXAGON_NEW_GPR_P (insn_info)){
+    new_insn_info->flags |= HEXAGON_NEW_GPR;
+  }
   if(HEXAGON_MOVED_P (insn_info)){
     new_insn_info->flags |= HEXAGON_MOVED;
   }
@@ -9258,7 +9526,7 @@ hexagon_find_new_value(rtx *x, void *y)
 
 
 static void
-hexagon_dot_oldify_gpr(struct hexagon_insn_info *insn_info)
+hexagon_dot_oldify_insn(struct hexagon_insn_info *insn_info)
 {
   rtx insn;
   rtx pattern;
@@ -9788,6 +10056,8 @@ hexagon_packet_insn_dependence_p(
 
     for(dep = dependencies; dep; dep = dep->next){
 
+      /* See if the consumer insn can use the newly generated predicate in the
+         same packet. */
       if(dep->type == HEXAGON_DEP_REGISTER
          && P_REG_P (dep->use)
          && hexagon_predicate_dot_newable_p(*insn_info)){
@@ -9807,6 +10077,16 @@ hexagon_packet_insn_dependence_p(
 
         if(!HEXAGON_NEW_GPR_P (*insn_info)){
           *insn_info = hexagon_dot_newify_gpr(*insn_info, dep);
+          (*insn_info)->transformed_at_packet = packet;
+        }
+        dependencies = hexagon_remove_dependence(dependencies, dep);
+      }
+
+      if(dep->type == HEXAGON_DEP_MEMORY
+         && hexagon_mem_dot_newable_p(packet->insns[i], *insn_info, dep)){
+
+        if(!HEXAGON_NEW_MEM_P (*insn_info)){
+          *insn_info = hexagon_dot_newify_mem(*insn_info, dep);
           (*insn_info)->transformed_at_packet = packet;
         }
         dependencies = hexagon_remove_dependence(dependencies, dep);
@@ -10726,8 +11006,9 @@ hexagon_remove_new_values(void)
 
   for(packet = hexagon_head_packet; packet; packet = packet->next){
     for(i = 0; i < packet->num_insns; i++){
-      if(HEXAGON_NEW_GPR_P (packet->insns[i])){
-        hexagon_dot_oldify_gpr(packet->insns[i]);
+      if(   HEXAGON_NEW_GPR_P (packet->insns[i])
+         || HEXAGON_NEW_MEM_P (packet->insns[i])){
+        hexagon_dot_oldify_insn(packet->insns[i]);
       }
     }
   }

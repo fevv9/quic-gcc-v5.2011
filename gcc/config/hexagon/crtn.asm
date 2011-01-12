@@ -38,12 +38,30 @@
 // This file is the last thing linked into any executable.
 
 	.file		"crtn.s"
+	.section .ctors, "a", @progbits
 
-	.section	".init"
+	.global  __CTOR_END__
+__CTOR_END__:
+	.word 0
+
+	.section .dtors, "a", @progbits
+
+__DTOR_END__:
+	.word 0
+
+	.section .eh_frame, "a", @progbits
+
+__EH_FRAME_END__:
+	.word 0
+
+
+
+        
+        
+        .section	".init"
 	deallocframe
 	jumpr r31
 
-	
 	.section	".fini"
 	deallocframe
 	jumpr r31

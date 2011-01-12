@@ -19,6 +19,10 @@ mv4
 Target RejectNegative
 alias for -march=hexagonv4
 
+mv5
+Target RejectNegative
+alias for -march=hexagonv5
+
 mcpu=
 Target Report RejectNegative Joined
 currently an alias for march
@@ -94,6 +98,10 @@ Enable .new-predicates (default)
 mnew-value-stores
 Target Report Mask(NEW_VALUE_STORES)
 Enable .new-value stores (default)
+
+mnew-memory-loads
+Target Report Mask(NEW_MEMORY_LOADS)
+Enable .new-memory loads (default)
 
 mpackets
 Target Report Mask(PACKETS)

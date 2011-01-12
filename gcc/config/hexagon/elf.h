@@ -9,7 +9,7 @@ Controlling the Compilation Driver, gcc
 
 /* Pass -v, -march=, and -G on to the assembler. */
 #undef ASM_SPEC
-#define ASM_SPEC "%{v} %{march=*} %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}}"
+#define ASM_SPEC "%{v} -march=v5 %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}}" /* ??? Force V5 for now. */
 
 /* Copied from config/svr4.h and modified to forward the -G option's argument
    and to not forward the -b option to the linker. */

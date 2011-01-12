@@ -44,7 +44,10 @@ Controlling the Compilation Driver, gcc
   {"-mv1", "-march=hexagonv1"}, \
   {"-mv2", "-march=hexagonv2"}, \
   {"-mv3", "-march=hexagonv3"}, \
-  {"-mv4", "-march=hexagonv4"}
+  {"-mv4", "-march=hexagonv4"}, \
+  {"-mv5", "-march=hexagonv5"}
+
+#define DRIVER_SELF_SPECS "-march=hexagonv5" /* ??? Force V5 for now. */
 
 /* As specified by the ABI, plain bitfields are unsigned.  This is a hack to
    compensate for the lack of a target hook for specifying this aspect of the
@@ -79,6 +82,10 @@ Run-time Target Specification
       case HEXAGON_ARCH_V4: \
         builtin_define_std ("__HEXAGON_V4__"); \
         builtin_define_std ("__HEXAGON_ARCH__=4"); \
+        break; \
+      case HEXAGON_ARCH_V5: \
+        builtin_define_std ("__HEXAGON_V5__"); \
+        builtin_define_std ("__HEXAGON_ARCH__=5"); \
         break; \
       default: \
         abort(); \
@@ -1079,6 +1086,7 @@ enum hexagon_architecture {
   HEXAGON_ARCH_V2,
   HEXAGON_ARCH_V3,
   HEXAGON_ARCH_V4,
+  HEXAGON_ARCH_V5,
   NUM_HEXAGON_ARCH,
   HEXAGON_ARCH_UNSPECIFIED
 };
@@ -1092,6 +1100,7 @@ extern int hexagon_qdsp6_compat;
 #define HEXAGON_FEAT_V2 (1 << HEXAGON_ARCH_V2)
 #define HEXAGON_FEAT_V3 (1 << HEXAGON_ARCH_V3)
 #define HEXAGON_FEAT_V4 (1 << HEXAGON_ARCH_V4)
+#define HEXAGON_FEAT_V5 (1 << HEXAGON_ARCH_V5)
 
 extern int hexagon_features;
 
@@ -1099,6 +1108,7 @@ extern int hexagon_features;
 #define TARGET_V2_FEATURES ((hexagon_features & HEXAGON_FEAT_V2) != 0)
 #define TARGET_V3_FEATURES ((hexagon_features & HEXAGON_FEAT_V3) != 0)
 #define TARGET_V4_FEATURES ((hexagon_features & HEXAGON_FEAT_V4) != 0)
+#define TARGET_V5_FEATURES ((hexagon_features & HEXAGON_FEAT_V5) != 0)
 
 struct hexagon_arch_table_entry {
   const char *const name;
@@ -1110,14 +1120,19 @@ struct hexagon_arch_table_entry {
   { \
     {"hexagonv1", HEXAGON_ARCH_V1,   HEXAGON_FEAT_V1}, \
     {"hexagonv2", HEXAGON_ARCH_V2,   HEXAGON_FEAT_V1 \
-                               | HEXAGON_FEAT_V2}, \
+                                   | HEXAGON_FEAT_V2}, \
     {"hexagonv3", HEXAGON_ARCH_V3,   HEXAGON_FEAT_V1 \
-                               | HEXAGON_FEAT_V2 \
-                               | HEXAGON_FEAT_V3}, \
+                                   | HEXAGON_FEAT_V2 \
+                                   | HEXAGON_FEAT_V3}, \
     {"hexagonv4", HEXAGON_ARCH_V4,   HEXAGON_FEAT_V1 \
-                               | HEXAGON_FEAT_V2 \
-                               | HEXAGON_FEAT_V3 \
-                               | HEXAGON_FEAT_V4} \
+                                   | HEXAGON_FEAT_V2 \
+                                   | HEXAGON_FEAT_V3 \
+                                   | HEXAGON_FEAT_V4}, \
+    {"hexagonv5", HEXAGON_ARCH_V5,   HEXAGON_FEAT_V1 \
+                                   | HEXAGON_FEAT_V2 \
+                                   | HEXAGON_FEAT_V3 \
+                                   | HEXAGON_FEAT_V4 \
+                                   | HEXAGON_FEAT_V5} \
   }
 
 #define HEXAGON_ARCH_TABLE_DEFAULT_INDEX HEXAGON_ARCH_V2
@@ -1274,6 +1289,7 @@ struct hexagon_final_info GTY(()) {
   rtx endloop_label;
   bool dot_new_predicate_p;
   bool dot_new_gpr_p;
+  bool dot_new_mem_p;
   bool duplex;
 };
 
@@ -1376,8 +1392,9 @@ struct hexagon_dependence GTY((chain_next ("%h.next"))) {
 #define HEXAGON_VOLATILE       HEXAGON_MASK(1, 12)
 #define HEXAGON_NEW_PREDICATE  HEXAGON_MASK(1, 13)
 #define HEXAGON_NEW_GPR        HEXAGON_MASK(1, 14)
+#define HEXAGON_NEW_MEM        HEXAGON_MASK(1, 15)
 
-#define HEXAGON_MOVED          HEXAGON_MASK(1, 15)
+#define HEXAGON_MOVED          HEXAGON_MASK(1, 16)
 
 #define HEXAGON_CONDITION(INSN)       ((INSN)->flags & HEXAGON_CONDITION_MASK)
 #define HEXAGON_PREDICATE(INSN)       ((INSN)->flags & HEXAGON_PREDICATE_MASK)
@@ -1403,6 +1420,7 @@ struct hexagon_dependence GTY((chain_next ("%h.next"))) {
 #define HEXAGON_VOLATILE_P(INSN)      (((INSN)->flags & HEXAGON_VOLATILE) != 0)
 #define HEXAGON_NEW_PREDICATE_P(INSN) (((INSN)->flags & HEXAGON_NEW_PREDICATE) != 0)
 #define HEXAGON_NEW_GPR_P(INSN)       (((INSN)->flags & HEXAGON_NEW_GPR) != 0)
+#define HEXAGON_NEW_MEM_P(INSN)       (((INSN)->flags & HEXAGON_NEW_MEM) != 0)
 
 #define HEXAGON_MOVED_P(INSN)  (((INSN)->flags & HEXAGON_MOVED) != 0)
 
@@ -1424,6 +1442,10 @@ struct hexagon_dependence GTY((chain_next ("%h.next"))) {
         case HEXAGON_ARCH_V4: \
           builtin_define_std ("__QDSP6_V4__"); \
           builtin_define_std ("__QDSP6_ARCH__=4"); \
+          break; \
+        case HEXAGON_ARCH_V5: /* ??? Disallow? */ \
+          builtin_define_std ("__QDSP6_V5__"); \
+          builtin_define_std ("__QDSP6_ARCH__=5"); \
           break; \
         default: \
           abort(); \

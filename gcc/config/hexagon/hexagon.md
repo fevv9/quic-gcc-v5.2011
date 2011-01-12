@@ -81,13 +81,13 @@
 
 ;; The architecture currently being compiled for
 
-(define_attr "arch" "v1,v2,v3,v4" (const (symbol_ref "hexagon_arch")))
+(define_attr "arch" "v1,v2,v3,v4,v5" (const (symbol_ref "hexagon_arch")))
 
 
 ;; Used to determine which slots an insn can use when scheduling insns
 
 (define_attr "type"
-             "A,X,Load,Store,Memop,NewValue,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR,multiple,J_dotnew,NewValueJump,ENewValueJump,AJ,XJ"
+             "A,X,Load,Store,Allocframe,Memop,NewValue,NewLoad,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,ENewLoad,EM,ES,EJ,EJR,ECR,multiple,J_dotnew,NewValueJump,ENewValueJump,AJ,XJ"
              (const_string "multiple"))
 
 
@@ -98,7 +98,7 @@
 
 (define_attr "length" ""
              (if_then_else (eq_attr "type"
-                                    "EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR")
+                                    "EA,EX,ELoad,EStore,EMemop,ENewValue,ENewLoad,EM,ES,EJ,EJR,ECR")
                            (const_string "8")
                            (const_string "4")))
 
@@ -382,6 +382,10 @@
                                                 (eq_attr "type" "Store"))
  "(Slot0 | Slot1) + (Store0 | Store1)")
 
+(define_insn_reservation "v4_Allocframe" 1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "Allocframe"))
+ "Slot0           + (Store0 | Store1)")
+
 (define_insn_reservation "v4_LoadStore"  1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "LoadStore"))
  "Slot0 + Slot1")
@@ -396,11 +400,11 @@
 
 (define_insn_reservation "v4_Memop"      1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "Memop"))
- "Slot0 + Store0 + Store1")
+ "Slot0           +  Store0 + Store1")
 
 (define_insn_reservation "v4_NewValue"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "NewValue"))
- "Slot0 + Store0 + Store1")
+ "Slot0           +  Store0 + Store1")
 
 (define_insn_reservation "v4_NewValueJump"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "NewValueJump"))
@@ -470,11 +474,11 @@
 
 (define_insn_reservation "v4_EMemop"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EMemop"))
- "ESlot0 + Store0 + Store1")
+ "ESlot0            +  Store0 + Store1")
 
 (define_insn_reservation "v4_ENewValue"  1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "ENewValue"))
- "ESlot0 + Store0 + Store1")
+ "ESlot0            +  Store0 + Store1")
 
 (define_insn_reservation "v4_EM"         1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "EM"))
@@ -493,6 +497,153 @@
                   "(ESlot2 | ESlot3) + (PCadder | PCadder_dualjumps) + (control | control_dualjumps)")
 
 (define_insn_reservation "v4_EJR"        1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EJR"))
+                   "ESlot2                                           +  control + control_dualjumps")
+
+
+;;----;;
+;; V5 ;;
+;;----;;
+
+(define_insn_reservation "v5_A"          1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "A"))
+ "Slot0 | Slot1 | Slot2 | Slot3")
+
+(define_insn_reservation "v5_X"          1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "X"))
+                 "Slot2 | Slot3")
+
+(define_insn_reservation "v5_Load"       1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "Load"))
+ "Slot0 | Slot1")
+
+(define_insn_reservation "v5_Store"      1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "Store"))
+ "(Slot0 | Slot1) + (Store0 | Store1)")
+
+(define_insn_reservation "v5_Allocframe" 1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "Allocframe"))
+ "Slot0           + (Store0 | Store1)")
+
+(define_insn_reservation "v5_LoadStore"  1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "LoadStore"))
+ "Slot0 + Slot1")
+
+(define_insn_reservation "v5_AStore"     1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "AStore"))
+ "((Slot0 + (Slot1 | Slot2 | Slot3)) | (Slot1 + (Slot2 | Slot3))) + (Store0 | Store1)")
+
+(define_insn_reservation "v5_ALoadStore" 1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "ALoadStore"))
+ "Slot0 + Slot1 + (Slot2 | Slot3)")
+
+(define_insn_reservation "v5_Memop"      1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "Memop"))
+ "Slot0           + (Store0 | Store1)")
+
+(define_insn_reservation "v5_NewValue"   1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "NewValue"))
+ "Slot0           +  Store0 + Store1")
+
+(define_insn_reservation "v5_NewLoad"    1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "NewLoad"))
+ "Slot0")
+
+(define_insn_reservation "v5_NewValueJump"   1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "NewValueJump"))
+ "Slot0 + Store0 + Store1 + PCadder + ( control | control_dualjumps ) ")
+
+(define_insn_reservation "v5_ENewValueJump"   1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "ENewValueJump"))
+ "Slot0 + Store0 + Store1 + PCadder + ( control | control_dualjumps ) + ( Slot1 | Slot2 | Slot3 )")
+
+
+(define_insn_reservation "v5_AJ"     1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "AJ"))
+ "((Slot2 + (Slot0 | Slot1 | Slot3)) | (Slot3 + (Slot0 | Slot1 | Slot2))) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+
+(define_insn_reservation "v5_XJ"     1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "XJ"))
+ "(Slot2 + Slot3) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+
+
+(define_insn_reservation "v5_M"          1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "M"))
+                 "Slot2 | Slot3")
+
+(define_insn_reservation "v5_S"          1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "S"))
+                 "Slot2 | Slot3")
+
+(define_insn_reservation "v5_CR"         1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "CR"))
+                         "Slot3")
+
+(define_insn_reservation "v5_loop"       1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "loop"))
+                         "Slot3  +  PCadder")
+
+(define_insn_reservation "v5_J"          1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "J"))
+                "(Slot2 | Slot3) + (PCadder | PCadder_dualjumps) + (control | control_dualjumps)")
+
+(define_insn_reservation "v5_JR"         1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "JR"))
+                 "Slot2                                          +  control + control_dualjumps")
+
+(define_insn_reservation "v5_endloop0"   1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "endloop0"))
+                                  "endloop0 + endloop0_dualjumps")
+
+(define_insn_reservation "v5_endloop1"   1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "endloop1"))
+                                  "endloop1 + endloop1_dualjumps")
+
+(define_insn_reservation "v5_EA"         1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "EA"))
+ "ESlot0 | ESlot1 | ESlot2 | ESlot3")
+
+(define_insn_reservation "v5_EX"         1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "EX"))
+                   "ESlot2 | ESlot3")
+
+(define_insn_reservation "v5_ELoad"      1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "ELoad"))
+ "ESlot0 | ESlot1")
+
+(define_insn_reservation "v5_EStore"     1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "EStore"))
+ "(ESlot0 | ESlot1) + (Store0 | Store1)")
+
+(define_insn_reservation "v5_EMemop"     1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "EMemop"))
+ "ESlot0            + (Store0 | Store1)")
+
+(define_insn_reservation "v5_ENewValue"  1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "ENewValue"))
+ "ESlot0            +  Store0 + Store1")
+
+(define_insn_reservation "v5_ENewLoad"   1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "ENewLoad"))
+ "ESlot0")
+
+(define_insn_reservation "v5_EM"         1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "EM"))
+                   "ESlot2 | ESlot3")
+
+(define_insn_reservation "v5_ES"         1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "ES"))
+                   "ESlot2 | ESlot3")
+
+(define_insn_reservation "v5_ECR"        1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "ECR"))
+                            "ESlot3")
+
+(define_insn_reservation "v5_EJ"         1 (and (eq_attr "arch" "v5")
+                                                (eq_attr "type" "EJ"))
+                  "(ESlot2 | ESlot3) + (PCadder | PCadder_dualjumps) + (control | control_dualjumps)")
+
+(define_insn_reservation "v5_EJR"        1 (and (eq_attr "arch" "v5")
                                                 (eq_attr "type" "EJR"))
                    "ESlot2                                           +  control + control_dualjumps")
 
@@ -628,14 +779,16 @@
 )
 
 (define_insn "movbi_new_value"
-  [(set (match_operand:BI 0 "memory_operand"             "=Anoext, m")
-        (unspec:BI [(match_operand:BI 1 "gr_register_operand" "Rg,Rg")]
+  [(set (match_operand:BI 0 "nonimmediate_operand"        "=Anoext, m,    Rg,Rg")
+        (unspec:BI [(match_operand:BI 1 "nonimmediate_operand" "Rg,Rg,Anoext, m")]
                    UNSPEC_NEW_VALUE))]
   "TARGET_V4_FEATURES"
   "@
    memb(%0) = %1.new //store(BI)
-   memb(%E0) = %1.new //store(BI)"
-  [(set_attr "type" "NewValue,ENewValue")]
+   memb(%E0) = %1.new //store(BI)
+   %0 = memb(%1).new //load(BI)
+   %0 = memb(%E1).new //load(BI)"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 ;;-------;;
@@ -704,14 +857,16 @@
 )
 
 (define_insn "movqi_new_value"
-  [(set (match_operand:QI 0 "memory_operand"             "=Anoext, m")
-        (unspec:QI [(match_operand:QI 1 "gr_register_operand" "Rg,Rg")]
+  [(set (match_operand:QI 0 "nonimmediate_operand"        "=Anoext, m,    Rg,Rg")
+        (unspec:QI [(match_operand:QI 1 "nonimmediate_operand" "Rg,Rg,Anoext, m")]
                    UNSPEC_NEW_VALUE))]
   "TARGET_V4_FEATURES"
   "@
    memb(%0) = %1.new
-   memb(%E0) = %1.new"
-  [(set_attr "type" "NewValue,ENewValue")]
+   memb(%E0) = %1.new
+   %0 = memb(%1).new
+   %0 = memb(%E1).new"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 (define_insn "movqi_real"
@@ -759,16 +914,18 @@
 (define_insn "cond_movqi_new_value"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"               "Rp,    Rp")
+       [(match_operand:BI 3 "pr_register_operand"                "Rp,    Rp,   Rp,    Rp")
         (const_int 0)])
-     (set (match_operand:QI 0 "memory_operand"              "=Acond,Aecond")
-          (unspec:QI [(match_operand:QI 1 "gr_register_operand" "Rg,    Rg")]
+     (set (match_operand:QI 0 "nonimmediate_operand"         "=Acond,Aecond,   Rg,    Rg")
+          (unspec:QI [(match_operand:QI 1 "nonimmediate_operand" "Rg,    Rg,Acond,Aecond")]
                      UNSPEC_NEW_VALUE)))]
   "TARGET_V4_FEATURES"
   "@
    if (%C2) memb(%0) = %1.new
-   if (%C2) memb(%E0) = %1.new"
-  [(set_attr "type" "NewValue,ENewValue")]
+   if (%C2) memb(%E0) = %1.new
+   if (%C2) %0 = memb(%1).new
+   if (%C2) %0 = memb(%E1).new"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 ;;-------;;
@@ -836,14 +993,16 @@
 )
 
 (define_insn "movhi_new_value"
-  [(set (match_operand:HI 0 "memory_operand"             "=Anoext, m")
-        (unspec:HI [(match_operand:HI 1 "gr_register_operand" "Rg,Rg")]
+  [(set (match_operand:HI 0 "nonimmediate_operand"        "=Anoext, m,    Rg,Rg")
+        (unspec:HI [(match_operand:HI 1 "nonimmediate_operand" "Rg,Rg,Anoext, m")]
                    UNSPEC_NEW_VALUE))]
   "TARGET_V4_FEATURES"
   "@
    memh(%0) = %1.new
-   memh(%E0) = %1.new"
-  [(set_attr "type" "NewValue,ENewValue")]
+   memh(%E0) = %1.new
+   %0 = memh(%1).new
+   %0 = memh(%E1).new"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 (define_insn "movhi_real"
@@ -892,16 +1051,18 @@
 (define_insn "cond_movhi_new_value"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"               "Rp,    Rp")
+       [(match_operand:BI 3 "pr_register_operand"                "Rp,    Rp,   Rp,    Rp")
         (const_int 0)])
-     (set (match_operand:HI 0 "memory_operand"              "=Acond,Aecond")
-          (unspec:HI [(match_operand:HI 1 "gr_register_operand" "Rg,    Rg")]
+     (set (match_operand:HI 0 "nonimmediate_operand"         "=Acond,Aecond,   Rg,    Rg")
+          (unspec:HI [(match_operand:HI 1 "nonimmediate_operand" "Rg,    Rg,Acond,Aecond")]
                      UNSPEC_NEW_VALUE)))]
   "TARGET_V4_FEATURES"
   "@
    if (%C2) memh(%0) = %1.new
-   if (%C2) memh(%E0) = %1.new"
-  [(set_attr "type" "NewValue,ENewValue")]
+   if (%C2) memh(%E0) = %1.new
+   if (%C2) %0 = memh(%1).new
+   if (%C2) %0 = memh(%E1).new"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 ;;-------;;
@@ -1002,14 +1163,16 @@
 )
 
 (define_insn "movsi_new_value"
-  [(set (match_operand:SI 0 "memory_operand"             "=Anoext, m")
-        (unspec:SI [(match_operand:SI 1 "gr_register_operand" "Rg,Rg")]
+  [(set (match_operand:SI 0 "nonimmediate_operand"        "=Anoext, m,    Rg,Rg")
+        (unspec:SI [(match_operand:SI 1 "nonimmediate_operand" "Rg,Rg,Anoext, m")]
                    UNSPEC_NEW_VALUE))]
   "TARGET_V4_FEATURES"
   "@
    memw(%0) = %1.new
-   memw(%E0) = %1.new"
-  [(set_attr "type" "NewValue,ENewValue")]
+   memw(%E0) = %1.new
+   %0 = memw(%1).new
+   %0 = memw(%E1).new"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 (define_insn "movsi_const32"
@@ -1105,16 +1268,18 @@
 (define_insn "cond_movsi_new_value"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"               "Rp,    Rp")
+       [(match_operand:BI 3 "pr_register_operand"                "Rp,    Rp,   Rp,    Rp")
         (const_int 0)])
-     (set (match_operand:SI 0 "memory_operand"              "=Acond,Aecond")
-          (unspec:SI [(match_operand:SI 1 "gr_register_operand" "Rg,    Rg")]
+     (set (match_operand:SI 0 "nonimmediate_operand"         "=Acond,Aecond,   Rg,    Rg")
+          (unspec:SI [(match_operand:SI 1 "nonimmediate_operand" "Rg,    Rg,Acond,Aecond")]
                      UNSPEC_NEW_VALUE)))]
   "TARGET_V4_FEATURES"
   "@
    if (%C2) memw(%0) = %1.new
-   if (%C2) memw(%E0) = %1.new"
-  [(set_attr "type" "NewValue,ENewValue")]
+   if (%C2) memw(%E0) = %1.new
+   if (%C2) %0 = memw(%1).new
+   if (%C2) %0 = memw(%E1).new"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 ;;-------;;
@@ -1179,6 +1344,17 @@
    (set_attr "duplex" "no,yes,no,no,yes,no,no,no,no,no,no,no")]
 )
 
+(define_insn "movdi_real_new_mem"
+  [(set (match_operand:DI 0 "gr_register_operand"           "=Rg,Rg")
+        (unspec:DI [(match_operand:DI 1 "memory_operand" "Anoext, m")]
+                   UNSPEC_NEW_VALUE))]
+  "TARGET_V5_FEATURES"
+  "@
+   %P0 = memd(%1).new
+   %P0 = memd(%E1).new"
+  [(set_attr "type"   "NewLoad,ENewLoad")]
+)
+
 ;; Split moves of immediates to register pairs into separate moves to each
 ;; register.  Each of those moves might themselves be split.
 (define_split
@@ -1214,6 +1390,21 @@
    if (%C2) memd(%0) = %P1
    if (%C2) memd(%E0) = %P1"
   [(set_attr "type" "A,Load,ELoad,Store,EStore")]
+)
+
+(define_insn "cond_movdi_new_mem"
+  [(cond_exec
+     (match_operator:BI 2 "predicate_operator"
+       [(match_operand:BI 3 "pr_register_operand"             "Rp,    Rp")
+        (const_int 0)])
+     (set (match_operand:DI 0 "gr_register_operand"          "=Rg,    Rg")
+          (unspec:DI [(match_operand:DI 1 "memory_operand" "Acond,Aecond")]
+                     UNSPEC_NEW_VALUE)))]
+  "TARGET_V5_FEATURES"
+  "@
+   if (%C2) %P0 = memd(%1).new
+   if (%C2) %P0 = memd(%E1).new"
+  [(set_attr "type" "NewLoad,ENewLoad")]
 )
 
 ;;-------;;
@@ -1284,14 +1475,16 @@
 )
 
 (define_insn "movsf_new_value"
-  [(set (match_operand:SF 0 "memory_operand"             "=Anoext, m")
-        (unspec:SF [(match_operand:SF 1 "gr_register_operand" "Rg,Rg")]
+  [(set (match_operand:SF 0 "nonimmediate_operand"        "=Anoext, m,    Rg,Rg")
+        (unspec:SF [(match_operand:SF 1 "nonimmediate_operand" "Rg,Rg,Anoext, m")]
                    UNSPEC_NEW_VALUE))]
   "TARGET_V4_FEATURES"
   "@
    memw(%0) = %1.new
-   memw(%E0) = %1.new"
-  [(set_attr "type" "NewValue,ENewValue")]
+   memw(%E0) = %1.new
+   %0 = memw(%1).new
+   %0 = memw(%E1).new"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 (define_insn "movsf_real"
@@ -1377,16 +1570,18 @@
 (define_insn "cond_movsf_new_value"
   [(cond_exec
      (match_operator:BI 2 "predicate_operator"
-       [(match_operand:BI 3 "pr_register_operand"               "Rp,    Rp")
+       [(match_operand:BI 3 "pr_register_operand"                "Rp,    Rp,   Rp,    Rp")
         (const_int 0)])
-     (set (match_operand:SF 0 "memory_operand"              "=Acond,Aecond")
-          (unspec:SF [(match_operand:SF 1 "gr_register_operand" "Rg,    Rg")]
+     (set (match_operand:SF 0 "nonimmediate_operand"         "=Acond,Aecond,   Rg,    Rg")
+          (unspec:SF [(match_operand:SF 1 "nonimmediate_operand" "Rg,    Rg,Acond,Aecond")]
                      UNSPEC_NEW_VALUE)))]
   "TARGET_V4_FEATURES"
   "@
    if (%C2) memw(%0) = %1.new
-   if (%C2) memw(%E0) = %1.new"
-  [(set_attr "type" "NewValue,ENewValue")]
+   if (%C2) memw(%E0) = %1.new
+   if (%C2) %0 = memw(%1).new
+   if (%C2) %0 = memw(%E1).new"
+  [(set_attr "type" "NewValue,ENewValue,NewLoad,ENewLoad")]
 )
 
 ;;-------;;
@@ -1434,6 +1629,17 @@
   [(set_attr "type" "A,Load,ELoad,Store,EStore,Load")]
 )
 
+(define_insn "movdf_real_new_mem"
+  [(set (match_operand:DF 0 "gr_register_operand"                 "=Rg,Rg")
+        (unspec:DF [(match_operand:DF 1 "nonimmediate_operand" "Anoext, m")]
+                   UNSPEC_NEW_VALUE))]
+  "TARGET_V5_FEATURES"
+  "@
+   %P0 = memd(%1).new
+   %P0 = memd(%E1).new"
+  [(set_attr "type" "NewLoad,ENewLoad")]
+)
+
 ;; After reload, replace floating immediate moves with integer immediate moves.
 (define_split
   [(set (match_operand:DF 0 "gr_register_operand" "")
@@ -1472,6 +1678,21 @@
    if (%C2) memd(%0) = %P1
    if (%C2) memd(%E0) = %P1"
   [(set_attr "type" "A,Load,ELoad,Store,EStore")]
+)
+
+(define_insn "cond_movdf_new_mem"
+  [(cond_exec
+     (match_operator:BI 2 "predicate_operator"
+       [(match_operand:BI 3 "pr_register_operand"             "Rp,    Rp")
+        (const_int 0)])
+     (set (match_operand:DF 0 "gr_register_operand"          "=Rg,    Rg")
+          (unspec:DF [(match_operand:DF 1 "memory_operand" "Acond,Aecond")]
+                     UNSPEC_NEW_VALUE)))]
+  "TARGET_V5_FEATURES"
+  "@
+   if (%C2) %P0 = memd(%1).new
+   if (%C2) %P0 = memd(%E1).new"
+  [(set_attr "type" "NewLoad,ENewLoad")]
 )
 
 
@@ -3266,6 +3487,17 @@
    (set_attr "duplex" "yes,yes,no,no")]
 )
 
+(define_insn "extendqisi2_new_mem"
+  [(set (match_operand:SI 0 "gr_register_operand"                           "=Rg,Rg")
+        (sign_extend:SI (unspec:QI [(match_operand:QI 1 "memory_operand" "Anoext, m")]
+                                   UNSPEC_NEW_VALUE)))]
+  "TARGET_V5_FEATURES"
+  "@
+   %0 = memb(%1).new
+   %0 = memb(%E1).new"
+  [(set_attr "type" "NewLoad,ENewLoad")]
+)
+
 (define_insn_and_split "extendqidi2"
   [(set (match_operand:DI 0 "gr_register_operand"                 "=Rg,Rg")
         (sign_extend:DI (match_operand:QI 1 "nonimmediate_operand" "Rg, m")))]
@@ -3292,6 +3524,17 @@
    %0 = memh(%E1)"
   [(set_attr "type"   "A,Load,Load,ELoad")
    (set_attr "duplex" "yes,yes,no,no")]
+)
+
+(define_insn "extendhisi2_new_mem"
+  [(set (match_operand:SI 0 "gr_register_operand"                           "=Rg,Rg")
+        (sign_extend:SI (unspec:HI [(match_operand:HI 1 "memory_operand" "Anoext, m")]
+                                   UNSPEC_NEW_VALUE)))]
+  "TARGET_V5_FEATURES"
+  "@
+   %0 = memh(%1).new
+   %0 = memh(%E1).new"
+  [(set_attr "type"   "NewLoad,ENewLoad")]
 )
 
 ;; short -> long long
@@ -3345,6 +3588,17 @@
    (set_attr "duplex" "yes,yes,no,no,no")]
 )
 
+(define_insn "zero_extendqisi2_new_mem"
+  [(set (match_operand:SI 0 "gr_register_operand"                           "=Rg,Rg")
+        (zero_extend:SI (unspec:QI [(match_operand:QI 1 "memory_operand" "Anoext, m")]
+                                   UNSPEC_NEW_VALUE)))]
+  "TARGET_V5_FEATURES"
+  "@
+   %0 = memub(%1).new
+   %0 = memub(%E1).new"
+  [(set_attr "type" "NewLoad,ENewLoad")]
+)
+
 ;; char -> long long
 (define_insn_and_split "zero_extendqidi2"
   [(set (match_operand:DI 0 "gr_register_operand"                 "=Rg,Rg")
@@ -3360,6 +3614,7 @@
   }
   [(set_attr "type" "multiple,multiple")]
 )
+
 ;; short -> int
 (define_insn "zero_extendhisi2"
   [(set (match_operand:SI 0 "gr_register_operand"                         "=Rg,  Rg,    Rg,Rg")
@@ -3372,6 +3627,17 @@
    %0 = memuh(%E1)"
   [(set_attr "type" "A,Load,Load,ELoad")
    (set_attr "duplex" "yes,yes,no,no")]
+)
+
+(define_insn "zero_extendhisi2_new_mem"
+  [(set (match_operand:SI 0 "gr_register_operand"                           "=Rg,Rg")
+        (zero_extend:SI (unspec:HI [(match_operand:HI 1 "memory_operand" "Anoext, m")]
+                                   UNSPEC_NEW_VALUE)))]
+  "TARGET_V5_FEATURES"
+  "@
+   %0 = memuh(%1).new
+   %0 = memuh(%E1).new"
+  [(set_attr "type" "NewLoad,ENewLoad")]
 )
 
 ;; short -> long long
@@ -8103,6 +8369,18 @@
   [(set_attr "type" "ELoad")]
 )
 
+(define_insn "absloadsetbi_new_mem"
+  [(parallel [(set (match_operand:BI 0 "gr_register_operand"                        "=Rg")
+                   (unspec:BI [(mem:BI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                              UNSPEC_NEW_VALUE))
+              (set (match_operand:SI 2 "gr_register_operand"                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memb(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
+)
+
 (define_insn "absloadsxtsetbi"
   [(parallel [(set (match_operand:SI 0 "gr_register_operand"                            "=Rg")
                    (sign_extend:SI (mem:BI (match_operand:SI 1 "absolute_address_operand" "Q"))))
@@ -8112,6 +8390,18 @@
    && rtx_equal_p(operands[1], operands[3])"
   "%0 = memb(%2=##%1)"
   [(set_attr "type" "ELoad")]
+)
+
+(define_insn "absloadsxtsetbi_new_mem"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                                        "=Rg")
+                   (sign_extend:SI (unspec:BI [(mem:BI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                                              UNSPEC_NEW_VALUE)))
+              (set (match_operand:SI 2 "gr_register_operand"                                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memb(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
 )
 
 (define_insn "absloadzxtsetbi"
@@ -8125,6 +8415,18 @@
   [(set_attr "type" "ELoad")]
 )
 
+(define_insn "absloadzxtsetbi_new_mem"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                                        "=Rg")
+                   (zero_extend:SI (unspec:BI [(mem:BI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                                              UNSPEC_NEW_VALUE)))
+              (set (match_operand:SI 2 "gr_register_operand"                                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memub(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
+)
+
 (define_insn "absloadsetqi"
   [(parallel [(set (match_operand:QI 0 "gr_register_operand"            "=Rg")
                    (mem:QI (match_operand:SI 1 "absolute_address_operand" "Q")))
@@ -8134,6 +8436,18 @@
    && rtx_equal_p(operands[1], operands[3])"
   "%0 = memb(%2=##%1)"
   [(set_attr "type" "ELoad")]
+)
+
+(define_insn "absloadsetqi_new_mem"
+  [(parallel [(set (match_operand:QI 0 "gr_register_operand"                        "=Rg")
+                   (unspec:QI [(mem:QI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                              UNSPEC_NEW_VALUE))
+              (set (match_operand:SI 2 "gr_register_operand"                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memb(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
 )
 
 (define_insn "absloadsxtsetqi"
@@ -8147,6 +8461,18 @@
   [(set_attr "type" "ELoad")]
 )
 
+(define_insn "absloadsxtsetqi_new_mem"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                                        "=Rg")
+                   (sign_extend:SI (unspec:QI [(mem:QI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                                              UNSPEC_NEW_VALUE)))
+              (set (match_operand:SI 2 "gr_register_operand"                                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memb(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
+)
+
 (define_insn "absloadzxtsetqi"
   [(parallel [(set (match_operand:SI 0 "gr_register_operand"                            "=Rg")
                    (zero_extend:SI (mem:QI (match_operand:SI 1 "absolute_address_operand" "Q"))))
@@ -8156,6 +8482,18 @@
    && rtx_equal_p(operands[1], operands[3])"
   "%0 = memub(%2=##%1)"
   [(set_attr "type" "ELoad")]
+)
+
+(define_insn "absloadzxtsetqi_new_mem"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                                        "=Rg")
+                   (zero_extend:SI (unspec:QI [(mem:QI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                                              UNSPEC_NEW_VALUE)))
+              (set (match_operand:SI 2 "gr_register_operand"                                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memub(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
 )
 
 (define_insn "absloadsethi"
@@ -8169,6 +8507,18 @@
   [(set_attr "type" "ELoad")]
 )
 
+(define_insn "absloadsethi_new_mem"
+  [(parallel [(set (match_operand:HI 0 "gr_register_operand"                        "=Rg")
+                   (unspec:HI [(mem:HI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                              UNSPEC_NEW_VALUE))
+              (set (match_operand:SI 2 "gr_register_operand"                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memh(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
+)
+
 (define_insn "absloadsxtsethi"
   [(parallel [(set (match_operand:SI 0 "gr_register_operand"                            "=Rg")
                    (sign_extend:SI (mem:HI (match_operand:SI 1 "absolute_address_operand" "Q"))))
@@ -8178,6 +8528,18 @@
    && rtx_equal_p(operands[1], operands[3])"
   "%0 = memh(%2=##%1)"
   [(set_attr "type" "ELoad")]
+)
+
+(define_insn "absloadsxtsethi_new_mem"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                                        "=Rg")
+                   (sign_extend:SI (unspec:HI [(mem:HI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                                              UNSPEC_NEW_VALUE)))
+              (set (match_operand:SI 2 "gr_register_operand"                                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memh(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
 )
 
 (define_insn "absloadzxtsethi"
@@ -8191,6 +8553,18 @@
   [(set_attr "type" "ELoad")]
 )
 
+(define_insn "absloadzxtsethi_new_mem"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                                        "=Rg")
+                   (zero_extend:SI (unspec:HI [(mem:HI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                                              UNSPEC_NEW_VALUE)))
+              (set (match_operand:SI 2 "gr_register_operand"                                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memuh(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
+)
+
 (define_insn "absloadsetsi"
   [(parallel [(set (match_operand:SI 0 "gr_register_operand"            "=Rg")
                    (mem:SI (match_operand:SI 1 "absolute_address_operand" "Q")))
@@ -8202,6 +8576,18 @@
   [(set_attr "type" "ELoad")]
 )
 
+(define_insn "absloadsetsi_new_mem"
+  [(parallel [(set (match_operand:SI 0 "gr_register_operand"                        "=Rg")
+                   (unspec:SI [(mem:SI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                              UNSPEC_NEW_VALUE))
+              (set (match_operand:SI 2 "gr_register_operand"                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memw(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
+)
+
 (define_insn "absloadsetdi"
   [(parallel [(set (match_operand:DI 0 "gr_register_operand"            "=Rg")
                    (mem:DI (match_operand:SI 1 "absolute_address_operand" "Q")))
@@ -8211,6 +8597,18 @@
    && rtx_equal_p(operands[1], operands[3])"
   "%0 = memd(%2=##%1)"
   [(set_attr "type" "ELoad")]
+)
+
+(define_insn "absloadsetdi_new_mem"
+  [(parallel [(set (match_operand:DI 0 "gr_register_operand"                        "=Rg")
+                   (unspec:DI [(mem:DI (match_operand:SI 1 "absolute_address_operand" "Q"))]
+                              UNSPEC_NEW_VALUE))
+              (set (match_operand:SI 2 "gr_register_operand"                        "=Rg")
+                   (match_operand:SI 3 "absolute_address_operand"                     "1"))])]
+  "TARGET_V5_FEATURES
+   && rtx_equal_p(operands[1], operands[3])"
+  "%0 = memd(%2=##%1).new"
+  [(set_attr "type" "ENewLoad")]
 )
 
 (define_insn "absstoresetbi"
@@ -8828,7 +9226,7 @@
     operands[0] = gen_int_mode(INTVAL (operands[0]) - 8, SImode);
     return "allocframe(#%0)";
   }
-  [(set_attr "type" "Store,Store")
+  [(set_attr "type" "Allocframe,Allocframe")
    (set_attr "duplex" "no,yes")]
 )
 
@@ -10123,179 +10521,187 @@
   [(set_attr "type" "A,A,Load")]
 )
 
-;;;---------------------------------
-;;; 32 bit floating point arithmetic
-;;;---------------------------------
-;
-;;;----------
-;;; add[sd]f3
-;;;----------
-;
-;(define_insn "addsf3"
-;  [(set (match_operand:SF 0 "gr_register_operand" "=r")
-;        (plus:SF (match_operand:SF 1 "gr_register_operand" "r")
-;                 (match_operand:SF 2 "gr_register_operand" "r")))]
-;  ""
-;  "%0 = sfadd(%1, %2)"
-;)
-;
-;(define_insn "adddf3"
-;  [(set (match_operand:DF 0 "gr_register_operand" "=r")
-;        (plus:DF (match_operand:DF 1 "gr_register_operand" "r")
-;                 (match_operand:DF 2 "gr_register_operand" "r")))]
-;  ""
-;  "%0 = dfadd(%1, %2)"
-;)
-;
-;;;----------
-;;; sub[sd]f3
-;;;----------
-;
-;(define_insn "subsf3"
-;  [(set (match_operand:SF 0 "gr_register_operand" "=r")
-;        (minus:SF (match_operand:SF 1 "gr_register_operand" "r")
-;                 (match_operand:SF 2 "gr_register_operand" "r")))]
-;  ""
-;  "%0 = sfsub(%1, %2)"
-;)
-;
-;(define_insn "subdf3"
-;  [(set (match_operand:DF 0 "gr_register_operand" "=r")
-;        (minus:DF (match_operand:DF 1 "gr_register_operand" "r")
-;                 (match_operand:DF 2 "gr_register_operand" "r")))]
-;  ""
-;  "%0 = dfsub(%1, %2)"
-;)
-;
-;
-;;; ----------
-;;; umax[sd]f3
-;;; ----------
-;
-;(define_insn "umaxsf3"
-;  [(set (match_operand:SF 0 "gr_register_operand"         "=Rg")
-;        (umax:SF (match_operand:SF 1 "gr_register_operand" "Rg")
-;                 (match_operand:SF 2 "gr_register_operand" "Rg")))]
-;  ""
-;  "%0 = sfmaxu(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;(define_insn "umaxdf3"
-;  [(set (match_operand:DF 0 "gr_register_operand"         "=Rg")
-;        (umax:DF (match_operand:DF 1 "gr_register_operand" "Rg")
-;                 (match_operand:DF 2 "gr_register_operand" "Rg")))]
-;  ""
-;  "%0 = dfmaxu(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;;; ----------
-;;; umin[sd]f3
-;;; ----------
-;
-;(define_insn "uminsf3"
-;  [(set (match_operand:SF 0 "gr_register_operand"         "=Rg")
-;        (umin:SF (match_operand:SF 1 "gr_register_operand" "Rg")
-;                 (match_operand:SF 2 "gr_register_operand" "Rg")))]
-;  ""
-;  "%0 = sfminu(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;(define_insn "umindf3"
-;  [(set (match_operand:DF 0 "gr_register_operand"         "=Rg")
-;        (umin:DF (match_operand:DF 1 "gr_register_operand" "Rg")
-;                 (match_operand:DF 2 "gr_register_operand" "Rg")))]
-;  ""
-;  "%0 = dfminu(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;;; --------
-;;; mul[sd]3
-;;; --------
-;
-;(define_insn "mulsf3"
-;  [(set (match_operand:SF 0 "register_operand" "=r")
-;        (mult:SF (match_operand:SF 1 "register_operand" "r")
-;                 (match_operand:SF 2 "register_operand" "r")))]
-;  ""
-;  "%0 = sfmpy(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;(define_insn "muldf3"
-;  [(set (match_operand:DF 0 "register_operand" "=r")
-;        (mult:DF (match_operand:DF 1 "register_operand" "r")
-;                 (match_operand:DF 2 "register_operand" "r")))]
-;  ""
-;  "%0 = dfmpy(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;;; -----------
-;;; cmp[fd]
-;;; -----------
-;
-;(define_expand "cmpsf"
-;  [(match_operand:SF 0 "gr_register_operand" "")
-;   (match_operand:SF 1 "gr_register_operand" "")] 
-;  ""
-;  {
-;    cfun->machine->compare_op0 = operands[0];
-;    cfun->machine->compare_op1 = operands[1];
-;    DONE;
-;  }
-;)
-;
-;
-;(define_expand "cmpdf"
-;  [(match_operand:DF 0 "gr_register_operand" "")
-;   (match_operand:DF 1 "gr_register_operand" "")] 
-;  ""
-;  {
-;    cfun->machine->compare_op0 = operands[0];
-;    cfun->machine->compare_op1 = operands[1];
-;    DONE;
-;  }
-;)
-;
-;(define_insn "cmpsf_gt"
-;  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
-;        (gt:BI (match_operand:SF 1 "gr_register_operand" "Rg")
-;               (match_operand:SF 2 "gr_register_operand" "Rg")))]
-;  ""
-;  "%0 = sfcmp.gt(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;(define_insn "cmpdf_gt"
-;  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
-;        (gt:BI (match_operand:DF 1 "gr_register_operand" "Rg")
-;               (match_operand:DF 2 "gr_register_operand" "Rg")))]
-;  ""
-;  "%0 = dfcmp.gt(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;(define_insn "cmpsf_eq"
-;  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
-;        (eq:BI (match_operand:SF 1 "gr_register_operand" "Rg")
-;               (match_operand:SF 2 "gr_register_operand" "Rg")))]
-;  ""
-;  "%0 = sfcmp.eq(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
-;
-;(define_insn "cmpdf_eq"
-;  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
-;        (eq:BI (match_operand:DF 1 "gr_register_operand" "Rg")
-;               (match_operand:DF 2 "gr_register_operand" "Rg")))]
-;  ""
-;  "%0 = dfcmp.eq(%1,%2)"
-;  [(set_attr "type" "X")]
-;)
+;;---------------------------------------
+;; BEGIN 32 bit floating point arithmetic
+;;---------------------------------------
+
+;;----------
+;; add[sd]f3
+;;----------
+
+(define_insn "addsf3"
+  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+        (plus:SF (match_operand:SF 1 "gr_register_operand" "r")
+                 (match_operand:SF 2 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = sfadd(%1, %2)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "adddf3"
+  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+        (plus:DF (match_operand:DF 1 "gr_register_operand" "r")
+                 (match_operand:DF 2 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = dfadd(%1, %2)"
+  [(set_attr "type" "X")]
+)
+
+;;----------
+;; sub[sd]f3
+;;----------
+
+(define_insn "subsf3"
+  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+        (minus:SF (match_operand:SF 1 "gr_register_operand" "r")
+                 (match_operand:SF 2 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = sfsub(%1, %2)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "subdf3"
+  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+        (minus:DF (match_operand:DF 1 "gr_register_operand" "r")
+                 (match_operand:DF 2 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = dfsub(%1, %2)"
+  [(set_attr "type" "X")]
+)
+
+
+;; ----------
+;; umax[sd]f3
+;; ----------
+
+(define_insn "umaxsf3"
+  [(set (match_operand:SF 0 "gr_register_operand"         "=Rg")
+        (umax:SF (match_operand:SF 1 "gr_register_operand" "Rg")
+                 (match_operand:SF 2 "gr_register_operand" "Rg")))]
+  "TARGET_V5_FEATURES"
+  "%0 = sfmaxu(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "umaxdf3"
+  [(set (match_operand:DF 0 "gr_register_operand"         "=Rg")
+        (umax:DF (match_operand:DF 1 "gr_register_operand" "Rg")
+                 (match_operand:DF 2 "gr_register_operand" "Rg")))]
+  "TARGET_V5_FEATURES"
+  "%0 = dfmaxu(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+;; ----------
+;; umin[sd]f3
+;; ----------
+
+(define_insn "uminsf3"
+  [(set (match_operand:SF 0 "gr_register_operand"         "=Rg")
+        (umin:SF (match_operand:SF 1 "gr_register_operand" "Rg")
+                 (match_operand:SF 2 "gr_register_operand" "Rg")))]
+  "TARGET_V5_FEATURES"
+  "%0 = sfminu(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "umindf3"
+  [(set (match_operand:DF 0 "gr_register_operand"         "=Rg")
+        (umin:DF (match_operand:DF 1 "gr_register_operand" "Rg")
+                 (match_operand:DF 2 "gr_register_operand" "Rg")))]
+  "TARGET_V5_FEATURES"
+  "%0 = dfminu(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+;; --------
+;; mul[sd]3
+;; --------
+
+(define_insn "mulsf3"
+  [(set (match_operand:SF 0 "register_operand" "=r")
+        (mult:SF (match_operand:SF 1 "register_operand" "r")
+                 (match_operand:SF 2 "register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = sfmpy(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "muldf3"
+  [(set (match_operand:DF 0 "register_operand" "=r")
+        (mult:DF (match_operand:DF 1 "register_operand" "r")
+                 (match_operand:DF 2 "register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = dfmpy(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+;; -----------
+;; cmp[fd]
+;; -----------
+
+(define_expand "cmpsf"
+  [(match_operand:SF 0 "gr_register_operand" "")
+   (match_operand:SF 1 "gr_register_operand" "")] 
+  "TARGET_V5_FEATURES"
+  {
+    cfun->machine->compare_op0 = operands[0];
+    cfun->machine->compare_op1 = operands[1];
+    DONE;
+  }
+)
+
+
+(define_expand "cmpdf"
+  [(match_operand:DF 0 "gr_register_operand" "")
+   (match_operand:DF 1 "gr_register_operand" "")] 
+  "TARGET_V5_FEATURES"
+  {
+    cfun->machine->compare_op0 = operands[0];
+    cfun->machine->compare_op1 = operands[1];
+    DONE;
+  }
+)
+
+(define_insn "cmpsf_gt"
+  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+        (gt:BI (match_operand:SF 1 "gr_register_operand" "Rg")
+               (match_operand:SF 2 "gr_register_operand" "Rg")))]
+  "TARGET_V5_FEATURES"
+  "%0 = sfcmp.gt(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "cmpdf_gt"
+  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+        (gt:BI (match_operand:DF 1 "gr_register_operand" "Rg")
+               (match_operand:DF 2 "gr_register_operand" "Rg")))]
+  "TARGET_V5_FEATURES"
+  "%0 = dfcmp.gt(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "cmpsf_eq"
+  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+        (eq:BI (match_operand:SF 1 "gr_register_operand" "Rg")
+               (match_operand:SF 2 "gr_register_operand" "Rg")))]
+  "TARGET_V5_FEATURES"
+  "%0 = sfcmp.eq(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "cmpdf_eq"
+  [(set (match_operand:BI 0 "pr_register_operand"       "=Rp")
+        (eq:BI (match_operand:DF 1 "gr_register_operand" "Rg")
+               (match_operand:DF 2 "gr_register_operand" "Rg")))]
+  "TARGET_V5_FEATURES"
+  "%0 = dfcmp.eq(%1,%2)"
+  [(set_attr "type" "X")]
+)
+
+;;-------------------------------------
+;; END 32 bit floating point arithmetic
+;;-------------------------------------
 
 (define_insn_and_split "cond_combinesi"
   [(cond_exec
@@ -10372,7 +10778,7 @@
    (use (label_ref (match_operand 1 "" "")))]
    "flag_pic"
    { 
-     return "\n# setup %0 as the GOT pointer\n%l1:\;%0 = pc\";
+     return "\n# setup %0 as the GOT pointer\n%l1:\;%0 = pc";
    }
   ;; We don't want this instruction to be packetized
   [(set_attr "type" "multiple")]
