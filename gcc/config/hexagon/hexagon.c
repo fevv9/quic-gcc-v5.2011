@@ -262,7 +262,8 @@ static struct hexagon_insn_info *hexagon_dot_newify_mem(
                                  struct hexagon_dependence *dependence);
 static int hexagon_find_new_value(rtx *x, void *y);
 static void hexagon_dot_oldify_insn(struct hexagon_insn_info *insn_info);
-static bool hexagon_predicate_dot_newable_p(struct hexagon_insn_info *insn_info);
+static bool hexagon_predicate_dot_newable_p(struct hexagon_insn_info *producer,
+                                            struct hexagon_insn_info *insn_info);
 static struct hexagon_insn_info *hexagon_dot_newify_predicate(
                                  struct hexagon_insn_info *insn_info);
 static bool hexagon_prologue_insn_p(struct hexagon_insn_info *insn_info);
@@ -9576,11 +9577,18 @@ hexagon_dot_oldify_insn(struct hexagon_insn_info *insn_info)
   delete_insn(insn_info->insn);
 }
 
-
-
+static bool
+hexagon_is_floating_point_p(rtx *x, void *data ATTRIBUTE_UNUSED)
+{
+  if(FLOAT_MODE_P (GET_MODE (*x))){
+    return true;
+  }
+  return false;
+}
 
 static bool
-hexagon_predicate_dot_newable_p(struct hexagon_insn_info *insn_info)
+hexagon_predicate_dot_newable_p(struct hexagon_insn_info *producer, 
+                                struct hexagon_insn_info *insn_info)
 {
   rtx pattern;
   rtx address;
@@ -9602,6 +9610,14 @@ hexagon_predicate_dot_newable_p(struct hexagon_insn_info *insn_info)
      && (HEXAGON_CALL_P (insn_info)
          || (!TARGET_V4_FEATURES && !HEXAGON_DIRECT_JUMP_P (insn_info)))){
     return false;
+  }
+
+  /* Check for FP compares and disallow */
+  if(TARGET_V5_FEATURES){
+      pattern = PATTERN (producer->insn);
+      if(for_each_rtx(&pattern, hexagon_is_floating_point_p, NULL)){
+          return false;
+      }
   }
 
   /* In V4, all non-control predicable instructions are .new predicable. */
@@ -10060,7 +10076,7 @@ hexagon_packet_insn_dependence_p(
          same packet. */
       if(dep->type == HEXAGON_DEP_REGISTER
          && P_REG_P (dep->use)
-         && hexagon_predicate_dot_newable_p(*insn_info)){
+         && hexagon_predicate_dot_newable_p(packet->insns[i], *insn_info)){
 
         if(!HEXAGON_NEW_PREDICATE_P (*insn_info)){
           *insn_info = hexagon_dot_newify_predicate(*insn_info);
