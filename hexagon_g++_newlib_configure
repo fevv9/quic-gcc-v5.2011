@@ -24,7 +24,7 @@ bash `dirname $0`/configure \
   --target=hexagon \
   --program-prefix=hexagon- \
   --enable-checking=assert,misc,tree,gc,rtlflag,runtime,df \
-  --enable-languages=c,c++ \
+  --enable-languages=c \
   --without-fp \
   --disable-sjlj-exceptions \
   --disable-nls \

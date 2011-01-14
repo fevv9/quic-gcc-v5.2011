@@ -2221,11 +2221,11 @@ hexagon_init_libfuncs(void)
 
   if (TARGET_V5_FEATURES)
     {
-      set_optab_libfunc(sdiv_optab, SFmode, "__hexagon_divsf3_opt");
-      set_optab_libfunc(sdiv_optab, DFmode, "__hexagon_divdf3_opt");
+      set_optab_libfunc(sdiv_optab, SFmode, "__qdsp_divsf3_opt");
+      set_optab_libfunc(sdiv_optab, DFmode, "__qdsp_divdf3_opt");
 
-      set_optab_libfunc(sqrt_optab, SFmode, "__hexagon_sqrtsf_opt");
-      set_optab_libfunc(sqrt_optab, DFmode, "__hexagon_sqrtdf_opt");
+      set_optab_libfunc(sqrt_optab, SFmode, "__qdsp_sqrtsf_opt");
+      set_optab_libfunc(sqrt_optab, DFmode, "__qdsp_sqrtdf_opt");
     }
   
   if (0 && flag_unsafe_math_optimizations)
