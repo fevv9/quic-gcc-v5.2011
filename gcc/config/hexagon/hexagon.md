@@ -10703,6 +10703,170 @@
 ;; END 32 bit floating point arithmetic
 ;;-------------------------------------
 
+;;---------------------------------------
+;; BEGIN floating / fit point conversions
+;;---------------------------------------
+
+;; 32/64 float -> 32/64 uint
+
+(define_insn "fixuns_truncsfsi2"
+  [(set (match_operand:SI 0 "gr_register_operand" "=r")
+        (unsigned_fix:SI (match_operand:SF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_sf2uw(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "fixuns_truncsfdi2"
+  [(set (match_operand:DI 0 "gr_register_operand" "=r")
+        (unsigned_fix:DI (match_operand:SF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_sf2ud(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "fixuns_truncdfsi2"
+  [(set (match_operand:SI 0 "gr_register_operand" "=r")
+        (unsigned_fix:SI (match_operand:DF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_df2uw(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "fixuns_truncdfdi2"
+  [(set (match_operand:DI 0 "gr_register_operand" "=r")
+        (unsigned_fix:DI (match_operand:DF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_df2ud(%1)"
+  [(set_attr "type" "X")]
+)
+
+;; 32/64 float -> 32/64 int
+
+(define_insn "fix_truncsfsi2"
+  [(set (match_operand:SI 0 "gr_register_operand" "=r")
+        (fix:SI (match_operand:SF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_sf2w(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "fix_truncsfdi2"
+  [(set (match_operand:DI 0 "gr_register_operand" "=r")
+        (fix:DI (match_operand:SF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_sf2d(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "fix_truncdfsi2"
+  [(set (match_operand:SI 0 "gr_register_operand" "=r")
+        (fix:SI (match_operand:DF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_df2w(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "fix_truncdfdi2"
+  [(set (match_operand:DI 0 "gr_register_operand" "=r")
+        (fix:DI (match_operand:DF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_df2d(%1)"
+  [(set_attr "type" "X")]
+)
+
+;; 32/64 uint -> 32/64 float
+
+(define_insn "floatunssisf2"
+  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+        (unsigned_float:SF (match_operand:SI 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_uw2sf(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "floatunssidf2"
+  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+        (unsigned_float:DF (match_operand:SI 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_uw2df(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "floatunsdisf2"
+  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+        (unsigned_float:SF (match_operand:DI 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_ud2sf(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "floatunsdidf2"
+  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+        (unsigned_float:DF (match_operand:DI 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_ud2df(%1)"
+  [(set_attr "type" "X")]
+)
+
+;; 32/64 int -> 32/64 float
+
+(define_insn "floatsisf2"
+  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+        (float:SF (match_operand:SI 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_w2sf(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "floatsidf2"
+  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+        (float:DF (match_operand:SI 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_w2df(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "floatdisf2"
+  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+        (float:SF (match_operand:DI 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_d2sf(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "floatdidf2"
+  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+        (float:DF (match_operand:DI 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_d2df(%1)"
+  [(set_attr "type" "X")]
+)
+
+;; 32 float -> 64 float
+
+(define_insn "extendsfdf2"
+  [(set (match_operand:DF 0 "gr_register_operand" "=r")
+        (float_extend:DF (match_operand:SF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_sf2df(%1)"
+  [(set_attr "type" "X")]
+)
+
+(define_insn "truncdfsf2"
+  [(set (match_operand:SF 0 "gr_register_operand" "=r")
+        (float_truncate:SF (match_operand:DF 1 "gr_register_operand" "r")))]
+  "TARGET_V5_FEATURES"
+  "%0 = convert_df2sf(%1)"
+  [(set_attr "type" "X")]
+)
+
+
+
+;;---------------------------------------
+;; END floating / fit point conversions
+;;---------------------------------------
+
 (define_insn_and_split "cond_combinesi"
   [(cond_exec
      (match_operator:BI 4 "predicate_operator"

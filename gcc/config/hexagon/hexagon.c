@@ -2119,6 +2119,7 @@ hexagon_init_libfuncs(void)
 
   set_optab_libfunc(gt_optab, SFmode, "__hexagon_gtsf2");
 
+#if 0
   set_conv_libfunc(sext_optab, DFmode, SFmode, "__hexagon_extendsfdf2");
   set_conv_libfunc(trunc_optab, SFmode, DFmode, "__hexagon_truncdfsf2");
 
@@ -2139,17 +2140,20 @@ hexagon_init_libfuncs(void)
 
   set_conv_libfunc(sfloat_optab, DFmode, SImode, "__hexagon_floatsidf");
   set_conv_libfunc(sfloat_optab, DFmode, DImode, "__hexagon_floatdidf");
+#endif
 
   if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(sqrt_optab, DFmode, "__hexagon_fast_sqrt_df");
     }
 
+#if 0
   set_conv_libfunc(ufloat_optab, SFmode, SImode, "__hexagon_floatunsisf");
   set_conv_libfunc(ufloat_optab, SFmode, DImode, "__hexagon_floatundisf");
 
   set_conv_libfunc(ufloat_optab, DFmode, SImode, "__hexagon_floatunsidf");
   set_conv_libfunc(ufloat_optab, DFmode, DImode, "__hexagon_floatundidf");
+#endif
 }
 
 #elif HEXAGON_NEWLIB
@@ -2279,6 +2283,7 @@ hexagon_init_libfuncs(void)
 
   set_optab_libfunc(gt_optab, SFmode, "__gtsf2");
 
+#if 0
   set_conv_libfunc(sext_optab, DFmode, SFmode, "__extendsfdf2");
   set_conv_libfunc(trunc_optab, SFmode, DFmode, "__truncdfsf2");
 
@@ -2299,17 +2304,20 @@ hexagon_init_libfuncs(void)
 
   set_conv_libfunc(sfloat_optab, DFmode, SImode, "__floatsidf");
   set_conv_libfunc(sfloat_optab, DFmode, DImode, "__floatdidf");
+#endif
 
   if (0 && flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(sqrt_optab, DFmode, "__fast_sqrt_df");
     }
 
+#if 0
   set_conv_libfunc(ufloat_optab, SFmode, SImode, "__floatunsisf");
   set_conv_libfunc(ufloat_optab, SFmode, DImode, "__floatundisf");
 
   set_conv_libfunc(ufloat_optab, DFmode, SImode, "__floatunsidf");
   set_conv_libfunc(ufloat_optab, DFmode, DImode, "__floatundidf");
+#endif
 }
 
 #endif /* HEXAGON_DINKUMWARE */
@@ -9442,6 +9450,8 @@ hexagon_mem_dot_newable_p(
 )
 {
   return TARGET_V5_FEATURES && TARGET_NEW_MEMORY_LOADS
+         && !HEXAGON_EMULATION_CALL_P (producer)
+         && !HEXAGON_EMULATION_CALL_P (consumer)
          && consumer->loads && !consumer->loads->next && !consumer->stores;
 }
 
