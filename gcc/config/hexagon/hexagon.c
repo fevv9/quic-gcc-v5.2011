@@ -71,7 +71,7 @@ enum hexagon_falign hexagon_falign = HEXAGON_FALIGN_UNSPECIFIED;
 bool hexagon_dual_memory_accesses = true;
 
 /* Used for qdsp6 compatibility */
-int hexagon_qdsp6_compat = 0;
+int hexagon_qdsp6_compat = 1;
 
 static GTY(()) struct hexagon_packet_info *hexagon_head_packet;
 static GTY(()) struct hexagon_packet_info *hexagon_tail_packet;
