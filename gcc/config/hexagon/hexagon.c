@@ -1477,9 +1477,16 @@ hexagon_make_prologue_epilogue_decisions(struct hexagon_frame_info *info)
       info->offset = 0;
     }
   }
-
+  
+#ifdef LINUX
+  /* Bugfix 4799: Do not emit common functions for Linux. May result in
+     incorrect behavior in the presence of PLT trampolines */
+  use_common_functions = false;
+#else
   use_common_functions = (optimize_size || optimize == 2)
                          && info->use_allocframe && !crtl->calls_eh_return;
+#endif
+
 
   /* If we are using a function to save or restore callee-save registers or we
      are forming packets, then maximize the number of registers saved as pairs,
