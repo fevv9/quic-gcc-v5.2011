@@ -2736,7 +2736,7 @@ legitimize_pic_address(rtx orig, enum machine_mode mode, rtx reg)
     }
   else if (CONSTANT_P(orig)) 
     {
-     /* Taken from arm code */
+     /* Adopted from arm code */
      if (GET_CODE (orig) == CONST)
        {  
          if (GET_CODE (XEXP (orig, 0)) == PLUS)
@@ -2745,7 +2745,13 @@ legitimize_pic_address(rtx orig, enum machine_mode mode, rtx reg)
 	     base = legitimize_pic_address (XEXP (XEXP (orig, 0), 0), Pmode, reg);
 	     offset = legitimize_pic_address (XEXP (XEXP (orig, 0), 1), Pmode,
 					      base == reg ? 0 : reg);
-	     return gen_rtx_PLUS (Pmode, base, offset);
+             if (reg == 0)
+               {
+                 gcc_assert (can_create_pseudo_p());
+                 reg = gen_reg_rtx (Pmode);
+               }
+	     emit_insn(gen_addsi3(reg, base, offset));
+             return reg;
 	   }
        } 
     }
