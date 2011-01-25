@@ -621,7 +621,12 @@ Basic Stack Layout
 #define STACK_GROWS_DOWNWARD 1
 #define FRAME_GROWS_DOWNWARD 1
 
+#ifdef LINUX
+#undef TARGET_LIBC_PROVIDES_SSP
+#else
 #define TARGET_LIBC_PROVIDES_SSP 1
+#endif
+
 
 #define STARTING_FRAME_OFFSET 0
 
