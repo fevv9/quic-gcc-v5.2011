@@ -518,20 +518,25 @@ FUNC_START hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 	{
 		p0 = bitsclr(r1,#7)
 		p0 = bitsclr(r0,#7)
-		if (p0.new) r5:4 = memd(r1)
-		r3 = #-3
+		if (p0.new) r5:4 = memd(r1++#8)
+		r3 = add(r2,#-32)
 	}
 	{
-		if (!p0) jump 2f
+		if (!p0) jump ##memcpy
 		if (p0) memd(r0++#8) = r5:4
-		if (p0) r5:4 = memd(r1+#8)
-		r3 += lsr(r2,#3)
+		if (p0) r5:4 = memd(r1++#8)
 	}
 	{
 		memd(r0++#8) = r5:4
-		r5:4 = memd(r1+#16)
-		r1 = add(r1,#24)
+		r5:4 = memd(r1++#8)
+		r3 = lsr(r3,#3)
+		p0 = cmp.eq(r3,#0)
+	}
+	{
+		memd(r0++#8) = r5:4
+		r5:4 = memd(r1++#8)
 		loop0(1f,r3)
+		if (p0) jump 2f
 	}
 	.falign
 1:
@@ -539,16 +544,13 @@ FUNC_START hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 		memd(r0++#8) = r5:4
 		r5:4 = memd(r1++#8)
 	}:endloop0
+        .falign
+2:      
 	{
 		memd(r0) = r5:4
 		r0 -= add(r2,#-8)
 		jumpr r31
 	}
-#ifdef __PIC__
-2:	jump memcpy@PLT
-#else
-2:	jump memcpy
-#endif
 FUNC_END hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 #else
 FUNC_START hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
@@ -556,16 +558,16 @@ FUNC_START hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 		p0 = bitsclr(r1,#7)
 		p1 = bitsclr(r0,#7)
 		if (p0.new) r5:4 = memd(r1)
-		r3 = #-4
+		r3 = add(r2,#-32)
 	}
 	{
 		if (p1) memd(r0) = r5:4
 		if (p0) r5:4 = memd(r1+#8)
 		p0 = and(p0,p1)
-		r3 += lsr(r2,#3)
+		r3 = lsr(r3,#3)
 	}
 	{
-	        if (!p0) jump 2f
+		if (!p0) jump 2f
 		if (p0) memd(r0+#8) = r5:4
 		if (p0) r5:4 = memd(r1+#16)
 		if (p0) r0 = add(r0,#16)
@@ -588,10 +590,8 @@ FUNC_START hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 		r0 -= add(r2,#-8)
 		jumpr r31
 	}
-#ifdef __PIC__	
-2:	jump memcpy@PLT
-#else	
-2:	jump memcpy
+2:
+                jump memcpy
 #endif
 FUNC_END hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 #endif /* __HEXAGON_ARCH__ >= 4 */
