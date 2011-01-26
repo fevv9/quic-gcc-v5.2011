@@ -4765,6 +4765,10 @@
    (use (match_operand 3 "" ""))] ; loop level
   "TARGET_HARDWARE_LOOPS"
   {
+    if (flag_pic) {
+        require_pic_register();
+        emit_use(pic_offset_table_rtx);
+    }
     if(INTVAL (operands[3]) == 1){
       emit_insn(gen_doloop_begin0(operands[0], GEN_INT (REGNO (operands[0]))));
     }
@@ -4804,7 +4808,6 @@
     else {
       if(which_alternative == 0){
         if(flag_pic) {
-          require_pic_register();
           return "%2 = %0\;"
                  "{\;"
                  "  lc0 = %2\;"
@@ -4826,7 +4829,6 @@
       }
       else {
         if(flag_pic) {
-          require_pic_register();
           return "%2 = #%0\;"
                  "{\;"
                  "  lc0 = %2\;"
@@ -4871,7 +4873,7 @@
   [(set (reg:SI LC1_REGNUM) (match_operand:SI 0 "nonmemory_operand" "Rg,Iu10"))
    (set (reg:SI SA1_REGNUM) (label_ref (match_operand 1 "" "")))
    (clobber (match_scratch:SI 2 "=&Rg,&Rg"))]
-  "!flag_pic"
+  ""
   {
     if(get_attr_length(insn) == 4){
       if(which_alternative == 0){
@@ -4884,7 +4886,6 @@
     else {
       if(which_alternative == 0){
         if(flag_pic) {
-          require_pic_register();
           return "%2 = %0\;"
                  "{\;"
                  "  lc1 = %2\;"
@@ -4906,7 +4907,6 @@
       }
       else {
         if(flag_pic) {
-          require_pic_register();
           return "%2 = #%0\;"
                  "{\;"
                  "  lc1 = %2\;"
