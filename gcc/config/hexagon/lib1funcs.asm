@@ -592,7 +592,6 @@ FUNC_START hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 	}
 2:
                 jump memcpy
-#endif
 FUNC_END hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 #endif /* __HEXAGON_ARCH__ >= 4 */
 #endif /* L_hexagon_memcpy_likely_aligned_min32bytes_mult8bytes */
