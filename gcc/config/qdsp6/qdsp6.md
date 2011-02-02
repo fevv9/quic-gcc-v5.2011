@@ -3833,7 +3833,7 @@
                          (const_int 0)])
                       (label_ref (match_operand 2 "" ""))
                       (pc)))]
-  ""
+  "!TARGET_V4_FEATURES"
   {
     rtx prediction;
     if(get_attr_length(insn) == 4){
@@ -3849,6 +3849,33 @@
         (if_then_else (eq_attr "length" "4")
                       (const_string "J")
                       (const_string "multiple")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 50000))
+                      (const_string "4")
+                      (const_string "8")))]
+)
+
+(define_insn "cond_jump_v4"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "predicate_operator"
+                        [(match_operand:BI 1 "pr_register_operand" "Rp")
+                         (const_int 0)])
+                      (label_ref (match_operand 2 "" ""))
+                      (pc)))]
+  "TARGET_V4_FEATURES"
+  {
+    operands[3] = qdsp6_branch_hint(insn);
+    if(get_attr_length(insn) == 4){
+      return "if (%C0) jump%h3 %l2";
+    }
+    else {
+      return "if (%C0) jump%h3 ##%l2";
+    }
+  }
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "4")
+                      (const_string "J")
+                      (const_string "EJ")))
    (set (attr "length")
         (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 50000))
                       (const_string "4")
