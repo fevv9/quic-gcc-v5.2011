@@ -1027,7 +1027,7 @@
                                     !can_create_pseudo_p () ? operands[0] : NULL_RTX);
       operands[1] = tmp1;
     }
-    else if(flag_pic 
+    else if(flag_pic
        && (CONSTANT_P (operands[1])
            || symbol_mentioned_p (operands[1])
            || label_mentioned_p (operands[1]))){

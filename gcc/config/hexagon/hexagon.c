@@ -2565,7 +2565,6 @@ require_tls_register (void)
   /* Burn r25 as TLS register.*/
   fixed_regs[TLS_REGNUM] = 1;
   call_used_regs[TLS_REGNUM] = 1;
-
 }
 
 /*
@@ -2602,7 +2601,6 @@ hexagon_load_pic_register() {
 static void
 hexagon_load_got_register(rtx got_table_rtx)
 {
-
   rtx dummy_pic, pic_reg, label, seq;
 
   /* Materialize GOT base for PIC */
@@ -2766,9 +2764,9 @@ hexagon_legitimize_address (rtx x, rtx old_x, enum machine_mode mode)
 
 /*
  ---------------------------------------------
-    Begin Thread Local Storage Support  
+    Begin Thread Local Storage Support
  ---------------------------------------------
-*/                                          
+*/
 
 static GTY(()) rtx hexagon_tls_symbol;
 
@@ -2797,7 +2795,7 @@ legitimize_tls_address (rtx x, rtx reg)
     subregs = 1;
   }
 
-  if (subregs) 
+  if (subregs)
   {
     address = gen_reg_rtx (Pmode);
   }
@@ -2912,9 +2910,9 @@ hexagon_tls_referenced_p (rtx x)
 
 /*
  ---------------------------------------------
-    End Thread Local Storage Support  
+    End Thread Local Storage Support
  ---------------------------------------------
-*/                                          
+*/
 
 
 /* Construct a unique section name based on the decl name and the

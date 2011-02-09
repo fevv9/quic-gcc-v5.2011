@@ -368,7 +368,7 @@
 (define_predicate "tls_symbolic_operand"
   (ior (match_code "symbol_ref")
        (match_test "SYMBOL_REF_TLS_MODEL (op) != 0")))
- 
+
 
 ;;-----------;;
 ;; Operators ;;
