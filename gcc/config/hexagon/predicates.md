@@ -363,6 +363,13 @@
 (define_predicate "sym_or_lab_operand"
   (match_code "symbol_ref,label_ref"))
 
+;;Test for thread-local symbols
+;;for now use OR but change the OR to AND for the test below
+(define_predicate "tls_symbolic_operand"
+  (ior (match_code "symbol_ref")
+       (match_test "SYMBOL_REF_TLS_MODEL (op) != 0")))
+ 
+
 ;;-----------;;
 ;; Operators ;;
 ;;-----------;;

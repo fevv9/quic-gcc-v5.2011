@@ -840,6 +840,11 @@ Addressing Modes
 #define REG_OK_STRICT_P false
 #endif
 
+#ifdef HAVE_AS_TLS
+#undef TARGET_HAVE_TLS
+#define TARGET_HAVE_TLS true
+#endif
+
 #define GO_IF_LEGITIMATE_ADDRESS(MODE, X, LABEL) \
   if(hexagon_legitimate_address_p(MODE, X, REG_OK_STRICT_P, "m")){ \
     goto LABEL; \
@@ -1249,6 +1254,8 @@ struct hexagon_frame_info GTY(()) {
   /* number of unpaired callee-save registers saved in some special manner */
   unsigned int num_specially_saved_singles;
   bool computed;  /* true if frame info has already been computed */
+  bool tls_set;   /* true if tls register is set */
+  rtx tls_offset_table_rtx;
 };
 
 struct hexagon_final_info GTY(()) {

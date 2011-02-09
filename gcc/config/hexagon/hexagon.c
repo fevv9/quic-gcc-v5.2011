@@ -2548,6 +2548,25 @@ require_pic_register (void)
   }
 }
 
+/*
+ * Make that compiled function access the TLS register
+ */
+
+void
+require_tls_register (void)
+{
+  struct hexagon_frame_info *frame;
+
+  frame = hexagon_frame_info ();
+
+  frame->tls_offset_table_rtx = gen_rtx_REG (SImode, TLS_REGNUM);
+  frame->tls_set = 1;
+
+  /* Burn r25 as TLS register.*/
+  fixed_regs[TLS_REGNUM] = 1;
+  call_used_regs[TLS_REGNUM] = 1;
+
+}
 
 /*
   There must be a better way to do this. We need a register to use as a temporary
@@ -2579,6 +2598,37 @@ hexagon_load_pic_register() {
 				    gen_rtx_LABEL_REF(SImode, label)));
   emit_insn(gen_subsi3(pic_offset_table_rtx, pic_offset_table_rtx, temp_reg));
 }
+
+static void
+hexagon_load_got_register(rtx got_table_rtx)
+{
+
+  rtx dummy_pic, pic_reg, label, seq;
+
+  /* Materialize GOT base for PIC */
+
+  label = gen_label_rtx();
+  rtx temp_reg = gen_rtx_REG (SImode, NON_ARG_CALLER_SAVE_REGISTER_1);
+  /* emit insn sequence for computing the GOT base */
+  emit_insn(gen_compute_got_base(got_table_rtx, label));
+  emit_insn(gen_pic_movsi_hi_gotoff(temp_reg, gen_rtx_LABEL_REF(SImode, label)));
+  emit_insn(gen_pic_movsi_lo_gotoff(temp_reg, temp_reg,
+                gen_rtx_LABEL_REF(SImode, label)));
+  emit_insn(gen_subsi3(got_table_rtx, got_table_rtx, temp_reg));
+}
+
+
+/*
+ * Setup the tls register in the function prologue.  This function
+ * assumes the tls_set in the frame info has been set.
+ */
+static void
+hexagon_load_tls_register() {
+  
+  /* emit insn tls r25 = ugp */
+  emit_insn(gen_compute_tls_base());
+}
+
 
 /*
  * Helper function for hexagon_legitimize_address() for PIC compilation
@@ -2714,6 +2764,157 @@ hexagon_legitimize_address (rtx x, rtx old_x, enum machine_mode mode)
  ---------------------------------------------
 */                                          
 
+/*
+ ---------------------------------------------
+    Begin Thread Local Storage Support  
+ ---------------------------------------------
+*/                                          
+
+static GTY(()) rtx hexagon_tls_symbol;
+
+static inline rtx
+hexagon_tls_get_addr (void)
+{
+  if (!hexagon_tls_symbol)
+    hexagon_tls_symbol = gen_rtx_SYMBOL_REF (Pmode, "__tls_get_addr");
+
+  return hexagon_tls_symbol;
+}
+
+rtx
+legitimize_tls_address (rtx x, rtx reg)
+{
+  rtx call_sym, insn, address, ret, label;
+  int subregs = 0;
+  unsigned int model = SYMBOL_REF_TLS_MODEL (x);
+
+  /* TODO: why do we need the following 2 if clauses? */
+  /* Copied from legitimize_pic_address */
+  if (reg == 0)
+  {
+    gcc_assert (can_create_pseudo_p());
+    reg = gen_reg_rtx (Pmode);
+    subregs = 1;
+  }
+
+  if (subregs) 
+  {
+    address = gen_reg_rtx (Pmode);
+  }
+  else
+  {
+    address = reg;
+  }
+
+  switch (model)
+  {
+    case TLS_MODEL_GLOBAL_DYNAMIC:
+      {
+        require_pic_register ();
+        call_sym = hexagon_tls_get_addr ();
+
+        emit_insn (gen_load_tls_hi (address, x));
+        emit_insn (gen_load_tls_lo (address, address, x));
+        emit_insn (gen_addsi3 (address, address, pic_offset_table_rtx));
+
+        ret = emit_library_call_value (call_sym, NULL_RTX, LCT_CONST, Pmode, 1, address, Pmode);
+        return ret;
+      }
+
+    case TLS_MODEL_LOCAL_DYNAMIC:
+      {
+        require_pic_register ();
+        call_sym = hexagon_tls_get_addr ();
+
+        emit_insn (gen_load_tls_hi (address, x));
+        emit_insn (gen_load_tls_lo (address, address, x));
+        emit_insn (gen_addsi3 (address, address, pic_offset_table_rtx));
+        ret = emit_library_call_value (call_sym, NULL_RTX, LCT_CONST, Pmode, 1, address, Pmode);
+        address = gen_reg_rtx (Pmode);
+        emit_insn (gen_load_tls_tprel_hi (address, x));
+        emit_insn (gen_load_tls_tprel_lo (address, address, x));
+        emit_insn (gen_addsi3 (address, address, ret));
+        return address;
+      }
+
+    case TLS_MODEL_INITIAL_EXEC:
+      {
+        struct hexagon_frame_info *frame = hexagon_frame_info ();
+
+        if (!frame->tls_set)
+        {
+          require_tls_register ();
+        }
+
+        emit_insn (gen_load_tls_hi (address, x));
+        emit_insn (gen_load_tls_lo (address, address, x));
+        emit_move_insn (address, gen_const_mem (SImode, address));
+        emit_insn (gen_addsi3 (address, address, frame->tls_offset_table_rtx));
+
+        return address;
+      }
+
+    case TLS_MODEL_LOCAL_EXEC:
+      {
+        struct hexagon_frame_info *frame = hexagon_frame_info ();
+        if (!frame->tls_set)
+        {
+          require_tls_register ();
+        }
+
+        emit_insn (gen_load_tls_hi (address, x));
+        emit_insn (gen_load_tls_lo (address, address, x));
+        emit_insn (gen_addsi3 (address, address, frame->tls_offset_table_rtx));
+
+        return address;
+      }
+    default:
+      abort();
+  }
+
+}
+static bool
+hexagon_tls_symbol_p (rtx x)
+{
+  if (!TARGET_HAVE_TLS)
+    return false;
+
+  if (GET_CODE (x) != SYMBOL_REF)
+    return false;
+
+  return SYMBOL_REF_TLS_MODEL (x) != 0;
+}
+
+
+static int
+hexagon_tls_operand_p_1 (rtx *x, void *data ATTRIBUTE_UNUSED)
+{
+  if (GET_CODE (*x) == SYMBOL_REF)
+    return SYMBOL_REF_TLS_MODEL (*x) != 0;
+
+  /* Don't recurse into UNSPEC_TLS looking for TLS symbols; these are
+     TLS offsets, not real symbol references.  */
+  if (GET_CODE(*x) == CALL_INSN ||
+      (GET_CODE (*x) == UNSPEC && XINT (*x, 1) == UNSPEC_TLS))
+    return -1;
+
+  return 0;
+}
+
+bool
+hexagon_tls_referenced_p (rtx x)
+{
+  if (!TARGET_HAVE_TLS)
+    return false;
+
+  return for_each_rtx(&x, hexagon_tls_operand_p_1, NULL);
+}
+
+/*
+ ---------------------------------------------
+    End Thread Local Storage Support  
+ ---------------------------------------------
+*/                                          
 
 
 /* Construct a unique section name based on the decl name and the

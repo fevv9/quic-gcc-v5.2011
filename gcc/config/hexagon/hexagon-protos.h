@@ -77,5 +77,6 @@ extern rtx  hexagon_function_arg(CUMULATIVE_ARGS, enum machine_mode, tree, int);
 
 /* PIC support */
 extern rtx legitimize_pic_address(rtx, enum machine_mode, rtx);
+extern rtx legitimize_tls_address(rtx, rtx);
 extern rtx hexagon_legitimize_address (rtx, rtx, enum machine_mode);
 extern void require_pic_register (void);
