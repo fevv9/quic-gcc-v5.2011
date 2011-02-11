@@ -24,9 +24,9 @@ git clone /prj/austin/git/arch.git
 #git clone git://git-hexagon.quicinc.com/hexagon-opensource/gnutools
 #git clone git://git-hexagon.quicinc.com/hexagon-opensource/newlib
 
-git clone /prj/dsp/qdsp6/users/sundeepk/qdsp6_work/qdsp6_cvsroot/V4FP-tools/MAINLINE/gcc-4.4
-git clone /prj/dsp/qdsp6/users/sundeepk/qdsp6_work/qdsp6_cvsroot/V4FP-tools/MAINLINE/gnutools
-git clone /prj/dsp/qdsp6/users/sundeepk/qdsp6_work/qdsp6_cvsroot/V4FP-tools/MAINLINE/newlib
+git clone /prj/dsp/qdsp6/users/sundeepk/qdsp6_work/qdsp6_cvsroot/git-repo/gcc-4.4
+git clone /prj/dsp/qdsp6/users/sundeepk/qdsp6_work/qdsp6_cvsroot/git-repo/gnutools
+git clone /prj/dsp/qdsp6/users/sundeepk/qdsp6_work/qdsp6_cvsroot/git-repo/newlib
 
 cvs co tools/include
 cvs co -r V5 tools/libqdsp tools/dinkumware 
@@ -51,6 +51,8 @@ cd $workspace/arch/src
 make
 cp ../bin/sim ${prefix}_newlib/qc/bin
 cp ../bin/sim ${prefix}_dinkumware/qc/bin
+cp arch/hexagon_iset.h $workspace/gnutools/include/opcode/hexagon_iset_v5.h
+cp arch/hexagon_asm_maps.h $workspace/gnutools/include/opcode/hexagon_asm_maps.h
 
 # binutils
 cd $workspace/gnutools
