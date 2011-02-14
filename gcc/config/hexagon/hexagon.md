@@ -70,6 +70,8 @@
    (UNSPEC_DOLOOP_END      160)
    (UNSPEC_PIC_SYM_GOTOFF  161)   ; For PIC GOTOFF symbols
    (UNSPEC_PIC_SYM_GOT     162)   ; For PIC GOT symbols
+   (UNSPEC_TLS             163)   ; For TLS symbols
+   (UNSPEC_TPREL_TLS       164)   ; For TLS TPREL symbols
  ]
 )
 
