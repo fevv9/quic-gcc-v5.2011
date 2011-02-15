@@ -403,6 +403,7 @@ static rtx hexagon_nvj_get_operand( rtx insn, int op_count);
 void 
 hexagon_duplicate_doloop_begin(basic_block condition_bb, struct loop *loop);
 
+static bool hexagon_tls_symbol_p (rtx x);
 
 /* Initialize the GCC target structure. */
 
@@ -2743,6 +2744,10 @@ legitimize_pic_address(rtx orig, enum machine_mode mode, rtx reg)
 rtx
 hexagon_legitimize_address (rtx x, rtx old_x, enum machine_mode mode)
 {
+  if (hexagon_tls_symbol_p(x))
+  {
+    return legitimize_tls_address(x, NULL_RTX);
+  }
 
   if (flag_pic) 
     {
@@ -2782,7 +2787,7 @@ hexagon_tls_get_addr (void)
 rtx
 legitimize_tls_address (rtx x, rtx reg)
 {
-  rtx call_sym, insn, address, ret, label;
+  rtx call_sym, address, ret;
   int subregs = 0;
   unsigned int model = SYMBOL_REF_TLS_MODEL (x);
 
@@ -2846,6 +2851,10 @@ legitimize_tls_address (rtx x, rtx reg)
 
         emit_insn (gen_load_tls_hi (address, x));
         emit_insn (gen_load_tls_lo (address, address, x));
+        if (flag_pic) {
+          require_pic_register ();
+          emit_insn (gen_addsi3 (address, address, pic_offset_table_rtx));
+        }
         emit_move_insn (address, gen_const_mem (SImode, address));
         emit_insn (gen_addsi3 (address, address, frame->tls_offset_table_rtx));
 
@@ -7393,8 +7402,10 @@ hexagon_expand_prologue(void)
     hexagon_load_pic_register ();
   }
 
-}
+  if (frame->tls_set)
+    hexagon_load_tls_register ();
 
+}
 
 
 

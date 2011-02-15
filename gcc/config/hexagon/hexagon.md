@@ -578,7 +578,10 @@
      return "%0.h = #HI(%1@GDGOT)";
 
    case TLS_MODEL_INITIAL_EXEC:
-     return "%0.h = #HI(%1@IE)";
+     if (!flag_pic)
+       return "%0.h = #HI(%1@IE)";
+     else
+       return "%0.h = #HI(%1@IEGOT)";
 
    case TLS_MODEL_LOCAL_EXEC:
      return "%0.h = #HI(%1@TPREL)";
@@ -605,7 +608,10 @@
       return "%0.l = #LO(%2@GDGOT)";
 
     case TLS_MODEL_INITIAL_EXEC:
-      return "%0.l = #LO(%2@IE)";
+      if (!flag_pic)
+        return "%0.l = #LO(%2@IE)";
+      else 
+        return "%0.l = #LO(%2@IEGOT)";
 
     case TLS_MODEL_LOCAL_EXEC:
       return "%0.l = #LO(%2@TPREL)";
