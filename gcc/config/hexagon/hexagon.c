@@ -1279,10 +1279,16 @@ hexagon_save_register_p(unsigned int regno)
 {
   unsigned int eh_regno;
   unsigned int i;
+  struct hexagon_frame_info *info;
+
+  info = &cfun->machine->frame_info;
 
   if(regno >= FIRST_PSEUDO_REGISTER){
     return false;
   }
+
+  if (info->tls_set && regno == TLS_REGNUM)
+    return true;
 
   if(crtl->calls_eh_return){
     i = 0;

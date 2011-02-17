@@ -10495,7 +10495,8 @@
 )
 
 (define_insn "compute_tls_base"
-  [(unspec_volatile [(const_int 0)] UNSPEC_TLS)]
+  [(unspec_volatile [(const_int 0)] UNSPEC_TLS)
+   (clobber (reg:SI TLS_REGNUM))]
    "TARGET_HAVE_TLS"
      "r25 = ugp"
   ;; We don't want this instruction to be packetized
