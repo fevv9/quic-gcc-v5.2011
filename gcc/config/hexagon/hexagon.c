@@ -154,7 +154,7 @@ static section *hexagon_asm_select_rtx_section(
                   unsigned HOST_WIDE_INT align);
 static section * hexagon_select_section (tree decl, int reloc, unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED); 
 static bool hexagon_in_small_data_p(const_tree exp);
-static void qpds6_load_pic_register (void);
+static void hexagon_load_pic_register (void);
 static void hexagon_unique_section (tree decl, int reloc); 
 static void hexagon_elf_asm_named_section (const char *name, unsigned int flags,tree decl ATTRIBUTE_UNUSED); 
 
@@ -403,7 +403,11 @@ static rtx hexagon_nvj_get_operand( rtx insn, int op_count);
 void 
 hexagon_duplicate_doloop_begin(basic_block condition_bb, struct loop *loop);
 
+static void hexagon_load_tls_register (void); 
 static bool hexagon_tls_symbol_p (rtx x);
+void require_pic_register (void);
+void require_tls_register (void);
+bool hexagon_legitimate_pic_operand_p(rtx operand);
 
 /* Initialize the GCC target structure. */
 
@@ -2590,7 +2594,7 @@ require_tls_register (void)
 static void
 hexagon_load_pic_register() {
   
-  rtx dummy_pic, pic_reg, label, seq;
+  rtx label;
   
   /* Materialize GOT base for PIC */
 
@@ -2608,7 +2612,7 @@ hexagon_load_pic_register() {
 static void
 hexagon_load_got_register(rtx got_table_rtx)
 {
-  rtx dummy_pic, pic_reg, label, seq;
+  rtx label;
 
   /* Materialize GOT base for PIC */
 
@@ -2630,8 +2634,10 @@ hexagon_load_got_register(rtx got_table_rtx)
 static void
 hexagon_load_tls_register() {
   
+  struct hexagon_frame_info *frame;
   /* emit insn tls r25 = ugp */
-  emit_insn(gen_compute_tls_base());
+  frame = hexagon_frame_info ();
+  emit_insn (gen_compute_tls_base (frame->tls_offset_table_rtx));
 }
 
 
@@ -2646,9 +2652,8 @@ legitimize_pic_address(rtx orig, enum machine_mode mode, rtx reg)
   if (GET_CODE (orig) == SYMBOL_REF
       || GET_CODE (orig) == LABEL_REF)
     {
-      rtx pic_ref, address, dummy_pic, add_reg;
+      rtx pic_ref, address;
       rtx insn;
-      rtx temp_physical_reg;
  
       /* module_owns: set if this module owns the data (orig) */
       int module_owns = 0;
