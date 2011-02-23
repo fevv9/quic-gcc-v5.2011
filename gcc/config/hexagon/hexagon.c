@@ -403,7 +403,7 @@ static rtx hexagon_nvj_get_operand( rtx insn, int op_count);
 void 
 hexagon_duplicate_doloop_begin(basic_block condition_bb, struct loop *loop);
 
-static void hexagon_load_tls_register (void); 
+static void hexagon_load_tls_register (void);
 static bool hexagon_tls_symbol_p (rtx x);
 void require_pic_register (void);
 void require_tls_register (void);
