@@ -1291,9 +1291,6 @@ hexagon_save_register_p(unsigned int regno)
     return false;
   }
 
-  if (info->tls_set && regno == TLS_REGNUM)
-    return true;
-
   if(crtl->calls_eh_return){
     i = 0;
     do {
@@ -1304,6 +1301,15 @@ hexagon_save_register_p(unsigned int regno)
       i++;
     }while(eh_regno != INVALID_REGNUM);
   }
+
+  if (regno == TLS_REGNUM && 
+      (info->tls_set || df_regs_ever_live_p(regno) || TARGET_SAVE_RESTORE_R25))
+    return true;
+
+/*
+  if (regno == TLS_REGNUM)
+    return true;
+*/
 
   /* Handle the pic register differently since it is a call_used_reg
      and a fixed_reg.  Also, check both df_regs_ever_live_p and
