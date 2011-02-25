@@ -848,6 +848,9 @@ Addressing Modes
 #ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
+#else
+#undef TARGET_HAVE_TLS
+#define TARGET_HAVE_TLS false
 #endif
 
 #define GO_IF_LEGITIMATE_ADDRESS(MODE, X, LABEL) \

@@ -10495,15 +10495,6 @@
   [(set_attr "type" "multiple")]
 )
 
-;; This one will not generate live set for r25
-(define_insn "compute_tls_base_black_box"
-  [(unspec_volatile [(const_int 0)] UNSPEC_TLS)]
-   "TARGET_HAVE_TLS"
-     "r25 = ugp"
-  ;; We don't want this instruction to be packetized
-  [(set_attr "type" "multiple")]
-)
-
 ;; Pseudo instruction that prevents the scheduler from moving code above this
 ;; point.
 ;;(define_insn "blockage"

@@ -1302,14 +1302,9 @@ hexagon_save_register_p(unsigned int regno)
     }while(eh_regno != INVALID_REGNUM);
   }
 
-  if (regno == TLS_REGNUM && 
+  if (regno == TLS_REGNUM &&
       (info->tls_set || df_regs_ever_live_p(regno) || TARGET_SAVE_RESTORE_R25))
     return true;
-
-/*
-  if (regno == TLS_REGNUM)
-    return true;
-*/
 
   /* Handle the pic register differently since it is a call_used_reg
      and a fixed_reg.  Also, check both df_regs_ever_live_p and
@@ -2574,7 +2569,7 @@ require_tls_register (void)
 {
   struct hexagon_frame_info *frame;
 
-  frame = hexagon_frame_info ();
+  frame = &cfun->machine->frame_info;
 
   frame->tls_offset_table_rtx = gen_rtx_REG (SImode, TLS_REGNUM);
   frame->tls_set = 1;
@@ -2642,7 +2637,7 @@ hexagon_load_tls_register() {
   
   struct hexagon_frame_info *frame;
   /* emit insn tls r25 = ugp */
-  frame = hexagon_frame_info ();
+  frame = &cfun->machine->frame_info;
   emit_insn (gen_compute_tls_base (frame->tls_offset_table_rtx));
 }
 
@@ -2865,7 +2860,7 @@ legitimize_tls_address (rtx x, rtx reg)
 
     case TLS_MODEL_INITIAL_EXEC:
       {
-        struct hexagon_frame_info *frame = hexagon_frame_info ();
+        struct hexagon_frame_info *frame = &cfun->machine->frame_info;
 
         if (!frame->tls_set)
         {
@@ -2886,7 +2881,7 @@ legitimize_tls_address (rtx x, rtx reg)
 
     case TLS_MODEL_LOCAL_EXEC:
       {
-        struct hexagon_frame_info *frame = hexagon_frame_info ();
+        struct hexagon_frame_info *frame = &cfun->machine->frame_info;
         if (!frame->tls_set)
         {
           require_tls_register ();
