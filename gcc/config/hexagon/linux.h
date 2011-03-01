@@ -9,7 +9,7 @@ Controlling the Compilation Driver, gcc
 #define LINK_SPEC "-e _start \
                    %{h*} %{v:-V} \
 		   %{static:-dn -Bstatic} \
-		   %{shared:-G -dy -z text} \
+		   %{shared:-shared -G -dy -z text} \
 		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} \
 		   %{YP,*} \
@@ -18,7 +18,7 @@ Controlling the Compilation Driver, gcc
 #define LINK_SPEC "-e _start \
                    %{h*} %{v:-V} \
 		   %{static:-dn -Bstatic} \
-		   %{shared:-G -dy -z text} \
+		   %{shared:-shared -G -dy -z text} \
 		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} \
 		   %{YP,*} \
