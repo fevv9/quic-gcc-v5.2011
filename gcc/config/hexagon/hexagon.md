@@ -1029,11 +1029,22 @@
 
     if (hexagon_tls_referenced_p( operands[1]))
     {
-      rtx tmp1, tmp;
-      tmp = operands[1];
-      tmp1 = legitimize_tls_address (tmp,
+      rtx tmp = operands[1];
+      rtx addend = NULL;
+
+      if (GET_CODE (tmp) == CONST && GET_CODE (XEXP (tmp, 0)) == PLUS)
+      {
+        addend = XEXP (XEXP (tmp, 0), 1);
+        tmp    = XEXP (XEXP (tmp, 0), 0);
+      }
+      tmp = legitimize_tls_address (tmp,
                                     !can_create_pseudo_p () ? operands[0] : NULL_RTX);
-      operands[1] = tmp1;
+      if (addend)
+      {
+          tmp = gen_rtx_PLUS (SImode, tmp, addend);
+          tmp = force_operand (tmp, operands[0]);
+      }
+      operands[1] = tmp;
     }
     else if(flag_pic
        && (CONSTANT_P (operands[1])
@@ -1350,9 +1361,20 @@
     if (hexagon_tls_referenced_p( operands[1]))
     {
       rtx tmp = operands[1];
+      rtx addend = NULL;
 
+      if (GET_CODE (tmp) == CONST && GET_CODE (XEXP (tmp, 0)) == PLUS)
+      {
+        addend = XEXP (XEXP (tmp, 0), 1);
+        tmp    = XEXP (XEXP (tmp, 0), 0);
+      }
       tmp = legitimize_tls_address (tmp,
                                     !can_create_pseudo_p () ? operands[0] : NULL_RTX);
+      if (addend)
+      {
+          tmp = gen_rtx_PLUS (SImode, tmp, addend);
+          tmp = force_operand (tmp, operands[0]);
+      }
       operands[1] = tmp;
     }
     else if(flag_pic && CONSTANT_P (operands[1])){
