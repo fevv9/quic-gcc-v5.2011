@@ -2916,11 +2916,11 @@ hexagon_tls_operand_p_1 (rtx *x, void *data ATTRIBUTE_UNUSED)
     return (SYMBOL_REF_TLS_MODEL (*x) != 0 &&
             SYMBOL_REF_TLS_MODEL (*x) != 1);
 
-  /* Don't recurse into UNSPEC_TLS or other UNPSEC mentioned below, 
-     looking for TLS symbols; these are TLS offsets, 
+  /* Don't recurse into UNSPEC_TLS or other UNPSEC mentioned below,
+     looking for TLS symbols; these are TLS offsets,
      not real symbol references.  */
   if (GET_CODE (*x) == CALL_INSN ||
-       (GET_CODE (*x) == UNSPEC && 
+       (GET_CODE (*x) == UNSPEC &&
           (XINT (*x, 1) == UNSPEC_TLS            ||
            XINT (*x, 1) == UNSPEC_TPREL_TLS      || 
            XINT (*x, 1) == UNSPEC_PIC_SYM_GOTOFF ||
