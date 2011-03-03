@@ -2829,6 +2829,21 @@ legitimize_tls_address (rtx x, rtx reg)
   {
     case TLS_MODEL_GLOBAL_DYNAMIC:
       {
+        /* By default, TLS_MODELs GLOBAL_DYNAMIC and LOCAL_DYNAMIC are
+         * used in dso's - meaning with -fpic. However you can force GD/LD
+         * without using -fPIC option in the command like - either by
+         *   a. forcing tls model with -ftls-model="global-dynamic" or "local-dynamic"
+         *   b. using tls_model attribute - ((tls_model ("global-dynamic")))
+         * In such case, we are forced to generate PIC code even though -fPIC
+         * is not specified.
+         * However, we will not generate any PIC code - we will just issues a message
+        */
+        if (!flag_pic)
+        {
+          fprintf(stderr, "\nPlease provide -fPIC option as the tls variable is global-dynamic.\n");
+          gcc_assert (false);
+        }
+
         require_pic_register ();
         call_sym = hexagon_tls_get_addr ();
 
@@ -2842,6 +2857,13 @@ legitimize_tls_address (rtx x, rtx reg)
 
     case TLS_MODEL_LOCAL_DYNAMIC:
       {
+        /* See comments in case: TLS_MODEL_GLOBAL_DYNAMIC */
+        if (!flag_pic)
+        {
+          fprintf(stderr, "\nPlease provide -fPIC option as the tls variable is local-dynamic.\n");
+          gcc_assert (false);
+        }
+
         require_pic_register ();
         call_sym = hexagon_tls_get_addr ();
 
@@ -2922,7 +2944,7 @@ hexagon_tls_operand_p_1 (rtx *x, void *data ATTRIBUTE_UNUSED)
   if (GET_CODE (*x) == CALL_INSN ||
        (GET_CODE (*x) == UNSPEC &&
           (XINT (*x, 1) == UNSPEC_TLS            ||
-           XINT (*x, 1) == UNSPEC_TPREL_TLS      || 
+           XINT (*x, 1) == UNSPEC_TPREL_TLS      ||
            XINT (*x, 1) == UNSPEC_PIC_SYM_GOTOFF ||
            XINT (*x, 1) == UNSPEC_PIC_SYM_GOT )))
     return -1;
