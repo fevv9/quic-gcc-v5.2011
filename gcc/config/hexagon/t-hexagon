@@ -6,10 +6,6 @@ LIB1ASMFUNCS  = _udivmodsi4 _udivsi3 _umodsi3 _divsi3 _modsi3 \
                 _udivmoddi4 _udivdi3 _umoddi3 _divdi3 _moddi3 \
                 _common_prologue_epilogue
 
-ifneq (,$(with_newlib))
-LIB1ASMFUNCS += _hexagon_memcpy_likely_aligned_min32bytes_mult8bytes _crt0_standalone_support 
-endif
-
 # We want fine grained libraries, so use the new code to build the
 # floating point emulation libraries.
 FPBIT = fp-bit.c
