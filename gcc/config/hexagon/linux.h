@@ -39,9 +39,6 @@ Controlling the Compilation Driver, gcc
 #define ENDFILE_SPEC \
  "%{!shared:crtend%O%s} %{shared:crtendS%O%s} crtn%O%s"
 
-#undef LIB_SPEC
-#define LIB_SPEC "-lc"
-
 #undef HEXAGON_ABI_TABLE_DEFAULT_INDEX
 #define HEXAGON_ABI_TABLE_DEFAULT_INDEX HEXAGON_ABI_LINUX
 
