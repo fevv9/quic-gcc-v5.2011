@@ -1930,7 +1930,7 @@ hexagon-*-elf*)
 	;;
 hexagon-*-linux*)
 	tm_file="${tm_file} dbxelf.h elfos.h svr4.h hexagon/elf.h hexagon/linux.h"
-	tmake_file="hexagon/t-hexagon hexagon/t-linux"
+	tmake_file="${tmake_file} hexagon/t-hexagon hexagon/t-linux"
 	extra_parts="crti.o crtn.o crtbegin.o crtend.o"
 	need_64bit_hwint=yes
 	default_use_cxa_atexit=no
