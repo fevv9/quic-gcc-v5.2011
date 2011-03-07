@@ -1147,11 +1147,11 @@ hexagon_const_ok_for_constraint_p(HOST_WIDE_INT value, char c, const char *str)
       }
       else if(HEXAGON_CONSTRAINT_P(str, onehot32)){
         value &= 0xFFFFFFFFULL;
-        return value == (value & -value);
+        return (value && (value == (value & -value)));
       }
       else if(HEXAGON_CONSTRAINT_P(str, onenot32)){
         value = ~value & 0xFFFFFFFFULL;
-        return value == (value & -value);
+        return (value && (value == (value & -value)));
       }
       return false;
 
