@@ -6,6 +6,11 @@ Controlling the Compilation Driver, gcc
 #define DWARF2_ASM_LINE_DEBUG_INFO 1
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
+/* Use the generic pre-processor defines */
+#define TARGET_OS_CPP_BUILTINS() LINUX_TARGET_OS_CPP_BUILTINS()
+
+#define CPP_SPEC "%{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT}"
+
 /* Copied from config/svr4.h and modified to add the -e _start option, forward
    the -G option's argument, and not forward the -b option to the linker. */
 #undef	LINK_SPEC
