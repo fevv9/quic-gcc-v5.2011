@@ -2,6 +2,9 @@
 Controlling the Compilation Driver, gcc
 -------------------------------------*/
 
+#undef TARGET_VERSION
+#define TARGET_VERSION fputs (" (Hexagon GNU/Linux)", stderr);
+
 #define DWARF2_DEBUGGING_INFO 1
 #define DWARF2_ASM_LINE_DEBUG_INFO 1
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
