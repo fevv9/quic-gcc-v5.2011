@@ -1931,7 +1931,7 @@ hexagon-*-elf*)
 hexagon-*-linux*)
 	tm_file="${tm_file} dbxelf.h elfos.h svr4.h linux.h hexagon/elf.h hexagon/linux.h"
 	tmake_file="${tmake_file} hexagon/t-hexagon hexagon/t-linux"
-	extra_parts="crti.o crtn.o crtbegin.o crtend.o"
+	extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
 	need_64bit_hwint=yes
 	default_use_cxa_atexit=no
 	tm_defines="$tm_defines LINUX=1 OPTION_GLIBC=1"

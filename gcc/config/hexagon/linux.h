@@ -39,18 +39,6 @@ Controlling the Compilation Driver, gcc
 		   %{Qy:} %{!Qn:-Qy}"
 #endif /* !CROSS_COMPILE */
 
-#undef STARTFILE_SPEC
-/* Define linux startfiles */
-#define STARTFILE_SPEC \
-  "%{msys-crt0=*: %*} %{!msys-crt0=*:%{!shared:crt1%O%s}} \
-   %{msys-crt0=: %eYou need a C startup file for -msys-crt0=} \
-   crti%\O%s \
-   %{!shared:crtbegin%O%s} %{shared:crtbeginS%O%s}"
-
-#undef ENDFILE_SPEC
-#define ENDFILE_SPEC \
- "%{!shared:crtend%O%s} %{shared:crtendS%O%s} crtn%O%s"
-
 #undef HEXAGON_ABI_TABLE_DEFAULT_INDEX
 #define HEXAGON_ABI_TABLE_DEFAULT_INDEX HEXAGON_ABI_LINUX
 
