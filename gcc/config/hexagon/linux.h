@@ -2,6 +2,18 @@
 Controlling the Compilation Driver, gcc
 -------------------------------------*/
 
+#undef TARGET_VERSION
+#define TARGET_VERSION fputs (" (Hexagon GNU/Linux)", stderr);
+
+#define DWARF2_DEBUGGING_INFO 1
+#define DWARF2_ASM_LINE_DEBUG_INFO 1
+#define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
+
+/* Use the generic pre-processor defines */
+#define TARGET_OS_CPP_BUILTINS() LINUX_TARGET_OS_CPP_BUILTINS()
+
+#define CPP_SPEC "%{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT}"
+
 /* Copied from config/svr4.h and modified to add the -e _start option, forward
    the -G option's argument, and not forward the -b option to the linker. */
 #undef	LINK_SPEC
@@ -9,7 +21,7 @@ Controlling the Compilation Driver, gcc
 #define LINK_SPEC "-e _start \
                    %{h*} %{v:-V} \
 		   %{static:-dn -Bstatic} \
-		   %{shared:-G -dy -z text} \
+		   %{shared:-shared -G -dy -z text} \
 		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} \
 		   %{YP,*} \
@@ -18,7 +30,7 @@ Controlling the Compilation Driver, gcc
 #define LINK_SPEC "-e _start \
                    %{h*} %{v:-V} \
 		   %{static:-dn -Bstatic} \
-		   %{shared:-G -dy -z text} \
+		   %{shared:-shared -G -dy -z text} \
 		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} \
 		   %{YP,*} \
@@ -26,21 +38,6 @@ Controlling the Compilation Driver, gcc
 		    %{!p:-Y P,/usr/ccs/lib:/usr/lib}} \
 		   %{Qy:} %{!Qn:-Qy}"
 #endif /* !CROSS_COMPILE */
-
-#undef STARTFILE_SPEC
-/* Define linux startfiles */
-#define STARTFILE_SPEC \
-  "%{msys-crt0=*: %*} %{!msys-crt0=*:%{!shared:crt1%O%s}} \
-   %{msys-crt0=: %eYou need a C startup file for -msys-crt0=} \
-   crti%\O%s \
-   %{!shared:crtbegin%O%s} %{shared:crtbeginS%O%s}"
-
-#undef ENDFILE_SPEC
-#define ENDFILE_SPEC \
- "%{!shared:crtend%O%s} %{shared:crtendS%O%s} crtn%O%s"
-
-#undef LIB_SPEC
-#define LIB_SPEC "-lc"
 
 #undef HEXAGON_ABI_TABLE_DEFAULT_INDEX
 #define HEXAGON_ABI_TABLE_DEFAULT_INDEX HEXAGON_ABI_LINUX

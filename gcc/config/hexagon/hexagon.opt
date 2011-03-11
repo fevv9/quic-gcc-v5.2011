@@ -154,3 +154,7 @@ Allow two volatile memory accesses in a packet
 mnew-value-jump
 Target Report Mask(NEW_VALUE_JUMP)
 Enable new value jump (default)
+
+msave-restore-r25
+Target Report Mask(SAVE_RESTORE_R25)
+Save and restore r25 for all functions

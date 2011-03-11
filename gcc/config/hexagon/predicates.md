@@ -363,6 +363,13 @@
 (define_predicate "sym_or_lab_operand"
   (match_code "symbol_ref,label_ref"))
 
+;;thread-local symbols
+(define_predicate "tls_symbolic_operand"
+  (and (match_code "symbol_ref")
+       (and (match_test "SYMBOL_REF_TLS_MODEL (op) != TLS_MODEL_NONE")
+            (match_test "SYMBOL_REF_TLS_MODEL (op) != TLS_MODEL_EMULATED"))))
+
+
 ;;-----------;;
 ;; Operators ;;
 ;;-----------;;

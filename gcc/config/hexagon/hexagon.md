@@ -28,7 +28,8 @@
 ;;-----------;;
 
 (define_constants
-  [(SP_REGNUM         29) ; stack pointer
+  [(TLS_REGNUM        25) ; tls pointer - only when tls is detected, otherwise scratch
+   (SP_REGNUM         29) ; stack pointer
    (FP_REGNUM         30) ; frame pointer
    (LINK_REGNUM       31) ; link register
    (P0_REGNUM         32) ; p0
@@ -69,6 +70,8 @@
    (UNSPEC_DOLOOP_END      160)
    (UNSPEC_PIC_SYM_GOTOFF  161)   ; For PIC GOTOFF symbols
    (UNSPEC_PIC_SYM_GOT     162)   ; For PIC GOT symbols
+   (UNSPEC_TLS             163)   ; For TLS symbols
+   (UNSPEC_TPREL_TLS       164)   ; For TLS TPREL symbols
  ]
 )
 
@@ -533,6 +536,92 @@
 ;;----------------;;
 
 ;;---------;;
+;; TLS load;;
+;;---------;;
+
+(define_insn "load_tls_tprel_hi"
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
+        (high:SI (unspec:SI [(match_operand:SI 1 "tls_symbolic_operand" "")] UNSPEC_TPREL_TLS)))]
+"TARGET_HAVE_TLS"
+{
+     return "%0.h = #HI(%1@DTPREL)";
+}
+ [(set_attr "type" "A")]
+)
+
+
+(define_insn "load_tls_tprel_lo"
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
+        (lo_sum:SI (match_operand:SI 1 "gr_register_operand" "0")
+        (unspec:SI [(match_operand:SI 2 "tls_symbolic_operand" "")] UNSPEC_TPREL_TLS)))]
+"TARGET_HAVE_TLS"
+{
+      return "%0.l = #LO(%2@DTPREL)";
+}
+  [(set_attr "type" "A")]
+)
+
+
+(define_insn "load_tls_hi"
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
+        (high:SI (unspec:SI [(match_operand:SI 1 "tls_symbolic_operand" "")] UNSPEC_TLS)))]
+"TARGET_HAVE_TLS"
+{
+  int model = SYMBOL_REF_TLS_MODEL (operands[1]);
+
+  switch (model)
+  {
+    case TLS_MODEL_GLOBAL_DYNAMIC:
+      return "%0.h = #HI(%1@GDGOT)";
+
+   case TLS_MODEL_LOCAL_DYNAMIC:
+     return "%0.h = #HI(%1@GDGOT)";
+
+   case TLS_MODEL_INITIAL_EXEC:
+     if (!flag_pic)
+       return "%0.h = #HI(%1@IE)";
+     else
+       return "%0.h = #HI(%1@IEGOT)";
+
+   case TLS_MODEL_LOCAL_EXEC:
+     return "%0.h = #HI(%1@TPREL)";
+ }
+}
+ [(set_attr "type" "A")]
+)
+
+
+(define_insn "load_tls_lo"
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
+        (lo_sum:SI (match_operand:SI 1 "gr_register_operand" "0")
+        (unspec:SI [(match_operand:SI 2 "tls_symbolic_operand" "")] UNSPEC_TLS)))]
+"TARGET_HAVE_TLS"
+{
+  int model = SYMBOL_REF_TLS_MODEL (operands[2]);
+
+  switch (model)
+  {
+    case TLS_MODEL_GLOBAL_DYNAMIC:
+      return "%0.l = #LO(%2@GDGOT)";
+
+    case TLS_MODEL_LOCAL_DYNAMIC:
+      return "%0.l = #LO(%2@GDGOT)";
+
+    case TLS_MODEL_INITIAL_EXEC:
+      if (!flag_pic)
+        return "%0.l = #LO(%2@IE)";
+      else 
+        return "%0.l = #LO(%2@IEGOT)";
+
+    case TLS_MODEL_LOCAL_EXEC:
+      return "%0.l = #LO(%2@TPREL)";
+  }
+}
+  [(set_attr "type" "A")]
+)
+
+
+;;---------;;
 ;; PIC mov ;;
 ;;---------;;
 
@@ -937,8 +1026,27 @@
              && s8_const_int_operand(operands[1], SImode)))){
       operands[1] = force_reg(SImode, operands[1]);
     }
-    
-    if(flag_pic 
+
+    if (hexagon_tls_referenced_p( operands[1]))
+    {
+      rtx tmp = operands[1];
+      rtx addend = NULL;
+
+      if (GET_CODE (tmp) == CONST && GET_CODE (XEXP (tmp, 0)) == PLUS)
+      {
+        addend = XEXP (XEXP (tmp, 0), 1);
+        tmp    = XEXP (XEXP (tmp, 0), 0);
+      }
+      tmp = legitimize_tls_address (tmp,
+                                    !can_create_pseudo_p () ? operands[0] : NULL_RTX);
+      if (addend)
+      {
+          tmp = gen_rtx_PLUS (SImode, tmp, addend);
+          tmp = force_operand (tmp, operands[0]);
+      }
+      operands[1] = tmp;
+    }
+    else if(flag_pic
        && (CONSTANT_P (operands[1])
            || symbol_mentioned_p (operands[1])
            || label_mentioned_p (operands[1]))){
@@ -1250,7 +1358,26 @@
       operands[1] = force_reg(SFmode, operands[1]);
     }
 
-    if(flag_pic && CONSTANT_P (operands[1])){
+    if (hexagon_tls_referenced_p( operands[1]))
+    {
+      rtx tmp = operands[1];
+      rtx addend = NULL;
+
+      if (GET_CODE (tmp) == CONST && GET_CODE (XEXP (tmp, 0)) == PLUS)
+      {
+        addend = XEXP (XEXP (tmp, 0), 1);
+        tmp    = XEXP (XEXP (tmp, 0), 0);
+      }
+      tmp = legitimize_tls_address (tmp,
+                                    !can_create_pseudo_p () ? operands[0] : NULL_RTX);
+      if (addend)
+      {
+          tmp = gen_rtx_PLUS (SImode, tmp, addend);
+          tmp = force_operand (tmp, operands[0]);
+      }
+      operands[1] = tmp;
+    }
+    else if(flag_pic && CONSTANT_P (operands[1])){
       operands[1] = legitimize_pic_address (operands[1], SImode,
                                             (can_create_pseudo_p()
                                              ? NULL_RTX : operands[0]));
@@ -10378,6 +10505,17 @@
   [(set_attr "type" "multiple")]
 )
 
+(define_insn "compute_tls_base"
+  [ (set (match_operand:SI 0 "register_operand" "=Rg")
+         (unspec_volatile [(const_int 0)] UNSPEC_TLS))
+    (clobber (reg:SI TLS_REGNUM))]
+    "TARGET_HAVE_TLS"
+    {
+     return "%0 = ugp";
+    }
+  ;; We don't want this instruction to be packetized
+  [(set_attr "type" "multiple")]
+)
 
 ;; Pseudo instruction that prevents the scheduler from moving code above this
 ;; point.

@@ -652,8 +652,15 @@ Exception Handling Support
 #define EH_RETURN_HANDLER_RTX \
   gen_rtx_MEM (Pmode, plus_constant(hard_frame_pointer_rtx, UNITS_PER_WORD))
 
+/* Select a format to encode pointers in exception handling data.  CODE
+   is 0 for data, 1 for code labels, 2 for function pointers.  GLOBAL is
+   true if the symbol may be affected by dynamic relocations.
+ */
 #define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) \
-  (flag_pic  ? DW_EH_PE_aligned : DW_EH_PE_absptr)
+  ((flag_pic  ?  \
+    (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel) \
+       : DW_EH_PE_absptr) | \
+  ((CODE) ? 0 : DW_EH_PE_sdata4))
 
 /* ??? do we want this? */
 /*#define ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX(FILE, ENCODING, SIZE, ADDR, DONE)*/
@@ -843,6 +850,14 @@ Addressing Modes
 #define REG_OK_STRICT_P true
 #else
 #define REG_OK_STRICT_P false
+#endif
+
+#ifdef HAVE_AS_TLS
+#undef TARGET_HAVE_TLS
+#define TARGET_HAVE_TLS true
+#else
+#undef TARGET_HAVE_TLS
+#define TARGET_HAVE_TLS false
 #endif
 
 #define GO_IF_LEGITIMATE_ADDRESS(MODE, X, LABEL) \
@@ -1254,6 +1269,8 @@ struct hexagon_frame_info GTY(()) {
   /* number of unpaired callee-save registers saved in some special manner */
   unsigned int num_specially_saved_singles;
   bool computed;  /* true if frame info has already been computed */
+  bool tls_set;   /* true if tls register is set */
+  rtx tls_offset_table_rtx;
 };
 
 struct hexagon_final_info GTY(()) {

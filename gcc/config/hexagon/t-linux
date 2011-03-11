@@ -21,4 +21,4 @@ MULTILIB_MATCHES    = fpic=fPIC
 MULTILIB_EXCEPTIONS =
 MULTILIB_EXTRA_OPTS = mbuilding-multilib G0
 
-EXTRA_MULTILIB_PARTS = crtbegin.o crtend.o crti.o crtn.o crtbeginS.o crtendS.o
+EXTRA_MULTILIB_PARTS = crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o
