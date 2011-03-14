@@ -20,19 +20,25 @@ Controlling the Compilation Driver, gcc
 #ifdef CROSS_COMPILE
 #define LINK_SPEC "-e _start \
                    %{h*} %{v:-V} \
-		   %{static:-dn -Bstatic} \
 		   %{shared:-shared -G -dy -z text} \
 		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} \
+       %{!shared: \
+         %{!static: \
+       %{rdynamic:-export-dynamic}} \
+       %{static:-dn -Bstatic}} \
 		   %{YP,*} \
 		   %{Qy:} %{!Qn:-Qy}"
 #else /* !CROSS_COMPILE */
 #define LINK_SPEC "-e _start \
                    %{h*} %{v:-V} \
-		   %{static:-dn -Bstatic} \
 		   %{shared:-shared -G -dy -z text} \
 		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} \
+       %{!shared: \
+         %{!static: \
+       %{rdynamic:-export-dynamic}} \
+       %{static:-dn -Bstatic}} \
 		   %{YP,*} \
 		   %{!YP,*:%{p:-Y P,/usr/ccs/lib/libp:/usr/lib/libp:/usr/ccs/lib:/usr/lib} \
 		    %{!p:-Y P,/usr/ccs/lib:/usr/lib}} \
