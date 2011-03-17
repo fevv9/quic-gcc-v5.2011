@@ -649,8 +649,12 @@ Exception Handling Support
 
 #define EH_RETURN_STACKADJ_RTX gen_rtx_REG (Pmode, 28)
 
+/* Set frame_related, as otherwise its optimized away */
 #define EH_RETURN_HANDLER_RTX \
-  gen_rtx_MEM (Pmode, plus_constant(hard_frame_pointer_rtx, UNITS_PER_WORD))
+  ({ rtx tmp = gen_frame_mem (Pmode, \
+              plus_constant(hard_frame_pointer_rtx, UNITS_PER_WORD)); \
+     tmp->volatil = 1; \
+     tmp; })
 
 /* Select a format to encode pointers in exception handling data.  CODE
    is 0 for data, 1 for code labels, 2 for function pointers.  GLOBAL is
