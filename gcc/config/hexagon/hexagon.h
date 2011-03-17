@@ -653,7 +653,7 @@ Exception Handling Support
 #define EH_RETURN_HANDLER_RTX \
   ({ rtx tmp = gen_frame_mem (Pmode, \
               plus_constant(hard_frame_pointer_rtx, UNITS_PER_WORD)); \
-     tmp->volatil = 1; \
+     MEM_VOLATILE_P(tmp) = 1; \
      tmp; })
 
 /* Select a format to encode pointers in exception handling data.  CODE
