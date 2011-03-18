@@ -42,3 +42,7 @@ Storage Layout
 /* ??? Is this right? */
 #undef MAX_OFILE_ALIGNMENT
 #define MAX_OFILE_ALIGNMENT ((1 << 16) * BITS_PER_UNIT)
+
+#undef ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL)
+#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) \
+  (flag_pic  ? DW_EH_PE_aligned : DW_EH_PE_absptr)
