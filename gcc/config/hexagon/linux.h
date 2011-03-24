@@ -48,3 +48,12 @@ Controlling the Compilation Driver, gcc
 #undef HEXAGON_ABI_TABLE_DEFAULT_INDEX
 #define HEXAGON_ABI_TABLE_DEFAULT_INDEX HEXAGON_ABI_LINUX
 
+/*-----------------------------
+Implementing the Varargs Macros
+-----------------------------*/
+/* For Linux, our ABI handles varargs differently */
+#undef  TARGET_SETUP_INCOMING_VARARGS
+#define TARGET_SETUP_INCOMING_VARARGS hexagon_setup_incoming_varargs
+
+#undef TARGET_EXPAND_BUILTIN_VA_START
+#define TARGET_EXPAND_BUILTIN_VA_START hexagon_va_start

@@ -1275,6 +1275,8 @@ struct hexagon_frame_info GTY(()) {
   bool computed;  /* true if frame info has already been computed */
   bool tls_set;   /* true if tls register is set */
   rtx tls_offset_table_rtx;
+  unsigned int pretend_size;
+  unsigned int first_anon_arg;
 };
 
 struct hexagon_final_info GTY(()) {

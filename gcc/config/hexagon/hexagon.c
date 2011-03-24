@@ -116,6 +116,14 @@ static void hexagon_asm_function_prologue(FILE *file, HOST_WIDE_INT size);
 
 static bool hexagon_function_ok_for_sibcall(tree decl, tree exp);
 
+static void hexagon_va_start (tree valist, rtx nextarg);
+
+static void hexagon_setup_incoming_varargs (CUMULATIVE_ARGS *cum,
+                                            enum machine_mode mode,
+                                            tree type ATTRIBUTE_UNUSED,
+                                            int *pretend_size,
+                                            int no_rtl);
+
 #if HEXAGON_DINKUMWARE
 static void hexagon_init_libfuncs(void);
 #endif /* HEXAGON_DINKUMWARE */
@@ -512,6 +520,14 @@ Implementing the Varargs Macros
 #undef TARGET_STRICT_ARGUMENT_NAMING
 #define TARGET_STRICT_ARGUMENT_NAMING hook_bool_CUMULATIVE_ARGS_true
 
+/* For Linux, our ABI handles varargs differently */
+#ifdef LINUX
+#undef  TARGET_SETUP_INCOMING_VARARGS
+#define TARGET_SETUP_INCOMING_VARARGS hexagon_setup_incoming_varargs
+
+#undef TARGET_EXPAND_BUILTIN_VA_START
+#define TARGET_EXPAND_BUILTIN_VA_START hexagon_va_start
+#endif
 
 /*--------------------------------
 Implicit Calls to Library Routines
@@ -1786,8 +1802,12 @@ hexagon_function_arg(
 {
   int size;
 
-  if(named == 0){
-    return NULL_RTX;
+  /* For the Linux ABI we do not necessarily pass the first unnamed 
+   parameter on the stack */
+  if (hexagon_abi != HEXAGON_ABI_LINUX) {
+    if(named == 0){
+      return NULL_RTX;
+    }
   }
 
   if(hexagon_must_pass_in_stack(mode, type)){
@@ -1855,8 +1875,12 @@ hexagon_function_arg_advance(
 {
   int size;
 
-  if(named == 0){
-    return cum;
+  /* For the Linux ABI we do not necessarily pass the first unnamed 
+   parameter on the stack */
+  if (hexagon_abi != HEXAGON_ABI_LINUX) {
+    if(named == 0){
+      return cum;
+    }
   }
 
   if(hexagon_must_pass_in_stack(mode, type)){
@@ -2002,6 +2026,45 @@ hexagon_function_ok_for_sibcall(tree decl, tree exp ATTRIBUTE_UNUSED)
 }
 
 
+/*-----------------------------
+Implementing the Varargs Macros
+-----------------------------*/
+/* Taken from arc */
+static void
+hexagon_setup_incoming_varargs (CUMULATIVE_ARGS *cum,
+                                enum machine_mode mode,
+                                tree type ATTRIBUTE_UNUSED,
+                                int *pretend_size,
+                                int no_rtl ATTRIBUTE_UNUSED)
+{
+  struct hexagon_frame_info *frame =  hexagon_frame_info();
+  int first_anon_arg = *cum + ((GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1)
+                               / UNITS_PER_WORD);
+  /* Extra slop to keep stack eight byte aligned.  */
+  int align_slop = (HEXAGON_NUM_ARG_REGS - first_anon_arg) & 1;
+
+  if (first_anon_arg < HEXAGON_NUM_ARG_REGS)
+    *pretend_size = (HEXAGON_NUM_ARG_REGS - first_anon_arg 
+                     + align_slop) * UNITS_PER_WORD;
+  
+  frame->pretend_size = *pretend_size;
+  frame->first_anon_arg = first_anon_arg;
+}
+
+
+static void
+hexagon_va_start (tree valist, rtx nextarg)
+{
+
+  /* va_start may need to account for the padding to ensure 8-byte alignment
+     at the end of the varargs pushed */
+  struct hexagon_frame_info *frame =  hexagon_frame_info();
+  int align_slop = (HEXAGON_NUM_ARG_REGS - frame->first_anon_arg) & 1;
+  if (align_slop)
+      nextarg = plus_constant (nextarg, UNITS_PER_WORD);
+
+  return std_expand_builtin_va_start (valist, nextarg);
+}
 
 
 /*--------------------------------
@@ -7406,8 +7469,35 @@ hexagon_expand_prologue(void)
   rtx base_reg;
   HOST_WIDE_INT offset;
   unsigned int i;
+  int regno;
 
   frame = hexagon_frame_info();
+
+  /* Handle pushing of varargs registers before the allocframe if needed */
+  if (frame->pretend_size && 
+      frame->first_anon_arg < HEXAGON_NUM_ARG_REGS){
+      int stack_off;
+      int first_reg_offset = frame->first_anon_arg;
+
+      /* Iterate through the vararg regs to push on the stack */
+      for (regno =  HEXAGON_NUM_ARG_REGS - 1, stack_off = 1; 
+           regno >= first_reg_offset; --regno, ++stack_off) {
+        rtx stack_loc = gen_rtx_PLUS (Pmode, stack_pointer_rtx, 
+                                      GEN_INT (-UNITS_PER_WORD * stack_off));
+        rtx arg_reg = gen_rtx_REG (word_mode, FIRST_ARG_REGNUM + regno);
+        rtx move_insn = emit_move_insn (gen_rtx_MEM (word_mode, stack_loc),
+                                        arg_reg);
+        RTX_FRAME_RELATED_P (move_insn) = 1;
+      }
+
+      /* Reset the stack pointer to sp - pretend_size. sp - pretend_size must be
+         double-word aligned. Hence there may be some padding at the end of the
+         pushed varargs registers */
+      rtx stack_adj = emit_insn(gen_addsi3(stack_pointer_rtx,
+                                           stack_pointer_rtx,
+                                           gen_int_mode(-frame->pretend_size, Pmode)));
+      RTX_FRAME_RELATED_P (stack_adj) = 1;
+  } 
 
   /* Do we need to use the allocframe instruction? */
   if(frame->use_allocframe){
@@ -7570,6 +7660,13 @@ hexagon_expand_epilogue(bool sibcall)
   if(crtl->calls_eh_return){
     emit_insn(gen_addsi3(stack_pointer_rtx,
                          stack_pointer_rtx, EH_RETURN_STACKADJ_RTX));
+  }
+
+  if (frame->pretend_size){
+      rtx stack_adj = emit_insn(gen_addsi3(stack_pointer_rtx,
+                                           stack_pointer_rtx,
+                                           gen_int_mode(frame->pretend_size, Pmode)));
+      RTX_FRAME_RELATED_P (stack_adj) = 1;
   }
 
   /* Emit a return jump if we still need to. */
