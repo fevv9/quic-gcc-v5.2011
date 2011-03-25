@@ -9,6 +9,8 @@ Controlling the Compilation Driver, gcc
 #define DWARF2_ASM_LINE_DEBUG_INFO 1
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
+#define MD_UNWIND_SUPPORT "config/hexagon/linux-unwind.h"
+
 /* Use the generic pre-processor defines */
 #define TARGET_OS_CPP_BUILTINS() LINUX_TARGET_OS_CPP_BUILTINS()
 
