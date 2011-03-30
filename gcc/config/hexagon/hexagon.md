@@ -28,7 +28,8 @@
 ;;-----------;;
 
 (define_constants
-  [(TLS_REGNUM        25) ; tls pointer - only when tls is detected, otherwise scratch
+  [(PIC_REGNUM        24) ; pic register
+   (TLS_REGNUM        25) ; tls pointer - only when tls is detected, otherwise scratch
    (SP_REGNUM         29) ; stack pointer
    (FP_REGNUM         30) ; frame pointer
    (LINK_REGNUM       31) ; link register
@@ -4894,13 +4895,22 @@
   {
     if (flag_pic) {
         require_pic_register();
-        emit_use(pic_offset_table_rtx);
     }
     if(INTVAL (operands[3]) == 1){
-      emit_insn(gen_doloop_begin0(operands[0], GEN_INT (REGNO (operands[0]))));
+      if (flag_pic) {
+        emit_insn(gen_doloop_begin0_pic(operands[0], GEN_INT (REGNO (operands[0]))));
+      }
+      else {
+        emit_insn(gen_doloop_begin0(operands[0], GEN_INT (REGNO (operands[0]))));
+      }
     }
     else if(0 && INTVAL (operands[3]) == 2){
-      emit_insn(gen_doloop_begin1(operands[0], GEN_INT (REGNO (operands[0]))));
+      if (flag_pic) {
+        emit_insn(gen_doloop_begin1_pic(operands[0], GEN_INT (REGNO (operands[0]))));
+      }
+      else {
+        emit_insn(gen_doloop_begin1(operands[0], GEN_INT (REGNO (operands[0]))));
+      }
     }
     else {
       FAIL;
@@ -4914,6 +4924,16 @@
    (set (reg:SI SA0_REGNUM) (match_operand:SI 1 "const_int_operand" ""))
    (clobber (match_scratch:SI 2 "=&Rg,&Rg"))]
   ""
+  "error: This is a loop0 insn that should have been fixed up."
+  [(set_attr "type" "loop")]
+)
+
+(define_insn "doloop_begin0_pic"
+  [(set (reg:SI LC0_REGNUM) (match_operand:SI 0 "nonmemory_operand" "Rg,Iu10"))
+   (set (reg:SI SA0_REGNUM) (match_operand:SI 1 "const_int_operand" ""))
+   (clobber (match_scratch:SI 2 "=&Rg,&Rg"))
+   (use (reg:SI PIC_REGNUM))]
+  "flag_pic"
   "error: This is a loop0 insn that should have been fixed up."
   [(set_attr "type" "loop")]
 )
@@ -4934,46 +4954,70 @@
     }
     else {
       if(which_alternative == 0){
-        if(flag_pic) {
-          return "%2 = %0\;"
-                 "{\;"
-                 "  lc0 = %2\;"
-                 "  %2.h = #HI(%1@GOTOFF)\;"
-                 "}\;"
-                 "%2.l = #LO(%1@GOTOFF)\;"
-                 "%2 = add(%2, %p0)\;"
-                 "sa0 = %2";
-	}
-        else {
-          return "%2 = %0\;"
-                 "{\;"
-                 "  lc0 = %2\;"
-                 "  %2.h = #HI(%1)\;"
-                 "}\;"
-                 "%2.l = #LO(%1)\;"
-                 "sa0 = %2";
-        }
+        return "%2 = %0\;"
+               "{\;"
+               "  lc0 = %2\;"
+               "  %2.h = #HI(%1)\;"
+               "}\;"
+               "%2.l = #LO(%1)\;"
+               "sa0 = %2";
       }
       else {
-        if(flag_pic) {
-          return "%2 = #%0\;"
-                 "{\;"
-                 "  lc0 = %2\;"
-                 "  %2.h = #HI(%1@GOTOFF)\;"
-                 "}\;"
-                 "%2.l = #LO(%1@GOTOFF)\;"
-                 "%2 = add(%2, %p0)\;"
-                 "sa0 = %2";
-        }
-	else {
-          return "%2 = #%0\;"
-                 "{\;"
-                 "  lc0 = %2\;"
-                 "  %2.h = #HI(%1)\;"
-                 "}\;"
-                 "%2.l = #LO(%1)\;"
-                 "sa0 = %2";
-        }
+        return "%2 = #%0\;"
+               "{\;"
+               "  lc0 = %2\;"
+               "  %2.h = #HI(%1)\;"
+               "}\;"
+               "%2.l = #LO(%1)\;"
+               "sa0 = %2";
+      }
+    }
+  }
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "4")
+                      (const_string "loop")
+                      (const_string "multiple")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 1) (pc))) (const_int 200))
+                      (const_string "4")
+                      (const_string "20")))]
+)
+
+(define_insn "loop0_pic"
+  [(set (reg:SI LC0_REGNUM) (match_operand:SI 0 "nonmemory_operand" "Rg,Iu10"))
+   (set (reg:SI SA0_REGNUM) (label_ref (match_operand 1 "" "")))
+   (clobber (match_scratch:SI 2 "=&Rg,&Rg"))
+   (use (reg:SI PIC_REGNUM))]
+  "flag_pic"
+  {
+    if(get_attr_length(insn) == 4){
+      if(which_alternative == 0){
+        return "loop0(%l1,%0)";
+      }
+      else {
+        return "loop0(%l1,#%0)";
+      }
+    }
+    else {
+      if(which_alternative == 0){
+        return "%2 = %0\;"
+               "{\;"
+               "  lc0 = %2\;"
+               "  %2.h = #HI(%1@GOTOFF)\;"
+               "}\;"
+               "%2.l = #LO(%1@GOTOFF)\;"
+               "%2 = add(%2, %p0)\;"
+               "sa0 = %2";
+      }
+      else {
+        return "%2 = #%0\;"
+               "{\;"
+               "  lc0 = %2\;"
+               "  %2.h = #HI(%1@GOTOFF)\;"
+               "}\;"
+               "%2.l = #LO(%1@GOTOFF)\;"
+               "%2 = add(%2, %p0)\;"
+               "sa0 = %2";
       }
     }
   }
@@ -4996,6 +5040,16 @@
   [(set_attr "type" "loop")]
 )
 
+(define_insn "doloop_begin1_pic"
+  [(set (reg:SI LC1_REGNUM) (match_operand:SI 0 "nonmemory_operand" "Rg,Iu10"))
+   (set (reg:SI SA1_REGNUM) (match_operand:SI 1 "const_int_operand" ""))
+   (clobber (match_scratch:SI 2 "=&Rg,&Rg"))
+   (use (reg:SI PIC_REGNUM))]
+  ""
+  "error: This is a loop1 insn that should have been fixed up."
+  [(set_attr "type" "loop")]
+)
+
 (define_insn "loop1"
   [(set (reg:SI LC1_REGNUM) (match_operand:SI 0 "nonmemory_operand" "Rg,Iu10"))
    (set (reg:SI SA1_REGNUM) (label_ref (match_operand 1 "" "")))
@@ -5012,46 +5066,70 @@
     }
     else {
       if(which_alternative == 0){
-        if(flag_pic) {
-          return "%2 = %0\;"
-                 "{\;"
-                 "  lc1 = %2\;"
-                 "  %2.h = #HI(%1@GOTOFF)\;"
-                 "}\;"
-                 "%2.l = #LO(%1@GOTOFF)\;"
-                 "%2 = add(%2, %p0)\;"
-                 "sa1 = %2";
-        }
-	else {
-          return "%2 = %0\;"
-                 "{\;"
-                 "  lc1 = %2\;"
-                 "  %2.h = #HI(%1)\;"
-                 "}\;"
-                 "%2.l = #LO(%1)\;"
-                 "sa1 = %2";
-        }
+        return "%2 = %0\;"
+               "{\;"
+               "  lc1 = %2\;"
+               "  %2.h = #HI(%1)\;"
+               "}\;"
+               "%2.l = #LO(%1)\;"
+               "sa1 = %2";
       }
       else {
-        if(flag_pic) {
-          return "%2 = #%0\;"
-                 "{\;"
-                 "  lc1 = %2\;"
-                 "  %2.h = #HI(%1@GOTOFF)\;"
-                 "}\;"
-                 "%2.l = #LO(%1@GOTOFF)\;"
-                 "%2 = add(%2, %p0)\;"
-                 "sa1 = %2";
-        }
-	else {
-         return "%2 = #%0\;"
-                 "{\;"
-                 "  lc1 = %2\;"
-                 "  %2.h = #HI(%1)\;"
-                 "}\;"
-                 "%2.l = #LO(%1)\;"
-                 "sa1 = %2";
-         }
+        return "%2 = #%0\;"
+               "{\;"
+               "  lc1 = %2\;"
+               "  %2.h = #HI(%1)\;"
+               "}\;"
+               "%2.l = #LO(%1)\;"
+               "sa1 = %2";
+      }
+    }
+  }
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "4")
+                      (const_string "loop")
+                      (const_string "multiple")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 1) (pc))) (const_int 200))
+                      (const_string "4")
+                      (const_string "20")))]
+)
+
+(define_insn "loop1_pic"
+  [(set (reg:SI LC1_REGNUM) (match_operand:SI 0 "nonmemory_operand" "Rg,Iu10"))
+   (set (reg:SI SA1_REGNUM) (label_ref (match_operand 1 "" "")))
+   (clobber (match_scratch:SI 2 "=&Rg,&Rg"))
+   (use (reg:SI PIC_REGNUM))]
+  "flag_pic"
+  {
+    if(get_attr_length(insn) == 4){
+      if(which_alternative == 0){
+        return "loop1(%l1,%0)";
+      }
+      else {
+        return "loop1(%l1,#%0)";
+      }
+    }
+    else {
+      if(which_alternative == 0){
+        return "%2 = %0\;"
+               "{\;"
+               "  lc1 = %2\;"
+               "  %2.h = #HI(%1@GOTOFF)\;"
+               "}\;"
+               "%2.l = #LO(%1@GOTOFF)\;"
+               "%2 = add(%2, %p0)\;"
+               "sa1 = %2";
+      }
+      else {
+        return "%2 = #%0\;"
+               "{\;"
+               "  lc1 = %2\;"
+               "  %2.h = #HI(%1@GOTOFF)\;"
+               "}\;"
+               "%2.l = #LO(%1@GOTOFF)\;"
+               "%2 = add(%2, %p0)\;"
+               "sa1 = %2";
       }
     }
   }

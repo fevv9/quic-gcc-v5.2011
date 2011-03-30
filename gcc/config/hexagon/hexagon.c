@@ -5579,7 +5579,8 @@ hexagon_duplicate_doloop_begin(basic_block condition_bb, struct loop *loop)
     {
         if (!INSN_P (insn)) continue;
 
-        if (INSN_CODE (insn) == CODE_FOR_doloop_begin0)
+        if (INSN_CODE (insn) == CODE_FOR_doloop_begin0 ||
+            INSN_CODE (insn) == CODE_FOR_doloop_begin0_pic)
         {
             begin_loop_insn = insn;
             break;
@@ -5644,12 +5645,24 @@ hexagon_fixup_doloops(void)
       label = XEXP (XEXP (SET_SRC (XVECEXP (PATTERN (tail), 0, 0)), 1), 0);
       tag = INTVAL (XVECEXP (XVECEXP (PATTERN (tail), 0, 2), 0, 1));
       if(tail_code == CODE_FOR_endloop0){
-        loop_setup_code = CODE_FOR_doloop_begin0;
-        gen_loop_setup = &gen_loop0;
+        if(flag_pic){
+          loop_setup_code = CODE_FOR_doloop_begin0_pic;
+          gen_loop_setup = &gen_loop0_pic;
+        }
+        else {
+          loop_setup_code = CODE_FOR_doloop_begin0;
+          gen_loop_setup = &gen_loop0;
+        }
       }
       else {
-        loop_setup_code = CODE_FOR_doloop_begin1;
-        gen_loop_setup = &gen_loop1;
+        if(flag_pic){
+          loop_setup_code = CODE_FOR_doloop_begin1_pic;
+          gen_loop_setup = &gen_loop1_pic;
+        }
+        else {
+          loop_setup_code = CODE_FOR_doloop_begin1;
+          gen_loop_setup = &gen_loop1;
+        }
       }
       /* ??? improve efficiency */
       for(insn = get_insns(); insn; insn = NEXT_INSN (insn)){
@@ -7884,7 +7897,12 @@ hexagon_expand_movmem_inline(rtx operands[], bool volatile_p)
     }
 
     if(TARGET_HARDWARE_LOOPS){
-      emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+      if(flag_pic){
+        emit_insn(gen_doloop_begin0_pic(loopcount_rtx, doloop_fixup_code));
+      }
+      else {
+        emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+      }
     }
     else {
       emit_move_insn(count_reg, loopcount_rtx);
@@ -8176,7 +8194,12 @@ hexagon_expand_setmem(rtx operands[])
           rtx doloop_fixup_code = GEN_INT(REGNO(count_reg));
           rtx loopcount_rtx = gen_int_mode(loop_count, SImode);
 
-          emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+          if(flag_pic){
+            emit_insn(gen_doloop_begin0_pic(loopcount_rtx, doloop_fixup_code));
+          }
+          else{
+            emit_insn(gen_doloop_begin0(loopcount_rtx, doloop_fixup_code));
+          }
           emit_label(label);
           emit_move_insn(store_reg, zero_reg);
           emit_insn(gen_addsi3(base_reg, base_reg, 
