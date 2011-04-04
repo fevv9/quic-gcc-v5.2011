@@ -1,12 +1,11 @@
 
 LIB1ASMFUNCS += _hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 
-/* Only add fast-math routines for non stage-1 builds */
-#ifndef HEXAGON_STAGE_1
+ifeq (,$(findstring HEXAGON_STAGE_1,$(CFLAGS)))
 LIB2FUNCS_EXTRA += $(srcdir)/config/hexagon/fastmath_dlib.c \
                    $(srcdir)/config/hexagon/fastmath_qdouble.c \
                    $(srcdir)/config/hexagon/fastmath_dlib_asm.S
-#endif
+endif
 
 # Assemble startup files.
 $(T)crti.o: $(srcdir)/config/hexagon/crti.asm $(GCC_PASSES)
