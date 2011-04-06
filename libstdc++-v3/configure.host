@@ -288,6 +288,11 @@ esac
 case "${host}" in
   *-*-linux*)
     case "${host_cpu}" in
+      hexagon*)
+        # Expose the C++ atomics only for the Hexagon Linux ABI
+        # and not for the phone ABI.
+        abi_baseline_pair=hexagon-linux-gnu
+        ;;
       i[567]86)
         abi_baseline_pair=i486-linux-gnu
         ;;
