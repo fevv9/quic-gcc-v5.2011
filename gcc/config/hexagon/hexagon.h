@@ -807,10 +807,14 @@ Function Entry and Exit
 Generating Code for Profiling
 ---------------------------*/
 
-#define FUNCTION_PROFILER(FILE, LABELNO) fprintf(FILE, "\tcall mcount\n");
-
-/* ??? dunno */
+/* Hexagon (like all modern profilers) does not use counters. */
 #define NO_PROFILE_COUNTERS 1
+
+/* Use PROFILE_HOOK instead of FUNCTION_PROFILER; by emitting rtx, 
+   the packetizer can slot in the call to _mcount as appropriate. */
+#define FUNCTION_PROFILER(FILE, LABELNO)
+#define PROFILE_HOOK(X) \
+	emit_library_call (init_one_libfunc ("_mcount"), LCT_NORMAL, VOIDmode, 0);
 
 
 /*------------------------------
