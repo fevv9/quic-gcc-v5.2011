@@ -8853,7 +8853,7 @@
     emit_move_insn(address_reg, address);
     operands[0] = change_address(operands[0], QImode, address_reg);
   }
-  [(set_attr "type" "Memop,Memop,A")]
+  [(set_attr "type" "Memop,EMemop,A")]
 )
 
 (define_insn_and_split "andhi3_memop"
