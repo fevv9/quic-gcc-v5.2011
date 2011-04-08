@@ -1325,7 +1325,9 @@ hexagon_save_register_p(unsigned int regno)
      uses_pic_offset_table in the odd case that uses_pic_offset_table
      is set, but df_regs_ever_live_p is not. */
   if (flag_pic && regno == PIC_OFFSET_TABLE_REGNUM && 
-      (df_regs_ever_live_p(regno) || crtl->uses_pic_offset_table)) {
+      (df_regs_ever_live_p(regno)
+       || crtl->uses_pic_offset_table
+       || crtl->saves_all_registers)) {
     return true;  
   }
 
