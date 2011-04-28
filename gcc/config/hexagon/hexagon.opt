@@ -127,6 +127,14 @@ mlocal-combine
 Target Report Mask(LOCAL_COMBINE) Optimization
 Run local combine pass (default at -Os)
 
+mlocal-combine-immediate
+Target Report Mask(LOCAL_COMBINE_IMMEDIATE) Optimization
+Run local combine pass on immediates (default at -O2 and -Os)
+
+mmod_hw_loops
+Target Report Undocumented Mask(MOD_HW_LOOPS)
+Enable modulo sched for HW loops
+
 mresolve-restrict-aliasing
 Target Report Mask(RESOLVE_RESTRICT_ALIASING) Optimization
 Perform MIDI specific optimizations
