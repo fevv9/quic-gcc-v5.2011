@@ -11420,7 +11420,8 @@ qdsp6_nvj_move_possible(
 
     start_sequence();
 
-    if (GET_CODE(feeder_reg1) == ZERO_EXTRACT ) 
+    if (GET_CODE(feeder_reg1) == ZERO_EXTRACT &&
+        zero_constant(XEXP(*op1, 2), SImode))
     {
       rtx tstbit_operands = *op1;
       *op1 = XEXP(tstbit_operands, 0);
@@ -11965,7 +11966,8 @@ qdsp6_new_value_jump(void)
 
           /*now call the qdsp6 genroutine to get the actual instruction */
           /*if the compare is a tstbit, only first operand can be .new  */
-          if (GET_CODE(XEXP(SET_SRC(PATTERN(compare_insn_info->insn)),0)) == ZERO_EXTRACT)
+          if (GET_CODE(XEXP(SET_SRC(PATTERN(compare_insn_info->insn)),0)) == ZERO_EXTRACT &&
+              zero_constant(operand2, SImode))
           {
             nvj_instruction = gen_new_value_jump_tstbit(comp_operator, operand1, operand2, branch_label, p_reg);
           }

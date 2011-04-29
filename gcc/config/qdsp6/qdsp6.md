@@ -3882,19 +3882,20 @@
                       (const_string "8")))]
 )
 
+
 (define_insn "new_value_jump_tstbit"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
-                        [(zero_extract:SI (unspec:SI [(match_operand:SI 1 "gr_register_operand" "Rg, Rg")]
+                        [(zero_extract:SI (unspec:SI [(match_operand:SI 1 "gr_register_operand" "Rg")]
                                            UNSPEC_NEW_VALUE)
                                           (const_int 1)
-                                          (match_operand:SI 2 "nonmemory_operand"  "Iu5,Rg"))
+                                          (match_operand:SI 2 "immediate_operand"  "Iu00"))
                          (const_int 0)
                         ]
                       )
                       (label_ref (match_operand 3 "" ""))
                       (pc)))
-  (set  (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
+  (set  (match_operand:BI 4 "pr_register_operand" "=Rp")
         (match_op_dup:BI 0 
           [(zero_extract:SI (unspec:SI [(match_dup 1)] UNSPEC_NEW_VALUE) 
                              (const_int 1) 
@@ -3955,8 +3956,7 @@
       }
     }
   }
-  [(set_attr "type" "NewValueJump,ENewValueJump")
-   (set (attr "type")
+  [(set (attr "type")
         (if_then_else (eq_attr "length" "4")
                       (const_string "NewValueJump")
                       (const_string "ENewValueJump")))
@@ -3969,15 +3969,15 @@
 (define_insn "compare_and_jump_tstbit"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
-                        [(zero_extract:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
+                        [(zero_extract:SI (match_operand:SI 1 "gr_register_operand" "Rg")
                                           (const_int 1)
-                                          (match_operand:SI 2 "nonmemory_operand"  "Iu5,Rg"))
+                                          (match_operand:SI 2 "immediate_operand"  "Iu00"))
                          (const_int 0)
                         ]
                       )
                       (label_ref (match_operand 3 "" ""))
                       (pc)))
-  (set  (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
+  (set  (match_operand:BI 4 "pr_register_operand" "=Rp")
         (match_op_dup:BI 0 
           [(zero_extract:SI  (match_dup 1) 
                              (const_int 1) 
