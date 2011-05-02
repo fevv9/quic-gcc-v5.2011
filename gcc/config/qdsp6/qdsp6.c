@@ -87,6 +87,7 @@ static struct qdsp6_bb_aux_info *qdsp6_head_bb_aux;
 
 
 
+
 #if !GCC_3_4_6
 static bool qdsp6_handle_option(size_t code, const char *arg, int value);
 #endif /* !GCC_3_4_6 */
@@ -199,6 +200,7 @@ static void qdsp6_fixup_cfg(void);
 static void qdsp6_fixup_doloops(void);
 static void qdsp6_machine_dependent_reorg(void);
 static void qdsp6_local_combine_pass(void);
+static void qdsp6_local_combine_immediate_pass(void);
 
 static void qdsp6_init_builtins(void);
 static rtx expand_one_builtin(
@@ -437,6 +439,7 @@ static bool qdsp6_predicate_use_DImode( struct qdsp6_insn_info *insn_info);
 static rtx qdsp6_nvj_swap_operands(rtx insn);
 static rtx qdsp6_nvj_get_compare( rtx nvj_insn, int elem_num);
 static rtx qdsp6_nvj_get_operand( rtx insn, int op_count);
+
 
 /* Initialize the GCC target structure. */
 
@@ -829,17 +832,21 @@ qdsp6_optimization_options(int level, int size)
   if(size){
     target_flags |= MASK_EXTENDED_CROSSJUMPING;
     target_flags |= MASK_LOCAL_COMBINE;
+    target_flags |= MASK_LOCAL_COMBINE_IMMEDIATE;
     target_flags |= MASK_DUPLEX_SCHEDULING;
+    target_flags |= MASK_MOD_HW_LOOPS;
     flag_aggregate_access = 1;
   }
 
   if(level >= 1){
     target_flags |= MASK_PRED_MUX;
+    target_flags |= MASK_MOD_HW_LOOPS;
   }
 
   if(level >= 2){
     target_flags |= MASK_PACKETS;
     target_flags |= MASK_PULLUP;
+    target_flags |= MASK_LOCAL_COMBINE_IMMEDIATE;
     flag_optimize_memset = 1;
     flag_aggregate_access = 1;
   }
@@ -2563,6 +2570,7 @@ qdsp6_legitimate_address_p(
 
   return false;
 }
+
 
 
 
@@ -5500,6 +5508,11 @@ qdsp6_machine_dependent_reorg(void)
       qdsp6_local_combine_pass();
     }
 
+  if (TARGET_LOCAL_COMBINE_IMMEDIATE)
+    {
+      qdsp6_local_combine_immediate_pass();
+    }
+
   if(TARGET_PULLUP){
     qdsp6_packet_optimizations();
   }
@@ -7689,6 +7702,7 @@ qdsp6_expand_prologue(void)
 
 
 
+
 /* Return true if the current function's epilogue consists only of a return
    instruction. */
 
@@ -9029,6 +9043,33 @@ qdsp6_register_copy_word_p (rtx insn)
   return (dest_reg && src_reg_imm);
 }
 
+/* Returns the pattern for immediate from an
+   immediate-to-register copy */
+static inline rtx
+qdsp6_register_copy_imm_p (rtx insn)
+{
+  rtx reg_copy;
+  bool dest_reg, src_reg_imm;
+  if (!insn || (!(reg_copy = single_set(insn))) ||
+      !REG_P (SET_DEST (reg_copy)))
+    {
+      return NULL;
+    }
+
+  if (GET_CODE (SET_SRC (reg_copy)) == CONST_INT)
+    return SET_SRC(reg_copy);
+
+  if (GET_CODE (SET_SRC (single_set(insn))) == HIGH &&
+      GET_CODE (XEXP (SET_SRC (single_set(insn)),0)) == CONST_INT)
+    return XEXP (SET_SRC (single_set(insn)),0);
+
+  if (GET_CODE (SET_SRC (single_set(insn))) == LO_SUM &&
+      GET_CODE (XEXP (SET_SRC (single_set(insn)),1)) == CONST_INT)
+    return XEXP (SET_SRC (single_set(insn)),1);
+
+    return NULL;
+}
+
 /* Predicate that checks if REG is a lower component of a pair register */
 #define QDSP6_LOWER_PAIR(REG)         (!(REG & 0x1))
 
@@ -9220,6 +9261,428 @@ qdsp6_local_combine_pass(void)
     }
 }
 
+/*
+  Both rtx are set immediate, both have the same dst mode.
+  Add asserts.
+*/
+static inline bool
+imm_delta_ok_for_mode(rtx insn1, rtx insn2)
+{
+  HOST_WIDE_INT imm_1 = INTVAL (qdsp6_register_copy_imm_p (insn1));
+  HOST_WIDE_INT imm_2 = INTVAL (qdsp6_register_copy_imm_p (insn2));
+  HOST_WIDE_INT original_offset = imm_1 - imm_2;
+
+  return CONST_OK_FOR_CONSTRAINT_P (original_offset, 'I', "Is16");
+}
+
+/*
+   Pass that scans through all basic blocks and optimizes
+   register = immediate; transfers where possible.
+   For instance, it combines:
+   r0 = #0080
+   ...
+   r1 = #0080
+   or
+   r1:0 = CONST64(#0xffff0000)
+   ...
+   r3:4 = CONST64(#0xffff0000)
+
+   into
+
+   r0 = #0080
+   ...
+   r1 = r0
+   or
+   r1:0 = CONST64(#0xffff0000)
+   ...
+   r3:4 = r1:0
+
+   or with -G0
+
+   r7.h = #HI(131072)
+   r7.l = #LO(131072)
+   r0.h = #HI(131072)
+   r0.l = #LO(131072)
+
+   into:
+
+   r7.h = #HI(131072)
+   r7.l = #LO(131072)
+   r0 = r7
+
+   and try to create base+offset style immediates:
+
+   r0.h = #HI(131072)
+   r0.l = #LO(131072)
+   ...
+   r0.h = #HI(131070)
+   r0.l = #LO(131070)
+
+   Change it to:
+
+   r0.h = #HI(131072)
+   r0.l = #LO(131072)
+   ...
+   r0 = add(r0,#-2);
+
+   High-level overview of the pass:
+   --------------------------------
+   Iterate over all instructions I in the basic block.
+   Consider all transfer instructions of the form rx = y, where rx is a
+   register and y is an immediate.
+   Maintain a map M from dest register number to insn pointer of the last
+   immediate being written to that register.
+   If the same immediate value is used as previously seen, and still "live",
+   replace usage with reg copy.
+   For all non-transfer instructions, iterate over the register writes
+   and invalidate the corresponding entry in the map M.
+*/
+
+typedef union  {
+    unsigned long long ulonglong;
+    unsigned short ushort[4];
+    unsigned int uint[2];
+} converter_type;
+
+typedef struct {
+  rtx origin;
+  HOST_WIDE_INT reg_const;
+  unsigned char valid;
+} const_table_type;
+
+#define GPR_ONLY 32
+
+static void
+qdsp6_local_combine_immediate_pass(void)
+{
+  rtx insn,rev_insn;
+  basic_block bb;
+  rtx head_insn;
+  rtx immediate;
+  /* immediate_single_set: array that holds the transfer
+     instruction. The index is the physical register defined by the transfer.
+     The vector element is the record of immediate and rtx of the
+     instruction.
+  */
+  const_table_type immediate_single_set[GPR_ONLY];
+  /* old_value is a way to keep around old value of the register
+     in hope it is close enough to the new one to be set in it.
+   */
+  const_table_type old_value[GPR_ONLY];
+  converter_type converter;
+  unsigned int i;
+
+
+  FOR_EACH_BB(bb)
+    {
+      insn = BB_HEAD (bb);
+
+      /* Reset both vectors */
+      for (i=0;i<GPR_ONLY;i++)
+        {
+          immediate_single_set[i].valid = 0;
+          old_value[i].valid = 0;
+        }
+
+      FOR_BB_INSNS (bb, insn)
+	{
+	  /* Only process instructions */
+	  if (!INSN_P(insn))    continue;
+
+      /* See if this is an instruction of interest:
+         Something we know the result of at compile time.
+         - simple immediate transfer
+         - HI/LO transfer
+      */
+	  if (immediate = qdsp6_register_copy_imm_p (insn))
+	    {
+          HOST_WIDE_INT current_imm = INTVAL (immediate);
+          converter.ulonglong = (unsigned long long)current_imm;
+          unsigned int iter = 0;
+          unsigned int dest_regno = REGNO (SET_DEST(single_set (insn)));
+          bool code_modified = false;
+
+          /* Only deal with GPRs for now */
+	      if (dest_regno >= GPR_ONLY)   continue;
+
+
+          /* First deal with redundant CONST64 copies
+             and some other DI related redundancies
+           */
+          if (GET_MODE (SET_DEST (single_set (insn))) == DImode)
+            {
+              /* If this is a small immediate, that would fit into
+                 8bit, do not bother messing with it. It will unlikely
+                 be profitable to replace it.
+                 Nevertheless update the table with its value.
+               */
+              if (!CONST_OK_FOR_CONSTRAINT_P (current_imm, 'I', "Is8"))
+                {
+                  for (iter = 0; iter <  GPR_ONLY; ++iter)
+                    {
+                      if ((immediate_single_set[iter].valid == 0xf) &&
+                          (immediate_single_set[get_pair_reg(iter)].valid == 0xf))
+                        {
+
+                          /* Two valid items are found in paired registers.
+                             We can now do extensive tracking on this,
+                             but for simplicity just handle identical
+                             immediate case.
+                             The other case would be of a similar constant
+                             that we can somehow transform into what we need,
+                             but opportunities are infrequent, and code to
+                             handle them is bulky.
+                           */
+                          converter_type match_converter;
+
+                          match_converter.uint[0] = immediate_single_set[iter].reg_const;
+                          match_converter.uint[1] = immediate_single_set[get_pair_reg(iter)].reg_const;
+
+                          if (current_imm == match_converter.ulonglong)
+                            {
+                              /* Exact match */
+                              gcc_assert(GET_CODE (SET_SRC (single_set (insn))) == CONST_INT);
+
+                              if ((GET_MODE (SET_DEST (single_set (insn))) ==
+                                   GET_MODE (SET_DEST (single_set (immediate_single_set[iter].origin)))) &&
+                                  (iter != dest_regno) && (iter != get_pair_reg(dest_regno)))
+                                {
+                                  rtx pattern = copy_rtx (PATTERN (insn));
+                                  pattern = replace_rtx (pattern, SET_SRC (single_set (insn)),
+                                                     SET_DEST(single_set (immediate_single_set[iter].origin)));
+
+                                  pattern = emit_insn_after(pattern,insn);
+                                  delete_insn(insn);
+                                  code_modified = true;
+                                  break;
+                                }
+                            }
+                        }
+                    }
+                }
+              if(!code_modified)
+                {
+                  immediate_single_set[dest_regno].valid = 0xf;
+                  immediate_single_set[dest_regno].reg_const = converter.uint[0];
+                  immediate_single_set[dest_regno].origin = insn;
+                  immediate_single_set[get_pair_reg(dest_regno)].valid = 0xf;
+                  immediate_single_set[get_pair_reg(dest_regno)].reg_const = converter.uint[1];
+                  immediate_single_set[get_pair_reg(dest_regno)].origin = insn;
+
+                  /* Also do not track split old values - they are
+                     overriten now
+                   */
+                  old_value[dest_regno].valid = 0;
+                  old_value[get_pair_reg(dest_regno)].valid = 0;
+                }
+            }
+          /* Now that we are done with DI, do all other
+             integer data types except for predicates.
+           */
+          else
+            {
+                /* The HI/LO pair in fact sets the same immediate
+                   in two different instructions, so they need to be tracked
+                   as a pair.
+                   Normally LO always should come after HI, but if we
+                   would encounter an assembly fragment that only
+                   sets HI, or reverses the order, we do not want to
+                   get confused here.
+                 */
+                if(GET_CODE (SET_SRC (single_set(insn))) == HIGH)
+                  {
+                    if ((immediate_single_set[dest_regno].valid == 0x3) &&
+                         (immediate_single_set[dest_regno].reg_const ==
+                          converter.uint[0]))
+                       {
+                          /* This is a case that should not happen
+                             in compiler generated sequence:
+                               r0.l = #LO(80954304)
+                               r0.h = #HI(80954304)
+                             But it is conceivable  in hand written assembly.
+                             We are not handling this here, and to avoid accidents,
+                             let's simply invalidate the entry.
+                           */
+                          immediate_single_set[dest_regno].valid = 0;
+                          /* There was no code modified,
+                             but this prevents further tracking of the
+                             instruction.
+                           */
+                          code_modified = true;
+                       }
+                    if (immediate_single_set[dest_regno].valid == 0xf)
+                      {
+                          /* There is another full const in this reg.
+                             Maybe it is a reuse of the reg to put another const in it.
+                             Remember the old value. There is a chance we can reuse it.
+                           */
+                          old_value[dest_regno].valid = 0xf;
+                          old_value[dest_regno].reg_const =
+                              immediate_single_set[dest_regno].reg_const;
+                          old_value[dest_regno].origin =
+                              immediate_single_set[dest_regno].origin;
+                      }
+                    if (!code_modified)
+                      {
+                        immediate_single_set[dest_regno].valid = 0xc;
+                        /* Remember the whole immediate,
+                           but only 16 bit are actually valid.
+                         */
+                        immediate_single_set[dest_regno].reg_const = converter.uint[0];
+                        immediate_single_set[dest_regno].origin = insn;
+                      }
+                  }
+                else if (GET_CODE (SET_SRC (single_set(insn))) == LO_SUM)
+                  {
+                    if ((immediate_single_set[dest_regno].valid == 0xc) &&
+                        (immediate_single_set[dest_regno].reg_const == converter.uint[0]))
+                      {
+                          /* This means HI was already performed and the immediate matches
+                             The set is complete. Look for matches.
+                           */
+                          for (iter = 0; iter <  GPR_ONLY; ++iter)
+                            {
+                              if (immediate_single_set[iter].valid == 0xf)
+                                {
+                                  /* Exact match */
+                                  if (immediate_single_set[iter].reg_const ==
+                                      converter.uint[0])
+                                    {
+                                      rtx pattern = gen_movsi_real (gen_rtx_REG (SImode, dest_regno),
+                                                                    gen_rtx_REG (SImode, iter));
+
+                                      pattern = emit_insn_after (pattern,insn);
+                                      delete_insn (insn);
+                                      delete_insn (immediate_single_set[dest_regno].origin);
+                                      code_modified = true;
+                                      immediate_single_set[dest_regno].valid = 0;
+
+                                      break;
+                                    }
+                                  /* Approximate match */
+                                  else if (imm_delta_ok_for_mode(insn,
+                                                                 immediate_single_set[iter].origin))
+                                    {
+                                        HOST_WIDE_INT original_offset = current_imm -
+                                                      INTVAL (qdsp6_register_copy_imm_p
+                                                             (immediate_single_set[iter].origin));
+
+                                        rtx pattern =
+                                            gen_addsi3_real (gen_rtx_REG(SImode, dest_regno),
+                                                             gen_rtx_REG(SImode, iter),
+                                                             gen_int_mode (original_offset, SImode));
+
+                                        pattern = emit_insn_after(pattern,insn);
+                                        delete_insn(insn);
+                                        delete_insn(immediate_single_set[dest_regno].origin);
+                                        code_modified = true;
+
+                                        /* Now I know exactly what is in this reg,
+                                           and it is NOT the same value
+                                           as might already exist there
+                                        */
+                                        immediate_single_set[dest_regno].valid = 0xf;
+                                        immediate_single_set[dest_regno].reg_const = current_imm;
+                                        immediate_single_set[dest_regno].origin = pattern;
+
+                                        break;
+                                    }
+                                }
+                           }
+                         /* Now check the same reg - maybe the old value in it
+                            could be reused. This effectively creates
+                            base+offset style immediates.
+                          */
+                         if (!code_modified &&
+                             old_value[dest_regno].valid == 0xf)
+                           {
+                             if (imm_delta_ok_for_mode(insn,old_value[dest_regno].origin))
+                               {
+                                 /* Approximate match with previous
+                                    value in the same register
+                                  */
+                                 HOST_WIDE_INT original_offset = current_imm -
+                                                 old_value[dest_regno].reg_const;
+                                 rtx pattern =
+                                   gen_addsi3_real (gen_rtx_REG(SImode, dest_regno),
+                                                    gen_rtx_REG(SImode, dest_regno),
+                                                    gen_int_mode (original_offset, SImode));
+
+                                pattern = emit_insn_after(pattern,insn);
+                                delete_insn(insn);
+                                delete_insn(immediate_single_set[dest_regno].origin);
+                                code_modified = true;
+
+                                /* Now I know exactly what is in this reg,
+                                   and it is NOT the same value
+                                   as might have already exist there.
+                                 */
+                                immediate_single_set[dest_regno].valid = 0xf;
+                                immediate_single_set[dest_regno].reg_const = current_imm;
+                                immediate_single_set[dest_regno].origin = pattern;
+
+                                break;
+                              }
+                           }
+                      }
+                    if (!code_modified)
+                      {
+                        /* New LO that was not modified.
+                           Make available. Invalidate old value.
+                         */
+                        immediate_single_set[dest_regno].valid |= 0x3;
+                        immediate_single_set[dest_regno].reg_const = converter.uint[0];
+                        immediate_single_set[dest_regno].origin = insn;
+
+                        old_value[dest_regno].valid = 0;
+                      }
+                  }
+                else
+                  {
+                    /* Ordinary set. Most likely it is an immediate
+                       transfer of a small value replacing which will only
+                       create unnecesary dependency for packetizer, so
+                       only update records, and do not try to modify.
+                    */
+                    immediate_single_set[dest_regno].valid = 0xf;
+                    immediate_single_set[dest_regno].reg_const = converter.uint[0];
+                    immediate_single_set[dest_regno].origin = insn;
+
+                    old_value[dest_regno].valid = 0;
+                  }
+            }
+        } /* qdsp6_register_copy_imm_p */
+	  else
+	    {
+          struct qdsp6_insn_info *insn_info;
+	      struct qdsp6_reg_access *write;
+
+	      /* For Call instructions we need to invalidate all caller-saved registers */
+	      if (CALL_P(insn))
+            {
+              for (i = 0; i < GPR_ONLY; ++i)
+                {
+                  if (call_used_regs[i])
+                    {
+                      immediate_single_set[i].valid = 0;
+                      old_value[i].valid = 0;
+                    }
+                }
+	        }
+          insn_info = qdsp6_get_insn_info(insn);
+          /* An non-transfer instruction is writing to a register. Remove from map */
+          for(write = insn_info->reg_writes; write; write = write->next)
+            {
+              if(write->regno < GPR_ONLY)
+                {
+                  immediate_single_set[write->regno].valid = 0;
+                  old_value[write->regno].valid = 0;
+                }
+            }
+	    }
+	}
+    }
+}
 
 static struct qdsp6_packet_info *
 qdsp6_start_new_packet(void)
@@ -9227,6 +9690,7 @@ qdsp6_start_new_packet(void)
   struct qdsp6_packet_info *new_packet;
 
   new_packet = (struct qdsp6_packet_info *)ggc_alloc_cleared(sizeof(struct qdsp6_packet_info));
+
 
   if(qdsp6_head_packet == NULL){
     qdsp6_head_packet = new_packet;

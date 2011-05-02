@@ -349,6 +349,36 @@ const_iteration_count (rtx count_reg, basic_block pre_header,
   get_ebb_head_tail (pre_header, pre_header, &head, &tail);
 
   for (insn = tail; insn != PREV_INSN (head); insn = PREV_INSN (insn))
+    {
+
+#ifdef HAVE_doloop_begin
+
+    /* In qdsp6's HW loop the trip counter is set in LC0
+       reg via a PARALLEL instruction. We need to be able to parse it
+       here to recognize the constant number of iterations
+     */
+    if (TARGET_MOD_HW_LOOPS &&
+        INSN_P (insn) && GET_CODE(PATTERN (insn)) == PARALLEL)
+      {
+        rtx parallel = PATTERN (insn);
+        rtx side_effect;
+        int i;
+
+        for (i = 0; i < XVECLEN (parallel, 0); i++)
+          {
+            side_effect = XVECEXP (parallel, 0, i);
+            if (GET_CODE (side_effect) == SET &&
+                REG_P (SET_DEST (side_effect)) &&
+                REGNO (SET_DEST (side_effect)) == LC0_REGNUM &&
+                GET_CODE (SET_SRC (side_effect)) == CONST_INT)
+              {
+                    *count = INTVAL (SET_SRC (side_effect));
+                    return insn;
+              }
+          }
+      }
+
+#endif
     if (INSN_P (insn) && single_set (insn) &&
 	rtx_equal_p (count_reg, SET_DEST (single_set (insn))))
       {
@@ -362,7 +392,7 @@ const_iteration_count (rtx count_reg, basic_block pre_header,
 
 	return NULL_RTX;
       }
-
+    }
   return NULL_RTX;
 }
 
@@ -1088,7 +1118,8 @@ sms_schedule (void)
       unsigned stage_count = 0;
       HOST_WIDEST_INT loop_count = 0;
 
-      int loopnum; int linenum;
+      int loopnum = 0;
+      int linenum = 0;
 
       if (! (g = g_arr[loop->num]))
         continue;
@@ -1301,8 +1332,40 @@ sms_schedule (void)
 
 	  /* Set new iteration count of loop kernel.  */
           if (count_reg && count_init)
-	    SET_SRC (single_set (count_init)) = GEN_INT (loop_count
+          {
+#ifdef HAVE_doloop_begin
+
+            /* In Hexagon's HW loop the trip counter is set in LC0
+               reg via a PARALLEL instruction. We need to be able to parse it
+               here to update the trip counter.
+             */
+            if (TARGET_MOD_HW_LOOPS &&
+                INSN_P (count_init) &&
+                GET_CODE (PATTERN (count_init)) == PARALLEL)
+              {
+                rtx parallel = PATTERN (count_init);
+                rtx side_effect;
+                int i;
+
+                for (i = 0; i < XVECLEN (parallel, 0); i++)
+                  {
+                    side_effect = XVECEXP (parallel, 0, i);
+                    if (GET_CODE (side_effect) == SET &&
+                        REG_P (SET_DEST (side_effect)) &&
+                        REGNO (SET_DEST (side_effect)) == LC0_REGNUM &&
+                        GET_CODE (SET_SRC (side_effect)) == CONST_INT)
+                      {
+                            SET_SRC (side_effect) = GEN_INT (loop_count
+                                     - stage_count + 1);
+                      }
+                  }
+              }
+            else
+#endif
+              SET_SRC (single_set (count_init)) = GEN_INT (loop_count
 						     - stage_count + 1);
+         }
+
 
 	  /* Now apply the scheduled kernel to the RTL of the loop.  */
 	  permute_partial_schedule (ps, g->closing_branch->first_note);
