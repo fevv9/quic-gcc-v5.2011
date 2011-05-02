@@ -8119,7 +8119,12 @@ hexagon_expand_movmem(rtx operands[])
   }
 
   if(volatile_p){
-    hexagon_emit_special_case_memcpy_fn(&hexagon_memcpy_volatile, "memcpy_v",
+    hexagon_emit_special_case_memcpy_fn(&hexagon_memcpy_volatile,
+#ifdef LINUX
+                                      "__hexagon_memcpy_volatile",
+#else
+                                      "memcpy_v",
+#endif
                                       operands[0], operands[1], operands[2],
                                       INTVAL (operands[6]));
     return true;
