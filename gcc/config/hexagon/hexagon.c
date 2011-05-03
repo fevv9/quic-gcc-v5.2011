@@ -798,6 +798,7 @@ hexagon_optimization_options(int level, int size)
     target_flags |= MASK_LOCAL_COMBINE_IMMEDIATE;
     target_flags |= MASK_DUPLEX_SCHEDULING;
     target_flags |= MASK_MOD_HW_LOOPS;
+    target_flags |= MASK_USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS;
   }
 
   if(level >= 1){
@@ -809,6 +810,7 @@ hexagon_optimization_options(int level, int size)
     target_flags |= MASK_PULLUP;
     target_flags |= MASK_AGGREGATE_ACCESS;
     target_flags |= MASK_LOCAL_COMBINE_IMMEDIATE;
+    target_flags |= MASK_USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS;
   }
 
   hexagon_falign = HEXAGON_NO_FALIGN;
@@ -1516,8 +1518,10 @@ hexagon_make_prologue_epilogue_decisions(struct hexagon_frame_info *info)
      incorrect behavior in the presence of PLT trampolines */
   use_common_functions = false;
 #else
-  use_common_functions = (optimize_size || optimize == 2)
-                         && info->use_allocframe && !crtl->calls_eh_return;
+  use_common_functions = TARGET_USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS &&
+                        (optimize_size || optimize == 2) &&
+                        info->use_allocframe &&
+                        !crtl->calls_eh_return;
 #endif
 
 

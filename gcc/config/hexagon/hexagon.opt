@@ -166,3 +166,7 @@ Enable new value jump (default)
 msave-restore-r25
 Target Report Mask(SAVE_RESTORE_R25)
 Save and restore r25 for all functions
+
+muse-common-prologue-epilogue-functions
+Target Report Undocumented Mask(USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS)
+Enable using functions to implement common prologue/epilogue sequences
