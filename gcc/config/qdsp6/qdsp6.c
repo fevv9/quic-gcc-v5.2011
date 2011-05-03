@@ -835,6 +835,7 @@ qdsp6_optimization_options(int level, int size)
     target_flags |= MASK_LOCAL_COMBINE_IMMEDIATE;
     target_flags |= MASK_DUPLEX_SCHEDULING;
     target_flags |= MASK_MOD_HW_LOOPS;
+    target_flags |= MASK_USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS;
     flag_aggregate_access = 1;
   }
 
@@ -847,6 +848,7 @@ qdsp6_optimization_options(int level, int size)
     target_flags |= MASK_PACKETS;
     target_flags |= MASK_PULLUP;
     target_flags |= MASK_LOCAL_COMBINE_IMMEDIATE;
+    target_flags |= MASK_USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS;
     flag_optimize_memset = 1;
     flag_aggregate_access = 1;
   }
@@ -1541,8 +1543,10 @@ qdsp6_make_prologue_epilogue_decisions(struct qdsp6_frame_info *info)
     }
   }
 
-  use_common_functions = (optimize_size || optimize == 2)
-                         && info->use_allocframe && !crtl->calls_eh_return;
+  use_common_functions = TARGET_USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS &&
+                         (optimize_size || optimize == 2) &&
+                         info->use_allocframe &&
+                         !crtl->calls_eh_return;
 
   /* If we are using a function to save or restore callee-save registers or we
      are forming packets, then maximize the number of registers saved as pairs,

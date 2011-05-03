@@ -175,6 +175,10 @@ mnew-value-jump
 Target Report Mask(NEW_VALUE_JUMP)
 Enable .new-value jump (default)
 
+muse-common-prologue-epilogue-functions
+Target Report Undocumented Mask(USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS)
+Enable using functions to implement common prologue/epilogue sequences
+
 mdebug_nvj=
 Target Joined Var(debug_nvj)
 NVJ debugging
