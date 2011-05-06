@@ -1,5 +1,6 @@
 
 LIB1ASMFUNCS += _hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
+LIB1ASMFUNCS += _hexagon_memcpy_volatile
 
 ifeq (,$(findstring HEXAGON_STAGE_1,$(CFLAGS)))
 LIB2FUNCS_EXTRA += $(srcdir)/config/hexagon/fastmath_dlib.c \

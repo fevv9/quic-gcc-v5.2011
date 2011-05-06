@@ -597,6 +597,196 @@ FUNC_END hexagon_memcpy_likely_aligned_min32bytes_mult8bytes
 #endif /* L_hexagon_memcpy_likely_aligned_min32bytes_mult8bytes */
 
 
+#ifdef L_hexagon_memcpy_volatile
+/*
+ * When doing memcopy of volatile areas, e.g. i/o space registers,
+ * or possibly spinlocked memory in other threads, must be careful
+ * to not touch memory twice, and etc.
+ *
+ * The usual memcpy code has side-effects when copying volatile
+ * memory; the below implements a much slower, but safer copy.
+ */
+FUNC_START hexagon_memcpy_volatile
+	{
+		p1 = cmp.eq(r2,#0)
+		p0 = cmp.eq(r0,r1)
+		r6 = r0
+		r3 = r1
+	}
+	{
+		p0 = or(p0,p1)
+		r4 = r0
+		if (p0.new) jump:nt .L3
+	}
+	{
+		p0 = cmp.gtu(r1,r0)
+		if (!p0.new) jump:nt .L4
+	}
+		r0 = or(r1,r0)
+		r0 = and(r0,#3)
+	{
+		p0 = cmp.eq(r0,#0)
+		if (!p0.new) jump:nt .L41
+	}
+.L5:
+		r5 = lsr(r2,#2)
+	{
+		p0 = cmp.eq(r5,#0)
+		if (p0.new) jump:nt .L11
+	}
+		r1:0 = combine(r4,r3)
+		loop0(.L38,r5)
+	.falign
+.L38:
+	{
+		r7 = memw(r0++#4)
+		r3 = add(r3,#4)
+		r4 = add(r4,#4)
+	}
+	{
+		memw(r1++#4) = r7
+	}:endloop0 // start=.L38
+.L11:
+		r5 = and(r2,#3)
+	{
+		p0 = cmp.eq(r5,#0)
+		if (p0.new) jump:nt .L3
+	}
+		r1:0 = combine(r4,r3)
+		loop0(.L37,r5)
+	.falign
+.L37:
+		r7 = memb(r0++#1)
+	{
+		memb(r1++#1) = r7
+	}:endloop0 // start=.L37
+.L3:
+	{
+		r0 = r6
+		jumpr r31
+	}
+.L4:
+	{
+		r3 = add(r1,r2)
+		r4 = add(r0,r2)
+	}
+		r0 = or(r3,r4)
+		r0 = and(r0,#3)
+	{
+		p0 = cmp.eq(r0,#0)
+		if (!p0.new) jump:nt .L42
+	}
+.L20:
+		r5 = lsr(r2,#2)
+	{
+		p0 = cmp.eq(r5,#0)
+		if (p0.new) jump:nt .L26
+	}
+		r1:0 = combine(r4,r3)
+		loop0(.L35,r5)
+	.falign
+.L35:
+	{
+		r0 = add(r0,#-4)
+		r1 = add(r1,#-4)
+		r3 = add(r3,#-4)
+		r4 = add(r4,#-4)
+	}
+		r7 = memw(r0)
+	{
+		memw(r1) = r7
+	}:endloop0 // start=.L35
+.L26:
+		r5 = and(r2,#3)
+	{
+		p0 = cmp.eq(r5,#0)
+		if (p0.new) jump:nt .L3
+	}
+	{
+		r1:0 = combine(r4,r3)
+		loop0(.L34,r5)
+	}
+	.falign
+.L34:
+	{
+		r0 = add(r0,#-1)
+		r1 = add(r1,#-1)
+	}
+		r7 = memb(r0)
+	{
+		memb(r1) = r7
+	}:endloop0 // start=.L34
+	{
+		r0 = r6
+		jumpr r31
+	}
+.L41:
+	{
+		r0 = xor(r1,r6)
+		p0 = cmp.gtu(r2,#3)
+	}
+		r0 = and(r0,#3)
+		p1 = cmp.eq(r0,#0)
+	{
+		p0 = and(p0,p1)
+		if (!p0.new) r5 = add(r2,#0)
+		if (!p0.new) jump:nt .L7
+	}
+		r0 = and(r1,#3)
+		r5 = sub(#4,r0)
+.L7:
+	{
+		r2 = sub(r2,r5)
+		r0 = r6
+		loop0(.L39,r5)
+	}
+	.falign
+.L39:
+	{
+		r7 = memb(r1++#1)
+		r3 = add(r3,#1)
+		r4 = add(r4,#1)
+	}
+	{
+		memb(r0++#1) = r7
+	}:endloop0 // start=.L39
+		jump .L5
+.L42:
+	{
+		r0 = xor(r3,r4)
+		p0 = cmp.gtu(r2,#4)
+	}
+		r0 = and(r0,#3)
+		p1 = cmp.eq(r0,#0)
+	{
+		p0 = and(p0,p1)
+		if (!p0.new) r5 = add(r2,#0)
+		if (!p0.new) jump:nt .L22
+	}
+		r5 = and(r3,#3)
+.L22:
+	{
+		r2 = sub(r2,r5)
+		r1:0 = combine(r4,r3)
+		loop0(.L36,r5)
+	}
+	.falign
+.L36:
+	{
+		r0 = add(r0,#-1)
+		r1 = add(r1,#-1)
+		r4 = add(r4,#-1)
+		r3 = add(r3,#-1)
+	}
+		r7 = memb(r0)
+	{
+		memb(r1) = r7
+	}:endloop0 // start=.L36
+		jump .L20
+FUNC_END hexagon_memcpy_volatile
+
+#endif /* L_hexagon_memcpy_volatile */
+
 /* Functions that implement common sequences in function prologues and epilogues
    used to save code size
 
