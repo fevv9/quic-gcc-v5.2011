@@ -194,6 +194,27 @@ doloop_condition_get (rtx doloop_pat)
   return 0;
 }
 
+/* Check whether exit of the LOOP is at the end of loop body.  */
+
+static bool
+loop_exit_at_end_p (struct loop *loop)
+{
+  struct niter_desc *desc = get_simple_loop_desc (loop);
+  rtx insn;
+
+  if (desc->in_edge->dest != loop->latch)
+    return false;
+
+  /* Check that the latch is empty.  */
+  FOR_BB_INSNS (loop->latch, insn)
+    {
+      if (INSN_P (insn))
+        return false;
+    }
+
+  return true;
+}
+
 /* Return nonzero if the loop specified by LOOP is suitable for
    the use of special low-overhead looping instructions.  DESC
    describes the number of iterations of the loop.  */
@@ -235,6 +256,17 @@ doloop_valid_p (struct loop *loop, struct niter_desc *desc)
 	 enable count-register loops in this case.  */
       if (dump_file)
 	fprintf (dump_file, "Doloop: Possible infinite iteration case.\n");
+      result = false;
+      goto cleanup;
+    }
+
+  /* Do not generate hardware loops if the loop exit is at the start
+     and the loop potentially executes UNIT_MAX times.  In this case,
+     the hardware loop code may add one to the no. of iterations
+     (see increment_count) which causes a wrap-around. */
+  if (!loop_exit_at_end_p (loop) && !desc->signed_p &&
+      desc->niter_max == (unsigned HOST_WIDEST_INT) -1)
+    {
       result = false;
       goto cleanup;
     }
