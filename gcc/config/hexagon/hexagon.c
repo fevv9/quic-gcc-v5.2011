@@ -2625,15 +2625,20 @@ hexagon_load_pic_register() {
   
   /* Materialize GOT base for PIC */
 
-  label = gen_label_rtx();    
-  rtx temp_reg = gen_rtx_REG (SImode, NON_ARG_CALLER_SAVE_REGISTER_1);
-  /* emit insn sequence for computing the GOT base */
-  emit_insn(gen_compute_got_base(pic_offset_table_rtx, label));
-  emit_insn(gen_pic_movsi_hi_gotoff(temp_reg, 
-				    gen_rtx_LABEL_REF(SImode, label)));
-  emit_insn(gen_pic_movsi_lo_gotoff(temp_reg, temp_reg,
-				    gen_rtx_LABEL_REF(SImode, label)));
-  emit_insn(gen_subsi3(pic_offset_table_rtx, pic_offset_table_rtx, temp_reg));
+  if(TARGET_V4_FEATURES){
+    emit_insn(gen_compute_got_base_v4(pic_offset_table_rtx));
+  }
+  else {
+    label = gen_label_rtx();
+    rtx temp_reg = gen_rtx_REG (SImode, NON_ARG_CALLER_SAVE_REGISTER_1);
+    /* emit insn sequence for computing the GOT base */
+    emit_insn(gen_compute_got_base(pic_offset_table_rtx, label));
+    emit_insn(gen_pic_movsi_hi_gotoff(temp_reg,
+                                      gen_rtx_LABEL_REF(SImode, label)));
+    emit_insn(gen_pic_movsi_lo_gotoff(temp_reg, temp_reg,
+                                      gen_rtx_LABEL_REF(SImode, label)));
+    emit_insn(gen_subsi3(pic_offset_table_rtx, pic_offset_table_rtx, temp_reg));
+  }
 }
 
 static void
@@ -2715,43 +2720,57 @@ legitimize_pic_address(rtx orig, enum machine_mode mode, rtx reg)
       /* Check if the module owns this data. The module always owns a label */
       module_owns = (GET_CODE (orig) == LABEL_REF) || SYMBOL_REF_LOCAL_P(orig);
 
-      /* 1. Load GOT-relative address */
-      if (module_owns) {
-	/* rx.h = #HI(addr@GOTOFF); rx.l = #LO(addr@GOTOFF) */
-	emit_insn (gen_pic_movsi_hi_gotoff(address, orig));
-	emit_insn (gen_pic_movsi_lo_gotoff(address, address, orig));
-	/* address = CONST32(#address@GOTOFF) */
-      }
-      else {
-	if (flag_pic == 1) {
-	  /* rx = #addr@GOT */
-	  emit_insn (gen_pic_movsi(address, gen_rtx_CONST(HImode, orig)));
-	} 
-	else {
-	  /* rx.h = #HI(addr@GOT); rx.l = #LO(addr@GOT) */
-	  emit_insn(gen_pic_movsi_hi_got(address, orig));
-	  emit_insn(gen_pic_movsi_lo_got(address, address, orig));
-	  /* address = CONST32(#address@GOT) */
-	}
-      }
+      if(TARGET_V4_FEATURES)
+        {
+          if(module_owns)
+            {
+              insn = emit_insn (gen_pic_movsi_pcrel(reg, orig));
+            }
+          else
+            {
+              insn = emit_insn (gen_pic_movsi_got_v4(reg, pic_offset_table_rtx, orig));
+            }
+        }
+      else
+        {
+          /* 1. Load GOT-relative address */
+          if (module_owns) {
+            /* rx.h = #HI(addr@GOTOFF); rx.l = #LO(addr@GOTOFF) */
+            emit_insn (gen_pic_movsi_hi_gotoff(address, orig));
+            emit_insn (gen_pic_movsi_lo_gotoff(address, address, orig));
+            /* address = CONST32(#address@GOTOFF) */
+          }
+          else {
+            if (flag_pic == 1) {
+              /* rx = #addr@GOT */
+              emit_insn (gen_pic_movsi(address, gen_rtx_CONST(HImode, orig)));
+            }
+            else {
+              /* rx.h = #HI(addr@GOT); rx.l = #LO(addr@GOT) */
+              emit_insn(gen_pic_movsi_hi_got(address, orig));
+              emit_insn(gen_pic_movsi_lo_got(address, address, orig));
+              /* address = CONST32(#address@GOT) */
+            }
+          }
 
-      /* 2. Add the absolute address of the GOT to the GOT-relative address */
-      /* reg = add(address, pic_reg) */
-      //      emit_insn(gen_addsi3(reg, pic_offset_table_rtx, address));
-      if (module_owns) {
-	/* If the module owns this data, then we are done. reg holds the
-	   gotoff-adjusted address */
-	pic_ref = gen_rtx_PLUS(Pmode, pic_offset_table_rtx, address);
-      }
-      else {
-       	/* reg = memw(address) */
-	// emit_move_insn(reg, gen_rtx_MEM(SImode, reg));
-	pic_ref = gen_const_mem (Pmode, 
-				 gen_rtx_PLUS (Pmode, pic_offset_table_rtx,
-					       address));
-      }
-      insn = emit_move_insn (reg, pic_ref);
-      set_unique_reg_note (insn, REG_EQUAL, orig);
+          /* 2. Add the absolute address of the GOT to the GOT-relative address */
+          /* reg = add(address, pic_reg) */
+          //      emit_insn(gen_addsi3(reg, pic_offset_table_rtx, address));
+          if (module_owns) {
+            /* If the module owns this data, then we are done. reg holds the
+               gotoff-adjusted address */
+            pic_ref = gen_rtx_PLUS(Pmode, pic_offset_table_rtx, address);
+          }
+          else {
+            /* reg = memw(address) */
+            // emit_move_insn(reg, gen_rtx_MEM(SImode, reg));
+            pic_ref = gen_const_mem (Pmode,
+                                     gen_rtx_PLUS (Pmode, pic_offset_table_rtx,
+                                                   address));
+          }
+          insn = emit_move_insn (reg, pic_ref);
+          set_unique_reg_note (insn, REG_EQUAL, orig);
+        }
 
       return reg;
     }

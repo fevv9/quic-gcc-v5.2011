@@ -647,6 +647,15 @@
   [(set_attr "type" "A")]
 )
 
+(define_insn "pic_movsi_pcrel"
+  [(set (match_operand:SI 0 "gr_register_operand"  "=Rg")
+        (unspec:SI [(plus:SI (pc)
+                    (match_operand:SI 1 "sym_or_lab_operand" ""))] UNSPEC_PIC_SYM_GOTOFF))]
+  "flag_pic && TARGET_V4_FEATURES"
+  "%0 = add(pc,##%1@PCREL)"
+  [(set_attr "type" "ECR")]
+)
+
 ;;
 ;; Compute global offset for PIC mode via @GOT
 ;;
@@ -674,6 +683,15 @@
   "flag_pic"
   "%0.l = #LO(%2@GOT)"
   [(set_attr "type" "A")]
+)
+
+(define_insn "pic_movsi_got_v4"
+  [(set (match_operand:SI 0 "gr_register_operand" "=Rg")
+        (unspec:SI [(plus:SI (match_operand:SI 1 "gr_register_operand" "Rg")
+                             (match_operand:SI 2 "sym_or_lab_operand" ""))] UNSPEC_PIC_SYM_GOT))]
+  "flag_pic && TARGET_V4_FEATURES"
+  "%0 = memw(%1+##%2@GOT)"
+  [(set_attr "type" "ELoad")]
 )
 
 ;;--------;;
@@ -5000,29 +5018,39 @@
     }
     else {
       if(which_alternative == 0){
-        return "%2 = %0\;"
-               "{\;"
-               "  lc0 = %2\;"
-               "  %2.h = #HI(%1@GOTOFF)\;"
-               "}\;"
-               "%2.l = #LO(%1@GOTOFF)\;"
-               "%2 = add(%2, %p0)\;"
-               "sa0 = %2";
+        if(TARGET_V4_FEATURES) {
+          return "loop0(##%l1,%0)";
+        }
+        else {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
+                 "sa0 = %2";
+        }
       }
       else {
-        return "%2 = #%0\;"
-               "{\;"
-               "  lc0 = %2\;"
-               "  %2.h = #HI(%1@GOTOFF)\;"
-               "}\;"
-               "%2.l = #LO(%1@GOTOFF)\;"
-               "%2 = add(%2, %p0)\;"
-               "sa0 = %2";
+        if(TARGET_V4_FEATURES) {
+          return "loop0(##%l1,#%0)";
+        }
+        else {
+          return "%2 = #%0\;"
+                 "{\;"
+                 "  lc0 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
+                 "sa0 = %2";
+        }
       }
     }
   }
   [(set (attr "type")
-        (if_then_else (eq_attr "length" "4")
+        (if_then_else (ior:BI (eq_attr "length" "4") (eq_attr "arch" "v4"))
                       (const_string "loop")
                       (const_string "multiple")))
    (set (attr "length")
@@ -5112,29 +5140,39 @@
     }
     else {
       if(which_alternative == 0){
-        return "%2 = %0\;"
-               "{\;"
-               "  lc1 = %2\;"
-               "  %2.h = #HI(%1@GOTOFF)\;"
-               "}\;"
-               "%2.l = #LO(%1@GOTOFF)\;"
-               "%2 = add(%2, %p0)\;"
-               "sa1 = %2";
+        if(TARGET_V4_FEATURES) {
+          return "loop1(##%l1,%0)";
+        }
+        else {
+          return "%2 = %0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
+                 "sa1 = %2";
+        }
       }
       else {
-        return "%2 = #%0\;"
-               "{\;"
-               "  lc1 = %2\;"
-               "  %2.h = #HI(%1@GOTOFF)\;"
-               "}\;"
-               "%2.l = #LO(%1@GOTOFF)\;"
-               "%2 = add(%2, %p0)\;"
-               "sa1 = %2";
+        if(TARGET_V4_FEATURES) {
+          return "loop1(##%l1,#%0)";
+        }
+        else {
+          return "%2 = #%0\;"
+                 "{\;"
+                 "  lc1 = %2\;"
+                 "  %2.h = #HI(%1@GOTOFF)\;"
+                 "}\;"
+                 "%2.l = #LO(%1@GOTOFF)\;"
+                 "%2 = add(%2, %p0)\;"
+                 "sa1 = %2";
+        }
       }
     }
   }
   [(set (attr "type")
-        (if_then_else (eq_attr "length" "4")
+        (if_then_else (ior:BI (eq_attr "length" "4") (eq_attr "arch" "v4"))
                       (const_string "loop")
                       (const_string "multiple")))
    (set (attr "length")
@@ -10581,6 +10619,15 @@
    }
   ;; We don't want this instruction to be packetized
   [(set_attr "type" "multiple")]
+)
+
+(define_insn "compute_got_base_v4"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+        (plus:SI (pc)
+        (unspec:SI [(const_int 0)] UNSPEC_PIC_SYM_GOT)))]
+  "flag_pic && TARGET_V4_FEATURES"
+  "%0 = add(pc,##_GLOBAL_OFFSET_TABLE_@PCREL)"
+  [(set_attr "type" "ECR")]
 )
 
 (define_insn "compute_tls_base"
