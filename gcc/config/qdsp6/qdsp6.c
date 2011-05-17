@@ -9785,7 +9785,7 @@ qdsp6_can_speculate_p(struct qdsp6_insn_info *insn_info, basic_block bb)
   /* Don't speculate any control insns, stores, or insns that might trap. */
   if(QDSP6_CONTROL_P (insn_info)
      || insn_info->stores
-     || may_trap_p(PATTERN (insn_info->insn))){
+     || may_trap_or_fault_p(PATTERN (insn_info->insn))){
     return false;
   }
 
