@@ -11885,24 +11885,28 @@ qdsp6_nvj_move_possible(
     *op2   = XEXP(SET_SRC(PATTERN(comp_insn_info->insn)),1);
     *b_lab = XEXP(SET_SRC(PATTERN(jump_insn_info->insn)),1);
 
+    if ( (GET_CODE(feeder_reg1) == ZERO_EXTRACT) &&
+         !zero_constant(XEXP(*op1, 2), SImode) )
+      {
+        return false;
+      }
 
     start_sequence();
 
-    if (GET_CODE(feeder_reg1) == ZERO_EXTRACT &&
-        zero_constant(XEXP(*op1, 2), SImode))
-    {
-      rtx tstbit_operands = *op1;
-      *op1 = XEXP(tstbit_operands, 0);
-      *op2 = XEXP(tstbit_operands, 2);
-      nvj_instruction =  gen_new_value_jump_tstbit( *oper, *op1, *op2, *b_lab, *pred ); 
-    }
+    if (GET_CODE(feeder_reg1) == ZERO_EXTRACT)
+      {
+        rtx tstbit_operands = *op1;
+        *op1 = XEXP(tstbit_operands, 0);
+        *op2 = XEXP(tstbit_operands, 2);
+        nvj_instruction =  gen_new_value_jump_tstbit( *oper, *op1, *op2, *b_lab, *pred ); 
+      }
     else 
-    {
-      if (*op_cnt==0)
-        nvj_instruction =  gen_new_value_jump1( *oper, *op1, *op2, *b_lab, *pred ); 
-      else
-        nvj_instruction =  gen_new_value_jump2( *oper, *op1, *op2, *b_lab, *pred ); 
-    }
+      {
+        if (*op_cnt==0)
+          nvj_instruction =  gen_new_value_jump1( *oper, *op1, *op2, *b_lab, *pred ); 
+        else
+          nvj_instruction =  gen_new_value_jump2( *oper, *op1, *op2, *b_lab, *pred ); 
+      }
 
     nvj_insn_rtx = emit_jump_insn ( nvj_instruction );
     resource_avail =  qdsp6_nvj_check_resources ( *src_insn, candidate_packet, comp_insn_info, jump_insn_info, nvj_insn_rtx);
@@ -12430,23 +12434,28 @@ qdsp6_new_value_jump(void)
             continue;
           }
 
+          if ( (GET_CODE(XEXP(SET_SRC(PATTERN(compare_insn_info->insn)),0))
+                == ZERO_EXTRACT) &&
+              !zero_constant(operand2, SImode) )
+            {
+              continue;
+            }
+
           qdsp6_move_insn(src_insn, src_packet, src_insn, nvj_packet, true);
 
           /*now call the qdsp6 genroutine to get the actual instruction */
           /*if the compare is a tstbit, only first operand can be .new  */
-          if (GET_CODE(XEXP(SET_SRC(PATTERN(compare_insn_info->insn)),0)) == ZERO_EXTRACT &&
-              zero_constant(operand2, SImode))
-          {
-            nvj_instruction = gen_new_value_jump_tstbit(comp_operator, operand1, operand2, branch_label, p_reg);
-          }
+          if (GET_CODE(XEXP(SET_SRC(PATTERN(compare_insn_info->insn)),0)) == ZERO_EXTRACT)
+            {
+              nvj_instruction = gen_new_value_jump_tstbit(comp_operator, operand1, operand2, branch_label, p_reg);
+            }
           else 
-          {
-            if (op_cnt==0)
-              nvj_instruction = gen_new_value_jump1(comp_operator, operand1, operand2, branch_label, p_reg);
-            else
-              nvj_instruction = gen_new_value_jump2(comp_operator, operand1, operand2, branch_label, p_reg);
-
-          }
+            {
+              if (op_cnt==0)
+                nvj_instruction = gen_new_value_jump1(comp_operator, operand1, operand2, branch_label, p_reg);
+              else
+                nvj_instruction = gen_new_value_jump2(comp_operator, operand1, operand2, branch_label, p_reg);
+            }
           /*generate a nvj instruction after the jump; later - remove old jump insn */
           nvj_insn = emit_jump_insn_after(nvj_instruction, jump_p_insn_info->insn);
 
