@@ -402,11 +402,11 @@
 
 (define_insn_reservation "v4_NewValueJump"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "NewValueJump"))
- "Slot0 + Store0 + Store1 + PCadder + ( control | control_dualjumps ) ")
+ "Slot0 + Store0 + Store1 + PCadder +  control + control_dualjumps ")
 
 (define_insn_reservation "v4_ENewValueJump"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "ENewValueJump"))
- "Slot0 + Store0 + Store1 + PCadder + ( control | control_dualjumps ) + ( Slot1 | Slot2 | Slot3 )")
+ "Slot0 + Store0 + Store1 + PCadder + control + control_dualjumps + ( Slot1 | Slot2 | Slot3 )")
 
 
 (define_insn_reservation "v4_AJ"     1 (and (eq_attr "arch" "v4")
@@ -432,7 +432,7 @@
 
 (define_insn_reservation "v4_loop"       1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "loop"))
-                         "Slot3  +  PCadder")
+                         "Slot3  +  PCadder + control_dualjumps + endloop0 + endloop0_dualjumps + endloop1 + endloop1_dualjumps")
 
 (define_insn_reservation "v4_J"          1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "J"))
@@ -4612,7 +4612,7 @@
     operands[2] = qdsp6_branch_hint(insn);
     return "if (%C0) dealloc_return%h2";
   }
-  [(set_attr "type" "NewValue")
+  [(set_attr "type" "NewValueJump")
    (set_attr "duplex" "yes")]
 )
 
@@ -4648,7 +4648,7 @@
       }
     }
   }
-  [(set_attr "type" "NewValue")]
+  [(set_attr "type" "NewValueJump")]
 )
 
 
@@ -9673,7 +9673,7 @@
         (mem:SI (reg:SI FP_REGNUM)))]
   "TARGET_V4_FEATURES"
   "dealloc_return"
-  [(set_attr "type" "NewValue")
+  [(set_attr "type" "NewValueJump")
    (set_attr "duplex" "yes")]
 )
 
