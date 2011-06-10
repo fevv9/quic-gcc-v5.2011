@@ -2116,6 +2116,10 @@ qdsp6_init_libfuncs(void)
     {
       set_optab_libfunc(add_optab, DFmode, "__qdsp_fast2_adddf3");
     }
+  else if (flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(add_optab, DFmode, "__qdsp_fast_adddf3");
+    }
   else 
     {
       set_optab_libfunc(add_optab, DFmode, "__qdsp_adddf3");
@@ -2136,6 +2140,10 @@ qdsp6_init_libfuncs(void)
     {
       set_optab_libfunc(sub_optab, DFmode, "__qdsp_fast2_subdf3");
     }
+  else if (flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(sub_optab, DFmode, "__qdsp_fast_subdf3");
+    }
   else
     {
       set_optab_libfunc(sub_optab, DFmode, "__qdsp_subdf3");
@@ -2154,6 +2162,10 @@ qdsp6_init_libfuncs(void)
   if (flag_fast_math2)
     {
       set_optab_libfunc(smul_optab, DFmode, "__qdsp_fast2_muldf3");
+    }
+  else if (flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(smul_optab, DFmode, "__qdsp_fast_muldf3");
     }
   else
     {
@@ -2174,6 +2186,10 @@ qdsp6_init_libfuncs(void)
     {
       set_optab_libfunc(sdiv_optab, DFmode, "__qdsp_fast2_divdf3");
     }
+  else if (flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(sdiv_optab, DFmode, "__qdsp_fast_divdf3");
+    }
   else
     {
       set_optab_libfunc(sdiv_optab, DFmode, "__qdsp_divdf3");
@@ -2192,6 +2208,10 @@ qdsp6_init_libfuncs(void)
   if (flag_fast_math2)
     {
       set_optab_libfunc(neg_optab, DFmode, "__qdsp_fast2_negdf2");
+    }
+  else if (flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(neg_optab, DFmode, "__qdsp_fast_negdf2");
     }
   else
     {
@@ -2227,6 +2247,10 @@ qdsp6_init_libfuncs(void)
     {
       set_optab_libfunc(lt_optab, DFmode, "__qdsp_fast2_ltdf2");
     }
+  else if (flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(lt_optab, DFmode, "__qdsp_fast_ltdf2");
+    }
   else
     {
       set_optab_libfunc(lt_optab, DFmode, "__qdsp_ltdf2");
@@ -2247,6 +2271,10 @@ qdsp6_init_libfuncs(void)
   if (flag_fast_math2)
     {
       set_optab_libfunc(gt_optab, DFmode, "__qdsp_fast2_gtdf2");
+    }
+  else if (flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(gt_optab, DFmode, "__qdsp_fast_gtdf2");
     }
   else 
     {
@@ -2286,6 +2314,10 @@ qdsp6_init_libfuncs(void)
   if (flag_fast_math2)
     {
       set_optab_libfunc(sqrt_optab, DFmode, "__qdsp_fast2_sqrt_df");
+    }
+  else if (flag_unsafe_math_optimizations)
+    {
+      set_optab_libfunc(sqrt_optab, DFmode, "__qdsp_fast_sqrt_df");
     }
 
 
