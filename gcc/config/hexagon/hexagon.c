@@ -2613,6 +2613,10 @@ hexagon_legitimate_address_p(
 
     /* base+index address */
     if(allow_base_plus_index){
+      /* Fix bug 4781 */
+      if (current_ir_type() == IR_GIMPLE) {
+        return false;
+      }
       if(REG_P (offset)){
         return hexagon_reg_ok_for_base_p(offset, reg_ok_strict_p);
       }
