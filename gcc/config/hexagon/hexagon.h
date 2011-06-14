@@ -649,8 +649,12 @@ Exception Handling Support
 
 #define EH_RETURN_STACKADJ_RTX gen_rtx_REG (Pmode, 28)
 
+/* Set frame_related, as otherwise its optimized away */
 #define EH_RETURN_HANDLER_RTX \
-  gen_rtx_MEM (Pmode, plus_constant(hard_frame_pointer_rtx, UNITS_PER_WORD))
+  ({ rtx tmp = gen_frame_mem (Pmode, \
+              plus_constant(hard_frame_pointer_rtx, UNITS_PER_WORD)); \
+     MEM_VOLATILE_P(tmp) = 1; \
+     tmp; })
 
 /* ??? do we want this? */
 /*#define ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX(FILE, ENCODING, SIZE, ADDR, DONE)*/
@@ -793,10 +797,14 @@ Function Entry and Exit
 Generating Code for Profiling
 ---------------------------*/
 
-#define FUNCTION_PROFILER(FILE, LABELNO) fprintf(FILE, "\tcall mcount\n");
-
-/* ??? dunno */
+/* Hexagon (like all modern profilers) does not use counters. */
 #define NO_PROFILE_COUNTERS 1
+
+/* Use PROFILE_HOOK instead of FUNCTION_PROFILER; by emitting rtx, 
+   the packetizer can slot in the call to _mcount as appropriate. */
+#define FUNCTION_PROFILER(FILE, LABELNO)
+#define PROFILE_HOOK(X) \
+	emit_library_call (init_one_libfunc ("_mcount"), LCT_NORMAL, VOIDmode, 0);
 
 
 /*------------------------------
@@ -1261,6 +1269,8 @@ struct hexagon_frame_info GTY(()) {
   bool computed;  /* true if frame info has already been computed */
   bool tls_set;   /* true if tls register is set */
   rtx tls_offset_table_rtx;
+  unsigned int pretend_size;
+  unsigned int first_anon_arg;
 };
 
 struct hexagon_final_info GTY(()) {

@@ -9,6 +9,8 @@ Controlling the Compilation Driver, gcc
 #define DWARF2_ASM_LINE_DEBUG_INFO 1
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
+#define MD_UNWIND_SUPPORT "config/hexagon/linux-unwind.h"
+
 /* Use the generic pre-processor defines */
 #define TARGET_OS_CPP_BUILTINS() LINUX_TARGET_OS_CPP_BUILTINS()
 
@@ -20,19 +22,25 @@ Controlling the Compilation Driver, gcc
 #ifdef CROSS_COMPILE
 #define LINK_SPEC "-e _start \
                    %{h*} %{v:-V} \
-		   %{static:-dn -Bstatic} \
 		   %{shared:-shared -G -dy -z text} \
 		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} \
+       %{!shared: \
+         %{!static: \
+       %{rdynamic:-export-dynamic}} \
+       %{static:-dn -Bstatic}} \
 		   %{YP,*} \
 		   %{Qy:} %{!Qn:-Qy}"
 #else /* !CROSS_COMPILE */
 #define LINK_SPEC "-e _start \
                    %{h*} %{v:-V} \
-		   %{static:-dn -Bstatic} \
 		   %{shared:-shared -G -dy -z text} \
 		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G*:-G%*;:%{mbuilding-multilib:%{mG0lib:-G0}}} \
+       %{!shared: \
+         %{!static: \
+       %{rdynamic:-export-dynamic}} \
+       %{static:-dn -Bstatic}} \
 		   %{YP,*} \
 		   %{!YP,*:%{p:-Y P,/usr/ccs/lib/libp:/usr/lib/libp:/usr/ccs/lib:/usr/lib} \
 		    %{!p:-Y P,/usr/ccs/lib:/usr/lib}} \
@@ -52,3 +60,13 @@ Controlling the Compilation Driver, gcc
     (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel) \
        : DW_EH_PE_absptr) | \
   ((CODE) ? 0 : DW_EH_PE_sdata4))
+
+/*-----------------------------
+Implementing the Varargs Macros
+-----------------------------*/
+/* For Linux, our ABI handles varargs differently */
+#undef  TARGET_SETUP_INCOMING_VARARGS
+#define TARGET_SETUP_INCOMING_VARARGS hexagon_setup_incoming_varargs
+
+#undef TARGET_EXPAND_BUILTIN_VA_START
+#define TARGET_EXPAND_BUILTIN_VA_START hexagon_va_start
