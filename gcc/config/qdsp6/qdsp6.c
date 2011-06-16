@@ -13259,7 +13259,7 @@ void qdsp6_fast_math_libfunc(rtx operand)
       if (flag_fast_math2){
         sqrt_func = gen_rtx_SYMBOL_REF (Pmode, "fast2_sqrt");
       }
-      if (flag_unsafe_math_optimizations){
+      else if (flag_unsafe_math_optimizations){
         sqrt_func = gen_rtx_SYMBOL_REF (Pmode, "fast_sqrt");
       }
       XEXP (operand, 0) = sqrt_func;
