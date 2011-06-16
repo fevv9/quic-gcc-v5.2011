@@ -13256,6 +13256,9 @@ void qdsp6_fast_math_libfunc(rtx operand)
     const char *name = XSTR (XEXP (operand, 0), 0); 
     if (!strncmp (name, "sqrt", strlen(name))){
       rtx sqrt_func;
+      if (flag_fast_math2){
+        sqrt_func = gen_rtx_SYMBOL_REF (Pmode, "fast2_sqrt");
+      }
       if (flag_unsafe_math_optimizations){
         sqrt_func = gen_rtx_SYMBOL_REF (Pmode, "fast_sqrt");
       }
