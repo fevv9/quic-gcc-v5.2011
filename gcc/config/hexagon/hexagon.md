@@ -91,7 +91,7 @@
 ;; Used to determine which slots an insn can use when scheduling insns
 
 (define_attr "type"
-             "A,X,Load,Store,Memop,NewValue,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR,multiple,J_dotnew,NewValueJump,ENewValueJump,AJ,XJ"
+             "A,X,Load,Store,Memop,NewValue,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR,multiple,J_dotnew,NewValueJump,ENewValueJump,AJ,EAJ,XJ,EXJ"
              (const_string "multiple"))
 
 
@@ -102,7 +102,7 @@
 
 (define_attr "length" ""
              (if_then_else (eq_attr "type"
-                                    "EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR")
+                                    "EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EAJ,EXJ,EJ,EJR,ECR")
                            (const_string "8")
                            (const_string "4")))
 
@@ -408,21 +408,28 @@
 
 (define_insn_reservation "v4_NewValueJump"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "NewValueJump"))
- "Slot0 + Store0 + Store1 + PCadder + ( control | control_dualjumps ) ")
+ "Slot0 + Store0 + Store1 + PCadder + control + control_dualjumps")
 
 (define_insn_reservation "v4_ENewValueJump"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "ENewValueJump"))
- "Slot0 + Store0 + Store1 + PCadder + ( control | control_dualjumps ) + ( Slot1 | Slot2 | Slot3 )")
+ "Slot0 + Store0 + Store1 + PCadder + control + control_dualjumps + ( Slot1 | Slot2 | Slot3 )")
 
 
 (define_insn_reservation "v4_AJ"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "AJ"))
  "((Slot2 + (Slot0 | Slot1 | Slot3)) | (Slot3 + (Slot0 | Slot1 | Slot2))) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
 
+(define_insn_reservation "v4_EAJ"     1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EAJ"))
+ "((ESlot2 + (ESlot0 | ESlot1 | ESlot3)) | (ESlot3 + (ESlot0 | ESlot1 | ESlot2))) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+
 (define_insn_reservation "v4_XJ"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "XJ"))
  "(Slot2 + Slot3) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
 
+(define_insn_reservation "v4_EXJ"     1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EXJ"))
+ "(ESlot2 + ESlot3) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
 
 (define_insn_reservation "v4_M"          1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "M"))
@@ -438,7 +445,7 @@
 
 (define_insn_reservation "v4_loop"       1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "loop"))
-                         "Slot3  +  PCadder")
+                         "Slot3  +  PCadder + control_dualjumps + endloop0 + endloop0_dualjumps + endloop1 + endloop1_dualjumps")
 
 (define_insn_reservation "v4_J"          1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "J"))
@@ -3988,6 +3995,33 @@
                       (const_string "12")))]
 )
 
+(define_insn "cond_jump_v4"
+  [(set (pc)
+        (if_then_else (match_operator:BI 0 "predicate_operator"
+                        [(match_operand:BI 1 "pr_register_operand" "Rp")
+                         (const_int 0)])
+                      (label_ref (match_operand 2 "" ""))
+                      (pc)))]
+  "TARGET_V4_FEATURES"
+  {
+      operands[3] = hexagon_branch_hint(insn);
+      if(get_attr_length(insn) == 4){
+          return "if (%C0) jump%h3 %l2";
+        }
+        else {
+            return "if (%C0) jump%h3 ##%l2";
+          }
+        }
+        [(set (attr "type")
+              (if_then_else (eq_attr "length" "4")
+                            (const_string "J")
+                            (const_string "EJ")))
+         (set (attr "length")
+              (if_then_else (le (abs (minus (match_dup 2) (pc))) (const_int 50000))
+                            (const_string "4")
+                            (const_string "8")))]
+      )
+
 (define_insn "cond_jump"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
@@ -4019,16 +4053,16 @@
 (define_insn "new_value_jump_tstbit"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
-                        [(zero_extract:SI (unspec:SI [(match_operand:SI 1 "gr_register_operand" "Rg, Rg")]
+                        [(zero_extract:SI (unspec:SI [(match_operand:SI 1 "gr_register_operand" "Rg")]
                                            UNSPEC_NEW_VALUE)
                                           (const_int 1)
-                                          (match_operand:SI 2 "nonmemory_operand"  "Iu5,Rg"))
+                                          (match_operand:SI 2 "nonmemory_operand"  "Iu00"))
                          (const_int 0)
                         ]
                       )
                       (label_ref (match_operand 3 "" ""))
                       (pc)))
-  (set  (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
+  (set  (match_operand:BI 4 "pr_register_operand" "=Rp")
         (match_op_dup:BI 0 
           [(zero_extract:SI (unspec:SI [(match_dup 1)] UNSPEC_NEW_VALUE) 
                              (const_int 1) 
@@ -4089,8 +4123,7 @@
       }
     }
   }
-  [(set_attr "type" "NewValueJump,ENewValueJump")
-   (set (attr "type")
+  [(set (attr "type")
         (if_then_else (eq_attr "length" "4")
                       (const_string "NewValueJump")
                       (const_string "ENewValueJump")))
@@ -4103,15 +4136,15 @@
 (define_insn "compare_and_jump_tstbit"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
-                        [(zero_extract:SI (match_operand:SI 1 "gr_register_operand" "Rg, Rg")
+                        [(zero_extract:SI (match_operand:SI 1 "gr_register_operand" "Rg")
                                           (const_int 1)
-                                          (match_operand:SI 2 "nonmemory_operand"  "Iu5,Rg"))
+                                          (match_operand:SI 2 "immediate_operand"  "Iu00"))
                          (const_int 0)
                         ]
                       )
                       (label_ref (match_operand 3 "" ""))
                       (pc)))
-  (set  (match_operand:BI 4 "pr_register_operand" "=Rp,Rp")
+  (set  (match_operand:BI 4 "pr_register_operand" "=Rp")
         (match_op_dup:BI 0 
           [(zero_extract:SI  (match_dup 1) 
                              (const_int 1) 
@@ -4167,7 +4200,14 @@
       }
     }
   }
-  [(set_attr "type" "XJ")]
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "8")
+                      (const_string "XJ")
+                      (const_string "EXJ")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
+                      (const_string "8")
+                      (const_string "12")))]
 )
 
 
@@ -4216,8 +4256,7 @@
       }
     }
   }
-  [(set_attr "type" "NewValueJump,ENewValueJump")
-   (set (attr "type")
+  [(set (attr "type")
         (if_then_else (eq_attr "length" "4")
                       (const_string "NewValueJump")
                       (const_string "ENewValueJump")))
@@ -4225,7 +4264,6 @@
         (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
                       (const_string "4")
                       (const_string "8")))]
-
 )
 
 
@@ -4269,7 +4307,14 @@
       }
     }
   }
-  [(set_attr "type" "AJ")]
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "8")
+                      (const_string "AJ")
+                      (const_string "EAJ")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
+                      (const_string "8")
+                      (const_string "12")))]
 )
 
 (define_insn "new_value_jump2"
@@ -4317,8 +4362,7 @@
       }
     }
   }
-  [(set_attr "type" "NewValueJump,ENewValueJump")
-   (set (attr "type")
+  [(set (attr "type")
         (if_then_else (eq_attr "length" "4")
                       (const_string "NewValueJump")
                       (const_string "ENewValueJump")))
@@ -4370,7 +4414,14 @@
       }
     }
   }
-  [(set_attr "type" "AJ")]
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "8")
+                      (const_string "AJ")
+                      (const_string "EAJ")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
+                      (const_string "8")
+                      (const_string "12")))]
 )
  
  
@@ -4665,7 +4716,7 @@
     operands[2] = hexagon_branch_hint(insn);
     return "if (%C0) dealloc_return%h2";
   }
-  [(set_attr "type" "NewValue")
+  [(set_attr "type" "NewValueJump")
    (set_attr "duplex" "yes")]
 )
 
@@ -9785,7 +9836,7 @@
         (mem:SI (reg:SI FP_REGNUM)))]
   "TARGET_V4_FEATURES"
   "dealloc_return"
-  [(set_attr "type" "NewValue")
+  [(set_attr "type" "NewValueJump")
    (set_attr "duplex" "yes")]
 )
 

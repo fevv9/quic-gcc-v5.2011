@@ -440,7 +440,7 @@ Run-time Target Specification
   (MASK_LITERAL_POOL | MASK_LITERAL_POOL_ADDRESSES | MASK_HARDWARE_LOOPS \
    | MASK_NEW_PREDICATES | MASK_NEW_VALUE_STORES | MASK_BASE_PLUS_INDEX \
    | MASK_MEMOPS | MASK_SECTION_SORTING | MASK_SECTION_SORTING_CODE_SUPPORT \
-   | MASK_DEEP_PHI_MATCH)
+   | MASK_NEW_VALUE_JUMP | MASK_DEEP_PHI_MATCH)
 
 
 
@@ -11826,6 +11826,11 @@ hexagon_nvj_move_possible(
     *op2   = XEXP(SET_SRC(PATTERN(comp_insn_info->insn)),1);
     *b_lab = XEXP(SET_SRC(PATTERN(jump_insn_info->insn)),1);
 
+    if ( (GET_CODE(feeder_reg1) == ZERO_EXTRACT) &&
+         !zero_constant(XEXP(*op1, 2), SImode) )
+      {
+        return false;
+      }
 
     start_sequence();
 
@@ -11841,7 +11846,7 @@ hexagon_nvj_move_possible(
       if (*op_cnt==0)
         nvj_instruction =  gen_new_value_jump1( *oper, *op1, *op2, *b_lab, *pred ); 
       else
-        nvj_instruction =  gen_new_value_jump2( *oper, *op2, *op1, *b_lab, *pred ); 
+        nvj_instruction =  gen_new_value_jump2( *oper, *op1, *op2, *b_lab, *pred ); 
     }
 
     nvj_insn_rtx = emit_jump_insn ( nvj_instruction );
@@ -12368,6 +12373,13 @@ hexagon_new_value_jump(void)
                                        &src_insn,  &op_cnt)) 
           {
             continue;
+          }
+
+          if ( (GET_CODE(XEXP(SET_SRC(PATTERN(compare_insn_info->insn)),0))
+                == ZERO_EXTRACT) &&
+              !zero_constant(operand2, SImode) )
+          {
+              continue;
           }
 
           hexagon_move_insn(src_insn, src_packet, src_insn, nvj_packet, true);

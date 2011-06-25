@@ -123,6 +123,14 @@ mlocal-combine
 Target Report Mask(LOCAL_COMBINE) Optimization
 Run local combine pass (default at -Os)
 
+mlocal-combine-immediate
+Target Report Mask(LOCAL_COMBINE_IMMEDIATE) Optimization
+Run local combine pass on immediates (default at -O2 and -Os)
+
+mmod_hw_loops
+Target Report Undocumented Mask(MOD_HW_LOOPS)
+Enable modulo sched for HW loops
+
 mresolve-restrict-aliasing
 Target Report Mask(RESOLVE_RESTRICT_ALIASING) Optimization
 Perform MIDI specific optimizations
@@ -149,4 +157,16 @@ Allow two volatile memory accesses in a packet
 
 mnew-value-jump
 Target Report Mask(NEW_VALUE_JUMP)
+<<<<<<< HEAD
 Enable new value jump (default)
+=======
+Enable .new-value jump (default)
+
+muse-common-prologue-epilogue-functions
+Target Report Undocumented Mask(USE_COMMON_PROLOGUE_EPILOGUE_FUNCTIONS)
+Enable using functions to implement common prologue/epilogue sequences
+
+mdebug_nvj=
+Target Joined Var(debug_nvj)
+NVJ debugging
+>>>>>>> BRANCH_3_0

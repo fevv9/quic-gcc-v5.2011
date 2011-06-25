@@ -544,11 +544,15 @@ FUNC_START qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 		r0 -= add(r2,#-8)
 		jumpr r31
 	}
+<<<<<<< HEAD
 #ifdef __PIC__
 2:	jump memcpy@PLT
 #else
 2:	jump memcpy
 #endif
+=======
+2:	jump memcpy
+>>>>>>> BRANCH_3_0
 FUNC_END qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 #else
 FUNC_START qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
@@ -588,11 +592,15 @@ FUNC_START qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 		r0 -= add(r2,#-8)
 		jumpr r31
 	}
+<<<<<<< HEAD
 #ifdef __PIC__	
 2:	jump memcpy@PLT
 #else	
 2:	jump memcpy
 #endif
+=======
+2:	jump memcpy
+>>>>>>> BRANCH_3_0
 FUNC_END qdsp_memcpy_likely_aligned_min32bytes_mult8bytes
 #endif /* __QDSP6_ARCH__ >= 4 */
 #endif /* L_qdsp_memcpy_likely_aligned_min32bytes_mult8bytes */
@@ -1070,6 +1078,10 @@ FUNC_END restore_r24_through_r25_and_deallocframe
 
 #endif /* L_common_prologue_epilogue */
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> BRANCH_3_0
 /****************************This function is required by crt0_standalone.S*****/
 /********probably should be a part of libstandalone.a which does not exit for newlib yet. *****/
 #ifdef L_crt0_standalone_support
