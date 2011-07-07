@@ -85,7 +85,7 @@
 ;; Used to determine which slots an insn can use when scheduling insns
 
 (define_attr "type"
-             "A,X,Load,Store,Memop,NewValue,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR,multiple,J_dotnew,NewValueJump,ENewValueJump,AJ,XJ"
+             "A,X,Load,Store,Memop,NewValue,LoadStore,AStore,ALoadStore,M,S,J,JR,CR,loop,endloop0,endloop1,EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR,multiple,J_dotnew,NewValueJump,ENewValueJump,AJ,XJ,EAJ,EXJ"
              (const_string "multiple"))
 
 
@@ -95,10 +95,12 @@
 
 
 (define_attr "length" ""
+             (if_then_else (eq_attr "type" "EAJ, EXJ, endloop1")
+                           (const_string "12")
              (if_then_else (eq_attr "type"
-                                    "EA,EX,ELoad,EStore,EMemop,ENewValue,EM,ES,EJ,EJR,ECR")
+                                    "EA,EX,ELoad,EStore,EMemop,ENewValue,ENewValueJump,EM,ES,EJ,EJR,ECR,endloop0")
                            (const_string "8")
-                           (const_string "4")))
+                           (const_string "4"))))
 
 
 ;; Predicable means that the insn can be conditionally executed based on
@@ -406,16 +408,24 @@
 
 (define_insn_reservation "v4_ENewValueJump"   1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "ENewValueJump"))
- "Slot0 + Store0 + Store1 + PCadder + control + control_dualjumps + ( Slot1 | Slot2 | Slot3 )")
-
+ "ESlot0 + Store0 + Store1 + PCadder + control + control_dualjumps")
 
 (define_insn_reservation "v4_AJ"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "AJ"))
  "((Slot2 + (Slot0 | Slot1 | Slot3)) | (Slot3 + (Slot0 | Slot1 | Slot2))) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
 
+(define_insn_reservation "v4_EAJ"     1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EAJ"))
+"((ESlot2 + (Slot0 | Slot1 | Slot3)) | (ESlot3 + (Slot0 | Slot1 | Slot2))) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+
 (define_insn_reservation "v4_XJ"     1 (and (eq_attr "arch" "v4")
                                                 (eq_attr "type" "XJ"))
  "(Slot2 + Slot3) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+
+(define_insn_reservation "v4_EXJ"     1 (and (eq_attr "arch" "v4")
+                                                (eq_attr "type" "EXJ"))
+ "(ESlot2 + Slot3) + ( PCadder | PCadder_dualjumps ) + ( control | control_dualjumps )")
+
 
 
 (define_insn_reservation "v4_M"          1 (and (eq_attr "arch" "v4")
@@ -3835,7 +3845,6 @@
                       (pc)))]
   "!TARGET_V4_FEATURES"
   {
-    rtx prediction;
     if(get_attr_length(insn) == 4){
       operands[3] = qdsp6_branch_hint(insn);
       return "if (%C0) jump%h3 %l2";
@@ -3882,7 +3891,6 @@
                       (const_string "8")))]
 )
 
-
 (define_insn "new_value_jump_tstbit"
   [(set (pc)
         (if_then_else (match_operator:BI 0 "predicate_operator"
@@ -3914,7 +3922,7 @@
     code = GET_CODE(operands[0]);
     prediction = find_reg_note(insn, REG_BR_PROB, 0);
     predict_taken = (prediction && INTVAL (XEXP (prediction, 0)) > REG_BR_PROB_BASE / 2);
- 
+
     if (GET_CODE(operands[2]) == CONST_INT) 
     {
       switch(code)
@@ -3961,7 +3969,7 @@
                       (const_string "NewValueJump")
                       (const_string "ENewValueJump")))
    (set (attr "length")
-        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 1000))
                       (const_string "4")
                       (const_string "8")))]
 )
@@ -4033,7 +4041,14 @@
       }
     }
   }
-  [(set_attr "type" "XJ")]
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "8")
+                      (const_string "XJ")
+                      (const_string "EXJ")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 1000))
+                      (const_string "8")
+                      (const_string "12")))]
 )
 
 
@@ -4082,16 +4097,14 @@
       }
     }
   }
-  [(set_attr "type" "NewValueJump,ENewValueJump")
-   (set (attr "type")
+  [(set (attr "type")
         (if_then_else (eq_attr "length" "4")
                       (const_string "NewValueJump")
                       (const_string "ENewValueJump")))
    (set (attr "length")
-        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 1000))
                       (const_string "4")
                       (const_string "8")))]
-
 )
 
 
@@ -4135,7 +4148,14 @@
       }
     }
   }
-  [(set_attr "type" "AJ")]
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "8")
+                      (const_string "AJ")
+                      (const_string "EAJ")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 1000))
+                      (const_string "8")
+                      (const_string "12")))]
 )
 
 (define_insn "new_value_jump2"
@@ -4161,11 +4181,11 @@
     if (GET_CODE(operands[1]) == CONST_INT) {
       switch(code) {
         case EQ: return "if (cmp.eq(#%1,%2.new)) jump%h5 %l3"; 
-        case NE: return "if (!cmp.eq(#%%1,%2.new)) jump%h5 %l3"; 
-        case GT: return "if (cmp.gt(#%%1,%2.new)) jump%h5 %l3"; 
-        case LE: return "if (!cmp.gt(#%%1,%2.new)) jump%h5 %l3"; 
-        case GTU: return "if (cmp.gtu(#%%1,%2.new)) jump%h5 %l3"; 
-        case LEU: return "if (!cmp.gtu(#%%1,%2.new)) jump%h5 %l3"; 
+        case NE: return "if (!cmp.eq(#%1,%2.new)) jump%h5 %l3"; 
+        case GT: return "if (cmp.gt(#%1,%2.new)) jump%h5 %l3"; 
+        case LE: return "if (!cmp.gt(#%1,%2.new)) jump%h5 %l3"; 
+        case GTU: return "if (cmp.gtu(#%1,%2.new)) jump%h5 %l3"; 
+        case LEU: return "if (!cmp.gtu(#%1,%2.new)) jump%h5 %l3"; 
         default:
           gcc_unreachable();
       }
@@ -4183,13 +4203,12 @@
       }
     }
   }
-  [(set_attr "type" "NewValueJump,ENewValueJump")
-   (set (attr "type")
+  [(set (attr "type")
         (if_then_else (eq_attr "length" "4")
                       (const_string "NewValueJump")
                       (const_string "ENewValueJump")))
    (set (attr "length")
-        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 804))
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 1000))
                       (const_string "4")
                       (const_string "8")))]
 
@@ -4236,7 +4255,14 @@
       }
     }
   }
-  [(set_attr "type" "AJ")]
+  [(set (attr "type")
+        (if_then_else (eq_attr "length" "8")
+                      (const_string "AJ")
+                      (const_string "EAJ")))
+   (set (attr "length")
+        (if_then_else (le (abs (minus (match_dup 3) (pc))) (const_int 1000))
+                      (const_string "8")
+                      (const_string "12")))]
 )
  
  
