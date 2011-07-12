@@ -9442,7 +9442,11 @@ qdsp6_local_combine_immediate_pass(void)
                           match_converter.uint[0] = immediate_single_set[iter].reg_const;
                           match_converter.uint[1] = immediate_single_set[get_pair_reg(iter)].reg_const;
 
-                          if (current_imm == match_converter.ulonglong)
+                          /* For a register pair Rn+1:Rn, Rn stores the LSB, Rn+1 sotres the MSB
+                             LSB must go to uint[0]; MSB must go to uint[1]
+                           */
+                          if (iter < get_pair_reg(iter) && current_imm == match_converter.ulonglong)
+
                             {
                               /* Exact match */
                               gcc_assert(GET_CODE (SET_SRC (single_set (insn))) == CONST_INT);
