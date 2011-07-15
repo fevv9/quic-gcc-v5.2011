@@ -4493,7 +4493,7 @@
               (clobber (reg:SI LINK_REGNUM))])]
   ""
   {
-    if (flag_unsafe_math_optimizations){
+    if (flag_fast_math2 || flag_unsafe_math_optimizations){
        qdsp6_fast_math_libfunc (operands[1]);
     }
     if(TARGET_LONG_CALLS && !REG_P (XEXP (operands[1], 0))){
@@ -4531,7 +4531,7 @@
               (return)])]
   "!TARGET_LONG_CALLS"
   {
-    if (flag_unsafe_math_optimizations){
+    if (flag_fast_math2 || flag_unsafe_math_optimizations){
        qdsp6_fast_math_libfunc (operands[1]);
     }
   }        

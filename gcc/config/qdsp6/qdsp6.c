@@ -2112,7 +2112,11 @@ qdsp6_init_libfuncs(void)
   set_optab_libfunc(udivmod_optab, SImode, "__qdsp_udivmodsi4");
   set_optab_libfunc(udivmod_optab, DImode, "__qdsp_udivmoddi4");
 
-  if (flag_unsafe_math_optimizations)
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(add_optab, DFmode, "__qdsp_fast2_adddf3");
+    }
+  else if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(add_optab, DFmode, "__qdsp_fast_adddf3");
     }
@@ -2121,9 +2125,22 @@ qdsp6_init_libfuncs(void)
       set_optab_libfunc(add_optab, DFmode, "__qdsp_adddf3");
     }
 
-  set_optab_libfunc(add_optab, SFmode, "__qdsp_addsf3");
 
-  if (flag_unsafe_math_optimizations)
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(add_optab, SFmode, "__qdsp_fast2_addsf3");
+    }
+  else
+    {
+      set_optab_libfunc(add_optab, SFmode, "__qdsp_addsf3");
+    }
+
+
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(sub_optab, DFmode, "__qdsp_fast2_subdf3");
+    }
+  else if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(sub_optab, DFmode, "__qdsp_fast_subdf3");
     }
@@ -2132,9 +2149,21 @@ qdsp6_init_libfuncs(void)
       set_optab_libfunc(sub_optab, DFmode, "__qdsp_subdf3");
     }
 
-  set_optab_libfunc(sub_optab, SFmode, "__qdsp_subsf3");
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(sub_optab, SFmode, "__qdsp_fast2_subsf3");
+    }
+  else
+    {
+      set_optab_libfunc(sub_optab, SFmode, "__qdsp_subsf3");
+    }
 
-  if (flag_unsafe_math_optimizations)
+
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(smul_optab, DFmode, "__qdsp_fast2_muldf3");
+    }
+  else if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(smul_optab, DFmode, "__qdsp_fast_muldf3");
     }
@@ -2143,9 +2172,21 @@ qdsp6_init_libfuncs(void)
       set_optab_libfunc(smul_optab, DFmode, "__qdsp_muldf3");
     }
 
-  set_optab_libfunc(smul_optab, SFmode, "__qdsp_mulsf3");
+
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(smul_optab, SFmode, "__qdsp_fast2_mulsf3");
+    }
+  else
+    {
+      set_optab_libfunc(smul_optab, SFmode, "__qdsp_mulsf3");
+    }
     
-  if (flag_unsafe_math_optimizations)
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(sdiv_optab, DFmode, "__qdsp_fast2_divdf3");
+    }
+  else if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(sdiv_optab, DFmode, "__qdsp_fast_divdf3");
     }
@@ -2154,9 +2195,21 @@ qdsp6_init_libfuncs(void)
       set_optab_libfunc(sdiv_optab, DFmode, "__qdsp_divdf3");
     }
 
-  set_optab_libfunc(sdiv_optab, SFmode, "__qdsp_divsf3");
-  
-  if (flag_unsafe_math_optimizations)
+
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(sdiv_optab, SFmode, "__qdsp_fast2_divsf3");
+    }
+  else
+    {
+      set_optab_libfunc(sdiv_optab, SFmode, "__qdsp_divsf3");
+    }
+
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(neg_optab, DFmode, "__qdsp_fast2_negdf2");
+    }
+  else if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(neg_optab, DFmode, "__qdsp_fast_negdf2");
     }
@@ -2165,7 +2218,15 @@ qdsp6_init_libfuncs(void)
       set_optab_libfunc(neg_optab, DFmode, "__qdsp_negdf2");
     }
 
-  set_optab_libfunc(neg_optab, SFmode, "__qdsp_negsf3");
+
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(neg_optab, SFmode, "__qdsp_fast2_negsf3");
+    }
+  else
+    {
+      set_optab_libfunc(neg_optab, SFmode, "__qdsp_negsf3");
+    }
 
   set_optab_libfunc(cmp_optab, SFmode, "__qdsp_cmpsf2");
   set_optab_libfunc(cmp_optab, DFmode, "__qdsp_cmpdf2");
@@ -2182,7 +2243,11 @@ qdsp6_init_libfuncs(void)
   set_optab_libfunc(ge_optab, SFmode, "__qdsp_gesf2");
   set_optab_libfunc(ge_optab, DFmode, "__qdsp_gedf2");
 
-  if (flag_unsafe_math_optimizations)
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(lt_optab, DFmode, "__qdsp_fast2_ltdf2");
+    }
+  else if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(lt_optab, DFmode, "__qdsp_fast_ltdf2");
     }
@@ -2191,12 +2256,23 @@ qdsp6_init_libfuncs(void)
       set_optab_libfunc(lt_optab, DFmode, "__qdsp_ltdf2");
     }
 
-  set_optab_libfunc(lt_optab, SFmode, "__qdsp_ltsf2");
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(lt_optab, SFmode, "__qdsp_fast2_ltsf2");
+    }
+  else
+    {
+      set_optab_libfunc(lt_optab, SFmode, "__qdsp_ltsf2");
+    }
 
   set_optab_libfunc(le_optab, SFmode, "__qdsp_lesf2");
   set_optab_libfunc(le_optab, DFmode, "__qdsp_ledf2");
 
-  if (flag_unsafe_math_optimizations)
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(gt_optab, DFmode, "__qdsp_fast2_gtdf2");
+    }
+  else if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(gt_optab, DFmode, "__qdsp_fast_gtdf2");
     }
@@ -2205,7 +2281,14 @@ qdsp6_init_libfuncs(void)
       set_optab_libfunc(gt_optab, DFmode, "__qdsp_gtdf2");
     }
 
-  set_optab_libfunc(gt_optab, SFmode, "__qdsp_gtsf2");
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(gt_optab, SFmode, "__qdsp_fast2_gtsf2");
+    }
+  else
+    {
+      set_optab_libfunc(gt_optab, SFmode, "__qdsp_gtsf2");
+    }
 
   set_conv_libfunc(sext_optab, DFmode, SFmode, "__qdsp_extendsfdf2");
   set_conv_libfunc(trunc_optab, SFmode, DFmode, "__qdsp_truncdfsf2");
@@ -2228,7 +2311,11 @@ qdsp6_init_libfuncs(void)
   set_conv_libfunc(sfloat_optab, DFmode, SImode, "__qdsp_floatsidf");
   set_conv_libfunc(sfloat_optab, DFmode, DImode, "__qdsp_floatdidf");
 
-  if (flag_unsafe_math_optimizations)
+  if (flag_fast_math2)
+    {
+      set_optab_libfunc(sqrt_optab, DFmode, "__qdsp_fast2_sqrt_df");
+    }
+  else if (flag_unsafe_math_optimizations)
     {
       set_optab_libfunc(sqrt_optab, DFmode, "__qdsp_fast_sqrt_df");
     }
@@ -13181,7 +13268,13 @@ void qdsp6_fast_math_libfunc(rtx operand)
   if (GET_CODE (XEXP (operand, 0)) == SYMBOL_REF) {
     const char *name = XSTR (XEXP (operand, 0), 0); 
     if (!strncmp (name, "sqrt", strlen(name))){
-      rtx sqrt_func = gen_rtx_SYMBOL_REF (Pmode, "fast_sqrt");
+      rtx sqrt_func;
+      if (flag_fast_math2){
+        sqrt_func = gen_rtx_SYMBOL_REF (Pmode, "fast2_sqrt");
+      }
+      else if (flag_unsafe_math_optimizations){
+        sqrt_func = gen_rtx_SYMBOL_REF (Pmode, "fast_sqrt");
+      }
       XEXP (operand, 0) = sqrt_func;
     }
     /* gcc's builtin fabs is faster than fast_fabs on floats. So, we do not

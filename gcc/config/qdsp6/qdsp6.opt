@@ -182,3 +182,7 @@ Enable using functions to implement common prologue/epilogue sequences
 mdebug_nvj=
 Target Joined Var(debug_nvj)
 NVJ debugging
+
+ffast-math2
+Target Report RejectNegative Var(flag_fast_math2)
+Use the high-precision fast-math library
