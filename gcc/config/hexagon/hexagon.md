@@ -539,7 +539,7 @@
 
 (define_insn_reservation "v5_Memop"      1 (and (eq_attr "arch" "v5")
                                                 (eq_attr "type" "Memop"))
- "Slot0           + (Store0 | Store1)")
+ "Slot0           + Store0 + Store1")
 
 (define_insn_reservation "v5_NewValue"   1 (and (eq_attr "arch" "v5")
                                                 (eq_attr "type" "NewValue"))
@@ -617,7 +617,7 @@
 
 (define_insn_reservation "v5_EMemop"     1 (and (eq_attr "arch" "v5")
                                                 (eq_attr "type" "EMemop"))
- "ESlot0            + (Store0 | Store1)")
+ "ESlot0            + Store0 + Store1")
 
 (define_insn_reservation "v5_ENewValue"  1 (and (eq_attr "arch" "v5")
                                                 (eq_attr "type" "ENewValue"))

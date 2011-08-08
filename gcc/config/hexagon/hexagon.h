@@ -1454,6 +1454,13 @@ struct hexagon_dependence GTY((chain_next ("%h.next"))) {
       builtin_define_std ("qdsp6"); \
     };
 
+/* Disable the store-followed-by-load feature that did not make it into V5.
+   This code may be ressurected for a future architecture version.
+   To re-enable, remove these #defines and uncomment the mnew-memory-loads
+   option in hexagon.opt. */
+#define MASK_NEW_MEMORY_LOADS 0
+#define TARGET_NEW_MEMORY_LOADS 0
+
 #endif /* !USED_FOR_TARGET */
 
 #endif /* !GCC_HEXAGON_H */

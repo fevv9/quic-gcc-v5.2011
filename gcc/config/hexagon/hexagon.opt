@@ -99,9 +99,13 @@ mnew-value-stores
 Target Report Mask(NEW_VALUE_STORES)
 Enable .new-value stores (default)
 
-mnew-memory-loads
-Target Report Mask(NEW_MEMORY_LOADS)
-Enable .new-memory loads (default)
+; Disable the store-followed-by-load feature that did not make it into V5.
+; This code may be ressurected for a future architecture version.
+; To re-enable, uncomment this and remove the #defines of MASK_NEW_MEMORY_LOADS
+; and TARGET_NEW_MEMORY_LOADS from hexagon.h.
+;mnew-memory-loads
+;Target Report Mask(NEW_MEMORY_LOADS)
+;Enable .new-memory loads (default)
 
 mpackets
 Target Report Mask(PACKETS)
